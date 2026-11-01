@@ -23,7 +23,7 @@ Per tutti i file, usa sempre la sottocartella relativa al giorno corrente.
 - `js/game.js`: logica di gioco (stati, fisica, IA della paletta CPU, power-up, high score in localStorage, rendering).
 - `js/levels.js`: i 4 livelli (classico, logo Commodore C=, scritta SEGA, Space Invaders senza paletta CPU).
 - `js/font.js`: font bitmap 5x7; `js/audio.js`: effetti sonori sintetizzati con Web Audio.
-- `assets/sprites.png` (foglio sprite originale), `assets/title.png` (schermata intro), `assets/atlas.png` + `js/atlas.js` (generati).
+- `assets/sprites.png` (foglio sprite originale), `assets/title.png` (schermata intro), `assets/win.png` (schermata di vittoria), `assets/atlas.png` + `js/atlas.js` (generati).
 
 ## Comandi
 

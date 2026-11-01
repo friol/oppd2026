@@ -171,9 +171,30 @@ const SONGS = [
       [[0, 76, 4], [4, 79, 4], [8, 84, 8]],
       [[0, 81, 12], [12, 76, 4]]
     ]
+  },
+  {
+    // Victory: triumphant C major fanfare (C - F - G - C - Am - F - G - C)
+    bpm: 132,
+    leadWave: 'square',
+    bassStyle: 'pump',
+    bassRoots: [48, 41, 43, 48, 45, 41, 43, 48],
+    arp: [MAJOR, MAJOR, MAJOR, MAJOR, MINOR, MAJOR, MAJOR, MAJOR],
+    arpEvery: 2,
+    drums: { kick: 'x.......x.x.....', snare: '....x.......x.xx', hat: 'x.x.x.x.x.x.x.x.' },
+    lead: [
+      [[0, 72, 2], [2, 76, 2], [4, 79, 2], [6, 84, 6], [12, 79, 2], [14, 84, 2]],
+      [[0, 81, 4], [4, 77, 2], [6, 81, 2], [8, 84, 6], [14, 81, 2]],
+      [[0, 83, 2], [2, 79, 2], [4, 74, 2], [6, 79, 2], [8, 83, 4], [12, 86, 4]],
+      [[0, 88, 8], [8, 84, 4], [12, 79, 4]],
+      [[0, 81, 2], [2, 84, 2], [4, 88, 4], [8, 86, 2], [10, 84, 2], [12, 81, 4]],
+      [[0, 77, 2], [2, 81, 2], [4, 84, 4], [8, 89, 4], [12, 88, 2], [14, 86, 2]],
+      [[0, 86, 4], [4, 83, 2], [6, 86, 2], [8, 91, 6], [14, 89, 2]],
+      [[0, 88, 12], [12, 84, 4]]
+    ]
   }
 ];
 const DEMO_SONG = 4;
+const WIN_SONG = 5;
 
 // Looping 8-bit background music: square/saw lead, triangle bass, square arpeggios and noise drums.
 // A small look-ahead scheduler queues notes slightly ahead of time for steady timing.
@@ -292,6 +313,14 @@ const Music = {
   reset(index) {
     this.song = SONGS[index];
     this.step = 0;
+  },
+
+  // Current playback position in beats (quarter notes), or -1 when the music is not playing.
+  // Notes are queued slightly ahead, so the position is derived from the audio clock.
+  beat() {
+    if (!this.timer) return -1;
+    const sixteenth = 60 / this.song.bpm / 4;
+    return Math.max(0, this.step - (this.nextTime - Sfx.ctx.currentTime) / sixteenth) / 4;
   },
 
   // Called every frame: starts or stops the music to match the game state

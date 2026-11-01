@@ -85,6 +85,8 @@ const atlasImg = new Image();
 atlasImg.src = 'assets/atlas.png';
 const titleImg = new Image();
 titleImg.src = 'assets/title.png';
+const winImg = new Image();
+winImg.src = 'assets/win.png';
 
 function resize() {
   const scale = Math.min(window.innerWidth / W, window.innerHeight / H);
@@ -984,14 +986,17 @@ function update(dt) {
       if (!game.warped) updatePlayer(dt);
       if (game.stateTime > 2.5) {
         if (game.level + 1 < LEVELS.length) startLevel(game.level + 1);
-        else setState('win');
+        else {
+          Music.reset(WIN_SONG);
+          setState('win');
+        }
       }
       break;
     case 'gameOver':
       if (game.stateTime > 3) finishGame();
       break;
     case 'win':
-      if (game.stateTime > 5) finishGame();
+      if (game.stateTime > 15) finishGame();
       break;
     case 'scores':
       if (game.stateTime > 10) setState('intro');
@@ -1515,12 +1520,6 @@ function drawGame() {
   } else if (st === 'gameOver') {
     drawPanel(460, 120);
     PixelFont.draw(ctx, 'GAME OVER', W / 2, 490, 7, '#ef4444', 'center');
-  } else if (st === 'win') {
-    drawPanel(440, 200);
-    PixelFont.draw(ctx, 'CONGRATULATIONS!', W / 2, 465, 4, '#fbbf24', 'center');
-    PixelFont.draw(ctx, 'YOU BEAT THE CPU', W / 2, 520, 3, '#ffffff', 'center');
-    PixelFont.draw(ctx, 'AND ALL ' + LEVELS.length + ' LEVELS', W / 2, 560, 3, '#ffffff', 'center');
-    PixelFont.draw(ctx, 'SCORE ' + pad(game.score, 6), W / 2, 605, 3, '#7dd3fc', 'center');
   }
   if (game.paused) {
     drawPanel(480, 100);
@@ -1573,10 +1572,96 @@ function drawEnterName() {
   PixelFont.draw(ctx, 'TYPE OR USE ARROWS, ENTER TO CONFIRM', W / 2, 570, 2, '#94a3b8', 'center');
 }
 
+// Horizontal sway of a dancing paddle; side (+1 / -1) mirrors the moves
+function danceSway(beat, side) {
+  return Math.sin(Math.PI * beat / 2) * 26 * side;
+}
+
+// One dancing paddle: hops on every beat, squashes on landing, sways and tilts.
+// side (+1 / -1) mirrors the moves so the two paddles dance facing each other.
+function drawDancer(name, x, y, w, h, beat, side) {
+  const f = beat % 1;
+  const big = Math.floor(beat) % 4 === 0; // higher jump on the first beat of each bar
+  const hop = Math.sin(Math.PI * f) * (big ? 34 : 18);
+  const squash = f < 0.15 ? 1 - (0.15 - f) / 0.15 * 0.35 : 1; // flattened right after landing
+  const sway = danceSway(beat, side);
+  const tilt = Math.sin(Math.PI * beat) * 0.18 * side;
+  ctx.save();
+  ctx.translate(x + sway, y - hop);
+  ctx.rotate(tilt);
+  ctx.scale(2 - squash, squash);
+  sprSliced(name, -w / 2, -h, w, h);
+  ctx.restore();
+  // Shadow on the floor, smaller while in the air
+  const sh = 1 - hop / 50;
+  ctx.fillStyle = 'rgba(125, 211, 252, 0.25)';
+  ctx.beginPath();
+  ctx.ellipse(x + sway, y + 6, w / 2 * sh, 4 * sh, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// Balls juggled by the dancing paddles. Every bounce happens exactly on a beat, when a paddle
+// is back on the floor and squashed, so each ball follows a parabola between two landing spots.
+// Ball: dancer indices it travels between, offset on the paddle, flight time and arc height (beats, px).
+const DANCE_Y = 630;
+const WIN_BALLS = [
+  { from: 0, to: 1, dx: 0, flight: 2, start: 0, arc: 110 },
+  { from: 1, to: 0, dx: 0, flight: 2, start: 1, arc: 110 },
+  { from: 0, to: 0, dx: -0.32, flight: 1, start: 0, arc: 60 },
+  { from: 1, to: 1, dx: 0.32, flight: 1, start: 0, arc: 60 }
+];
+
+function drawWinBalls(dancers, beat) {
+  const frame = Math.floor(game.time * 14) % 9;
+  for (const b of WIN_BALLS) {
+    const t = beat - b.start;
+    if (t < 0) continue;
+    const seg = Math.floor(t / b.flight);
+    const k = (t - seg * b.flight) / b.flight;
+    // Landing spot on dancer d at beat n (top of the squashed paddle)
+    const spot = (d, n) => ({ x: d.x + danceSway(n, d.side) + d.w * b.dx, y: DANCE_Y - d.h * 0.65 - BALL_R });
+    const a = spot(dancers[seg % 2 ? b.to : b.from], b.start + seg * b.flight);
+    const c = spot(dancers[seg % 2 ? b.from : b.to], b.start + (seg + 1) * b.flight);
+    const x = a.x + (c.x - a.x) * k;
+    const y = a.y + (c.y - a.y) * k - 4 * b.arc * k * (1 - k);
+    spr('ball' + frame, x - BALL_R - 1, y - BALL_R - 1, BALL_R * 2 + 2, BALL_R * 2 + 2);
+  }
+}
+
+// Victory screen: the "YOU WIN!" picture, the final score and the two paddles dancing to the music
+function drawWin() {
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, W, H);
+  if (winImg.complete && winImg.naturalWidth) {
+    const h = W * winImg.naturalHeight / winImg.naturalWidth;
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(winImg, 0, 62, W, h);
+  }
+  PixelFont.draw(ctx, 'CONGRATULATIONS!', W / 2, 18, 4, '#fbbf24', 'center');
+  PixelFont.draw(ctx, 'YOU BEAT THE CPU AND ALL ' + LEVELS.length + ' LEVELS', W / 2, 440, 2, '#ffffff', 'center');
+  PixelFont.draw(ctx, 'SCORE ' + pad(game.score, 6), W / 2, 470, 4, '#7dd3fc', 'center');
+
+  // Follow the music when it plays (it may be muted), otherwise keep the victory song tempo
+  let beat = Music.beat();
+  if (beat < 0) beat = game.stateTime * SONGS[WIN_SONG].bpm / 60;
+  const dancers = [
+    { name: 'paddleBig', x: W / 2 - 130, w: CPU_W, h: CPU_H, side: 1 },
+    { name: 'paddle', x: W / 2 + 130, w: game.player.w, h: PLAYER_H, side: -1 }
+  ];
+  for (const d of dancers) drawDancer(d.name, d.x, DANCE_Y, d.w, d.h, beat, d.side);
+  drawWinBalls(dancers, beat);
+
+  if (game.stateTime > 3 && blink(1)) PixelFont.draw(ctx, 'PRESS SPACE', W / 2, 690, 2, '#ffffff', 'center');
+}
+
 function render() {
   // The title screen shows only the title image and its text, without playfield or HUD
   if (game.state === 'intro') {
     drawIntro();
+    return;
+  }
+  if (game.state === 'win') {
+    drawWin();
     return;
   }
   drawBackground();
@@ -1614,6 +1699,9 @@ function primaryAction() {
       break;
     case 'scores':
       setState('intro');
+      break;
+    case 'win':
+      if (game.stateTime > 3) finishGame();
       break;
     case 'enterName':
       confirmName();
@@ -1758,8 +1846,8 @@ function loop(now) {
   const dt = Math.min(1 / 30, (now - last) / 1000);
   last = now;
   update(dt);
-  // The demo plays its own soft tune throughout; real games only during actual play
-  Music.update(!game.paused && (game.demo || game.state === 'play'));
+  // The demo plays its own soft tune throughout; real games only during actual play and the victory screen
+  Music.update(!game.paused && (game.demo || game.state === 'play' || game.state === 'win'));
   render();
   requestAnimationFrame(loop);
 }
