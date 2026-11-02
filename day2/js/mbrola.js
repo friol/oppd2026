@@ -193,27 +193,32 @@ const Mbrola = {
 
   // ---------- Rendering ----------
   render(fr, voice) {
-    const SR = Klatt.SR, ph = fr.built.phones;
     const out = new Float32Array(fr.n * fr.step);
-    // Runs of phones in the same language (silences stay with the current run)
-    let a = 0;
-    while (a < ph.length) {
-      const lang = (ph.slice(a).find(p => p.lang) || {}).lang || 'it';
-      let b = a + 1;
-      while (b < ph.length && !(ph[b].lang && ph[b].lang !== lang)) b++;
+    const ph = fr.built.phones;
+    this.renderRange(fr, voice, 0, ph.length, out, Math.round(ph[0].t * Klatt.SR));
+    return out;
+  },
+
+  // Phones [a, b) added into out (at Klatt.SR) starting at sample o0; one MBROLA run per
+  // stretch of the same language (silences stay with the current one)
+  renderRange(fr, voice, a, b, out, o0) {
+    const SR = Klatt.SR, ph = fr.built.phones, t0 = ph[a].t;
+    while (a < b) {
+      const lang = (ph.slice(a, b).find(p => p.lang) || {}).lang || 'it';
+      let e = a + 1;
+      while (e < b && !(ph[e].lang && ph[e].lang !== lang)) e++;
       const { id, fscale } = MBROLA_VOICES[lang];
       const k = voice.fscale / fscale;
-      const s = this.run(id, this.pho(fr, ph, a, b, lang, id, k));
+      const s = this.run(id, this.pho(fr, ph, a, e, lang, id, k));
       // 16 kHz (times k: k > 1 shorter tract and higher formants, k < 1 longer) -> SR, cubic
-      const ratio = 16000 * k / SR, o0 = Math.round(ph[a].t * SR);
-      for (let j = 0; o0 + j < out.length; j++) {
+      const ratio = 16000 * k / SR, start = o0 + Math.round((ph[a].t - t0) * SR);
+      for (let j = 0; start + j < out.length; j++) {
         const x = j * ratio, i = Math.floor(x), f = x - i;
         if (i + 2 >= s.length) break;
         const y0 = s[Math.max(0, i - 1)], y1 = s[i], y2 = s[i + 1], y3 = s[i + 2];
-        out[o0 + j] += (y1 + 0.5 * f * (y2 - y0 + f * (2 * y0 - 5 * y1 + 4 * y2 - y3 + f * (3 * (y1 - y2) + y3 - y0)))) / 32768;
+        out[start + j] += (y1 + 0.5 * f * (y2 - y0 + f * (2 * y0 - 5 * y1 + 4 * y2 - y3 + f * (3 * (y1 - y2) + y3 - y0)))) / 32768;
       }
-      a = b;
+      a = e;
     }
-    return out;
   }
 };

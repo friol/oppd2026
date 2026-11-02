@@ -20,9 +20,11 @@ Per tutti i file, usa sempre la sottocartella relativa al giorno corrente.
 
 ## Struttura
 
-Pipeline: testo → `parser` → G2P → `prosody` (durate, F0, segmenti, tracce per frame) → motore (`klatt` o `mbrola`: campioni) → Web Audio.
+Pipeline: testo → `parser` → G2P → `prosody` (durate, F0, segmenti, tracce per frame) → motore (`klatt`, `mbrola` o `piper`: campioni) → Web Audio.
 
 - `mbrola/`: materiale di terzi per il motore MBROLA (programma in WebAssembly, licenza AGPL, script di build, voci con le loro licenze); vedi `mbrola/README.md`.
+- `piper/`: materiale di terzi per il motore Piper (onnxruntime-web 1.27.0 MIT in `piper/ort/` con `.htaccess` per i tipi MIME di `.mjs`/`.wasm`, modelli `it_IT-paola-medium` e `en_US-ljspeech-medium` con model card); vedi `piper/README.md`. ~135 MB.
+- `.htaccess`: intestazioni COOP/COEP (isolamento cross-origin) per i thread di onnxruntime quando la pagina è servita da Apache.
 - `index.html` + `style.css`: UI (input, preset, controlli voce, spettrogramma, guida agli escape).
 - `js/phonemes.js`: inventario fonemi (target F1-F3/banda, durate inerenti/minime di Klatt, ampiezze del ramo parallelo per fricative e burst). Vocali italiane in minuscolo (`a e E i o O u`, `r` = vibrante), inglesi in ARPAbet.
 - `js/g2p-it.js`: regole italiane (c/g dolci, gn, gli, sc, geminate, s sonora, glide i/u, accento) + eccezioni.
@@ -32,7 +34,8 @@ Pipeline: testo → `parser` → G2P → `prosody` (durate, F0, segmenti, tracce
 - `js/klatt.js`: sintetizzatore a 22050 Hz: sorgente KLGLOTT88 con tilt/jitter/shimmer, aspirazione, coppia polo-zero nasale, cascata R5..R1, ramo parallelo A2..A6+AB per il rumore, radiazione.
 - `js/microprosody.js`: rifiniture della traccia F0 usate dal motore MBROLA: microprosodia (F0 più alto dopo ostruenti sorde, più basso dopo sonore, F0 intrinseco delle vocali, calo sulle consonanti sonore) e flutter KLSYN88. Overshoot di nota e vibrato irregolare sono in `prosody.js` sotto `voice.natural`.
 - `js/mbrola.js`: modalità MBROLA = difoni registrati. Il programma MBROLA originale (AGPL) compilato in WebAssembly (`mbrola/mbrola.js`, ricostruibile con `mbrola/build.sh`) gira sul filesystem in memoria di Emscripten: voce + file `.pho` (fonema, durata in ms, punti di F0 ogni ~20 ms) → campioni a 16 kHz, ricampionati a 22050 Hz. Voci in `mbrola/voices/` (solo it3 italiana maschile e us1 americana femminile, per il peso), in base64 dentro uno script per funzionare da `file://`, caricate al primo uso da `Mbrola.prepare`; ognuna ha la sua licenza (uso solo con il programma MBROLA, distribuzione gratuita con la nota). Fonemi mappati in SAMPA (vocali accentate italiane con `1`, `nf`/`ng`, occlusive inglesi aspirate `p_h`); se un difono manca nella voce (indice letto dal file) si sceglie con Viterbi la sostituzione più vicina. Le altre voci dell'app si ottengono scalando il tratto vocale: k = fscale della voce dell'app / fscale del parlante registrato (it3 1, us1 1.16), durate ×k e F0 /k verso MBROLA, poi uscita ricampionata di k (es. italiano femminile = it3 con k 1.16, inglese maschile = us1 con k 0.86). Con `\lang` ogni tratto di testo usa la voce della sua lingua. MBROLA tronca il periodo a campioni interi: si chiede l'altezza che dà il periodo più vicino.
-- `js/engines.js`: registro `ENGINES` (`klatt`, `mbrola`) con `render(frames, voice)` e hook facoltativi `prepare(settings, text)` (Promise per caricare dati esterni, attesa da `App.speak` e dal download WAV), `voice` (unito alla voce), `shape(frames, built, voice, segs)`.
+- `js/piper.js`: modalità Piper = parlato neurale (VITS) eseguito in locale con onnxruntime-web, un modello per lingua. I fonemi del nostro G2P sono scritti nell'IPA di espeak-ng (accento `ˈ` prima della vocale, monosillabi funzionali atoni, geminate raddoppiate e vocali accentate lunghe in sillaba aperta per l'italiano, flap `ɾ` per l'inglese) e convertiti in id con il `phoneme_id_map` del modello; inferenza per frase, 0,2 s tra le frasi. Il modello sceglie durate e intonazione: SPEED → `length_scale`, pitch e voce ignorati. L'inferenza è asincrona: `prepare()` sintetizza le parti parlate, `render()` le concatena con le parti cantate, rese da MBROLA (`Mbrola.renderRange`) seguendo note e tempi. Funziona solo da http (XAMPP): da `file://` il browser blocca il caricamento del WebAssembly di onnxruntime. onnxruntime gira in un Web Worker (`ort.env.wasm.proxy`) per non bloccare la pagina, con più thread quando la pagina è isolata cross-origin (intestazioni COOP/COEP in `.htaccess`, ~2× più veloce). Il modello della lingua corrente si precarica alla scelta del motore o della lingua (`preload`). I due modelli sono femminili: con Piper l'app consente solo la voce female (`voices` nel registro, applicato da `App.engineChanged`).
+- `js/engines.js`: registro `ENGINES` (`klatt`, `mbrola`, `piper`) con `render(frames, voice)` e hook facoltativi `prepare(settings, text)` (Promise per caricare dati esterni, attesa da `App.speak` e dal download WAV), `voice` (unito alla voce), `shape(frames, built, voice, segs)`.
 - `js/tts.js`: voci (male/female/child/robot), pipeline completa, trascrizione, export WAV.
 - `js/presets.js`: testi di esempio (parlato IT/EN e brevi estratti di canzoni).
 - `js/transcribe.js`: audio → escape. Lettore WAV proprio (MP3 via `decodeAudioData`), ricampionamento a 11025 Hz, pitch tracking YIN, segmentazione in note (salti di altezza, pause, riattacchi di energia), stima del BPM, quantizzazione in sedicesimi e generazione del testo. Le parole non vengono riconosciute: si canta su "la", oppure sulle sillabe del testo facoltativo inserito dall'utente.
@@ -40,7 +43,7 @@ Pipeline: testo → `parser` → G2P → `prosody` (durate, F0, segmenti, tracce
 
 ## Comandi
 
-- Avvio: aprire `index.html` nel browser (anche da `file://`) oppure `http://localhost/oppd2026/day2/` con XAMPP.
+- Avvio: aprire `index.html` nel browser (anche da `file://`, tranne il motore Piper) oppure `http://localhost/oppd2026/day2/` con XAMPP.
 
 ## Convenzioni
 

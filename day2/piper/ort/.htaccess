@@ -1,0 +1,3 @@
+# Apache (XAMPP) does not know these types: browsers refuse a module without a JavaScript type
+AddType text/javascript .mjs
+AddType application/wasm .wasm

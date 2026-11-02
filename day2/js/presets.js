@@ -2,11 +2,12 @@
 const PRESETS = [
   {
     name: 'Ciao (IT)', lang: 'it', voice: 'male',
-    text: 'Ciao! Sono un sintetizzatore vocale a formanti, costruito con le regole di Klatt e con la sintesi MBROLA. Ti piace la mia voce? Un po\' monotona, che dici?'
+    text: 'Ciao! Sono un sintetizzatore vocale, che può usare tre motori: Klatt, MBROLA e Paiper.\n' +
+      'Ti piace la mia voce? Un po\' monotona, che dici?'
   },
   {
     name: 'Hello (EN)', lang: 'en', voice: 'female',
-    text: 'Hello world. I am a formant speech synthesizer, running en taierly in your browser. Can you understand me?'
+    text: 'Hello world. I am a formant speech synthesizer, running entirely in your browser. Can you understand me?'
   },
   {
     name: 'Singing in the Rain', lang: 'en', voice: 'male',

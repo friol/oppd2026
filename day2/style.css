@@ -184,6 +184,8 @@ button:focus-visible { outline: 2px solid var(--amber); outline-offset: 1px; }
 .seg button:first-child { border-radius: 4px 0 0 4px; }
 .seg button:last-child { border-radius: 0 4px 4px 0; }
 .seg button.active { background: var(--seg-on); color: var(--phosphor); border-color: var(--seg-on-line); }
+.seg button:disabled { opacity: 0.35; cursor: not-allowed; }
+.seg button:disabled:hover { border-color: var(--line); }
 
 .knob { display: grid; grid-template-columns: 88px 1fr 64px; align-items: center; gap: 10px; }
 .knob label { font: 600 11px var(--mono); letter-spacing: 0.12em; color: var(--dim); }

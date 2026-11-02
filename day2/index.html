@@ -62,7 +62,7 @@
         </div>
         <span class="tag">ENGINE</span>
         <div class="seg" id="engine">
-          <button data-v="klatt" title="Cascade/parallel formant synthesizer">KLATT</button><button data-v="mbrola" title="Recorded diphones (MBROLA voices it3 and us1), loaded on first use">MBROLA</button>
+          <button data-v="klatt" title="Cascade/parallel formant synthesizer">KLATT</button><button data-v="mbrola" title="Recorded diphones (MBROLA voices it3 and us1), loaded on first use">MBROLA</button><button data-v="piper" title="Neural speech (Piper models paola and ljspeech, run locally); sung words use MBROLA. Needs the page served over http">PIPER</button>
         </div>
         <div class="knob"><label for="rate">SPEED</label><input id="rate" type="range" min="0.5" max="2" step="0.05"><output></output></div>
         <div class="knob"><label for="pitch">PITCH</label><input id="pitch" type="range" min="-12" max="12" step="1"><output></output></div>
@@ -104,6 +104,7 @@
   <script src="js/klatt.js"></script>
   <script src="js/microprosody.js"></script>
   <script src="js/mbrola.js"></script>
+  <script src="js/piper.js"></script>
   <script src="js/engines.js"></script>
   <script src="js/tts.js"></script>
   <script src="js/transcribe.js"></script>

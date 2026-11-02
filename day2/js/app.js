@@ -26,6 +26,7 @@ const App = {
     this.bindSeg('lang');
     this.bindSeg('voice');
     this.bindSeg('engine');
+    this.engineChanged();
     const fmt = {
       rate: v => v.toFixed(2) + '×',
       pitch: v => (v > 0 ? '+' : '') + v + ' st',
@@ -54,6 +55,7 @@ const App = {
         this.settings.voice = p.voice;
         this.refreshSeg('lang');
         this.refreshSeg('voice');
+        this.engineChanged();
         this.save();
         this.speak();
       });
@@ -84,10 +86,27 @@ const App = {
       b.addEventListener('click', () => {
         this.settings[key] = b.dataset.v;
         this.refreshSeg(key);
+        if (key === 'engine' || key === 'lang') this.engineChanged();
         this.save();
       });
     });
     this.refreshSeg(key);
+  },
+
+  // Some engines allow only some voices (Piper: female) and can start loading in the background
+  engineChanged() {
+    const eng = ENGINES[this.settings.engine];
+    const allowed = eng.voices || null;
+    this.$('voice').querySelectorAll('button').forEach(b => {
+      b.disabled = !!allowed && !allowed.includes(b.dataset.v);
+      b.title = b.disabled ? 'Not available with the ' + eng.label + ' engine' : '';
+    });
+    if (allowed && !allowed.includes(this.settings.voice)) {
+      this.settings.voice = allowed[0];
+      this.refreshSeg('voice');
+      this.save();
+    }
+    if (eng.preload) eng.preload(this.settings);
   },
 
   refreshSeg(key) {

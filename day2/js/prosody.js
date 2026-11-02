@@ -187,7 +187,7 @@ const Prosody = {
     else this.speechPitch(phones, items, B, f0pts);
     f0pts.sort((a, b) => a[0] - b[0]);
     if (!f0pts.length) f0pts.push([0, B]);
-    return { phones, f0pts, vib, total, natural: !!voice.natural };
+    return { phones, items, f0pts, vib, total, natural: !!voice.natural };
   },
 
   // Intonation of the spoken parts: declination, pitch accents on stressed syllables,

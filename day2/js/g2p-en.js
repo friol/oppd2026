@@ -36,7 +36,8 @@ const EnglishG2P = {
     eye: 'AY1', eyes: 'AY1 Z', heart: 'HH AA1 R T', sun: 'S AH1 N', moon: 'M UW1 N', day: 'D EY1',
     talk: 'T AO1 K', walk: 'W AO1 K', know: 'N OW1', new: 'N UW1', now: 'N AW1', our: 'AW1 ER0',
     hour: 'AW1 ER0', time: 'T AY1 M', make: 'M EY1 K', way: 'W EY1', see: 'S IY1', sea: 'S IY1',
-    la: 'L AA1', "i'm": 'AY1 M', glorious: 'G L AO1 R IY0 AX0 S', rain: 'R EY1 N', house: 'HH AW1 S', singing: 'S IH1 NG IH0 NG', beautiful: 'B Y UW1 T IH0 F UH0 L', every: 'EH1 V R IY0', everyone: 'EH1 V R IY0 W AH2 N', nothing: 'N AH1 TH IH0 NG', something: 'S AH1 M TH IH0 NG'
+    la: 'L AA1', "i'm": 'AY1 M', glorious: 'G L AO1 R IY0 AX0 S', rain: 'R EY1 N', house: 'HH AW1 S', singing: 'S IH1 NG IH0 NG', beautiful: 'B Y UW1 T IH0 F UH0 L', every: 'EH1 V R IY0', everyone: 'EH1 V R IY0 W AH2 N', nothing: 'N AH1 TH IH0 NG', something: 'S AH1 M TH IH0 NG',
+    entirely: 'EH0 N T AY1 ER0 L IY0', browser: 'B R AW1 Z ER0'
   },
 
   rulesSrc: {
