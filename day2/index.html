@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Singing Klatt</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230e0f0c'/%3E%3Cpath d='M8 36h6l4-14 5 26 5-34 5 30 4-16 4 8h15' fill='none' stroke='%239cf08a' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='50' cy='18' r='5' fill='%23ffb547'/%3E%3Cpath d='M55 18V6' stroke='%23ffb547' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+  <script>
+    // Apply the saved theme before the first paint (no flash of the wrong theme)
+    try { const t = localStorage.getItem('klattvox.theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) { /* storage unavailable */ }
+  </script>
+</head>
+<body>
+  <main class="rack">
+    <header class="head">
+      <div>
+        <h1>Singing Klatt</h1>
+        <p class="sub">Cascade/parallel formant synthesizer &mdash; speaks Italian and English, sings on request</p>
+      </div>
+      <div class="head-right">
+        <div class="led-row"><span class="led" id="led"></span><span id="status">READY</span></div>
+        <button id="theme" title="Theme: follow system / light / dark">&#9680; AUTO</button>
+      </div>
+    </header>
+
+    <section class="deck">
+      <div class="panel input">
+        <label class="tag" for="text">INPUT</label>
+        <textarea id="text" spellcheck="false" placeholder="Type a sentence, or a song with \note:B4 \time:4 escapes…"></textarea>
+        <div class="warn" id="warnings"></div>
+        <div class="actions">
+          <button id="speak" class="primary" title="Ctrl+Enter">&#9654; SPEAK</button>
+          <button id="stop">&#9632; STOP</button>
+          <button id="save">&#8595; WAV</button>
+          <span class="spacer"></span>
+          <span class="hint">Ctrl+Enter</span>
+        </div>
+        <div class="examples">
+          <span class="tag">PRESETS</span>
+          <div id="presets"></div>
+        </div>
+        <div class="transcribe">
+          <span class="tag">AUDIO &rarr; NOTES</span>
+          <div class="tr-row">
+            <button id="load">&#9835; LOAD WAV / MP3</button>
+            <input id="lyrics" type="text" placeholder="Lyrics (optional) &mdash; otherwise sung on &quot;la&quot;">
+            <input id="file" type="file" accept=".wav,.mp3,audio/wav,audio/mpeg" hidden>
+          </div>
+          <p class="tr-note">Works best on a solo voice recording (no backing track). Words are not recognized.</p>
+        </div>
+      </div>
+
+      <div class="panel controls">
+        <span class="tag">LANGUAGE</span>
+        <div class="seg" id="lang">
+          <button data-v="it">ITALIANO</button><button data-v="en">ENGLISH</button>
+        </div>
+        <span class="tag">VOICE</span>
+        <div class="seg" id="voice">
+          <button data-v="male">MALE</button><button data-v="female">FEMALE</button><button data-v="child">CHILD</button><button data-v="robot">ROBOT</button>
+        </div>
+        <span class="tag">ENGINE</span>
+        <div class="seg" id="engine">
+          <button data-v="klatt" title="Cascade/parallel formant synthesizer">KLATT</button><button data-v="natural" title="Klatt with LF source, microprosody, undershoot, flutter and natural singing">NATURAL</button><button data-v="articulatory" title="Natural, with formants from a simulated vocal tract (tongue, lips and consonant gestures)">ARTIC.</button>
+        </div>
+        <div class="knob"><label for="rate">SPEED</label><input id="rate" type="range" min="0.5" max="2" step="0.05"><output></output></div>
+        <div class="knob"><label for="pitch">PITCH</label><input id="pitch" type="range" min="-12" max="12" step="1"><output></output></div>
+        <div class="knob"><label for="tempo">TEMPO</label><input id="tempo" type="range" min="40" max="220" step="1"><output></output></div>
+        <div class="knob"><label for="transpose">TRANSPOSE</label><input id="transpose" type="range" min="-24" max="24" step="1"><output></output></div>
+        <div class="knob"><label for="vibrato">VIBRATO</label><input id="vibrato" type="range" min="0" max="2" step="0.1"><output></output></div>
+      </div>
+    </section>
+
+    <section class="panel scope">
+      <div class="scope-head">
+        <span class="tag" id="scope-title">SPECTROGRAM</span>
+        <span class="tag dim" id="info"></span>
+      </div>
+      <div class="scope-wrap">
+        <canvas id="spec"></canvas>
+      </div>
+      <div class="phon" id="phon"></div>
+    </section>
+
+    <section class="panel help">
+      <span class="tag">ESCAPE SEQUENCES</span>
+      <dl>
+        <dt>\note:B4</dt><dd>Sing the next word on this pitch. Accepts C#5, Eb3 and Italian names such as SI4, sol3.</dd>
+        <dt>\note:G4,A4</dt><dd>One note per syllable. Extra notes become a melisma on the last syllable.</dd>
+        <dt>\time:4</dt><dd>Duration of the next word: 1 whole, 2 half, 4 quarter, 8, 16. Use <code>4.</code> for dotted and <code>2+8</code> for tied notes, or <code>8,8</code> for one value per note. A sung word with no time reuses the last one.</dd>
+        <dt>\rest:4</dt><dd>Inserts a silence of that duration.</dd>
+        <dt>\tempo:120</dt><dd>Quarter notes per minute. Stays active until changed.</dd>
+        <dt>\lang:en</dt><dd>Switches language mid-text (<code>it</code> or <code>en</code>).</dd>
+      </dl>
+    </section>
+  </main>
+
+  <script src="js/phonemes.js"></script>
+  <script src="js/g2p-it.js"></script>
+  <script src="js/g2p-en.js"></script>
+  <script src="js/parser.js"></script>
+  <script src="js/prosody.js"></script>
+  <script src="js/klatt.js"></script>
+  <script src="js/natural.js"></script>
+  <script src="js/articulatory.js"></script>
+  <script src="js/engines.js"></script>
+  <script src="js/tts.js"></script>
+  <script src="js/transcribe.js"></script>
+  <script src="js/presets.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
