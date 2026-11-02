@@ -2,7 +2,7 @@
 const PRESETS = [
   {
     name: 'Ciao (IT)', lang: 'it', voice: 'male',
-    text: 'Ciao! Sono un sintetizzatore vocale a formanti, costruito con le regole di Klatt. Ti piace la mia voce?'
+    text: 'Ciao! Sono un sintetizzatore vocale a formanti, costruito con le regole di Klatt e con la sintesi MBROLA. Ti piace la mia voce? Un po\' monotona, che dici?'
   },
   {
     name: 'Hello (EN)', lang: 'en', voice: 'female',

@@ -164,7 +164,7 @@ const Prosody = {
           t += c.dur;
         }
         // Pitch: one level per note, short portamento, vibrato on long notes.
-        // Natural mode: the pitch overshoots the new note slightly and then settles.
+        // With voice.natural the pitch overshoots the new note slightly and then settles.
         let tp = beat;
         for (const p of un.parts) {
           const f = p.f || B;
@@ -286,7 +286,7 @@ const Prosody = {
           for (let k = 0; k < taps; k++) {
             const a = Object.assign({}, o); setF(a, P.f, P.b); a.av = P.av;
             add(a, tt, open, k ? '' : ph.ph); tt += open;
-            const d = Object.assign({}, o); setF(d, [250, P.f[1], P.f[2]], P.b); d.av = 36; d.tap = true;
+            const d = Object.assign({}, o); setF(d, [250, P.f[1], P.f[2]], P.b); d.av = 36;
             add(d, tt, dip, ''); tt += dip;
           }
           const a = Object.assign({}, o); setF(a, P.f, P.b); a.av = P.av;
@@ -420,7 +420,7 @@ const Prosody = {
     for (const [a, b] of built.vib) {
       if (t >= a && t < b) {
         const u = t - a, ramp = Math.min(1, u / 0.25);
-        // Natural mode: rate wanders by +-0.3 Hz and depth by +-20%, as in real singers
+        // With voice.natural the rate wanders by +-0.3 Hz and the depth by +-20%, as in real singers
         const cyc = built.natural ? 5.6 * u + 0.068 * Math.sin(2 * Math.PI * 0.7 * u) : 5.6 * u;
         const depth = built.natural ? 1 + 0.2 * Math.sin(2 * Math.PI * 0.43 * u + 1.3) : 1;
         f *= 1 + 0.022 * built.vibDepth * depth * ramp * Math.sin(2 * Math.PI * cyc);

@@ -47,8 +47,7 @@ const Klatt = {
     return y;
   },
 
-  // voice: { oq, tilt, breath, jitter, shimmer, fscale, source }
-  // source 'lf' replaces KLGLOTT88 with the LF model, shaped per period by the optional rd track
+  // voice: { oq, tilt, breath, jitter, shimmer, fscale }
   render(fr, voice) {
     const sr = this.SR, step = this.STEP;
     const out = new Float32Array(fr.n * step);
@@ -67,12 +66,10 @@ const Klatt = {
     const pb = this.resonator();
     this.setBP(pb, 3500 * voice.fscale, 3500, sr);
 
-    // Spectral tilt: one-pole low-pass on the glottal pulse (the LF pulse already has most of it)
-    const lf = voice.source === 'lf';
-    const tilt = lf ? voice.tilt * 0.4 : voice.tilt;
-    const tiltA = Math.exp(-2 * Math.PI * Math.max(200, 3000 - tilt * 220) / sr);
+    // Spectral tilt: one-pole low-pass on the glottal pulse
+    const tiltA = Math.exp(-2 * Math.PI * Math.max(200, 3000 - voice.tilt * 220) / sr);
 
-    let period = 0, pos = 0, nopen = 1, pulseAmp = 1, shape = null;
+    let period = 0, pos = 0, nopen = 1, pulseAmp = 1;
     let tiltY = 0, nLast = 0, zx1 = 0, zx2 = 0, radPrev = 0;
     // Gentle low-pass on the output: tames the digital hiss of the noise above ~7 kHz
     const lpA = Math.exp(-2 * Math.PI * 7000 / sr);
@@ -113,15 +110,11 @@ const Klatt = {
           pos = 0;
           const jit = 1 + voice.jitter * rand();
           period = sr / (f0 * jit);
-          if (lf) {
-            shape = LF.table(T.rd ? T.rd[f] : 1);
-            nopen = shape.te * period;
-          } else nopen = Math.max(2, voice.oq * period);
+          nopen = Math.max(2, voice.oq * period);
           pulseAmp = 1 + voice.shimmer * rand();
         }
         let glot = 0;
-        if (lf) glot = LF.sample(shape, pos / period) * pulseAmp;
-        else if (pos < nopen) {
+        if (pos < nopen) {
           const u = pos / nopen;
           glot = 6.75 * u * u * (1 - u) * pulseAmp;   // peak = 1 at u = 2/3
         }

@@ -15,13 +15,13 @@ const TTS = {
     const voice = Object.assign({}, base, {
       f0: base.f0 * Math.pow(2, settings.pitch / 12),
       rate: settings.rate,
-      transpose: settings.transpose || 0
+      transpose: settings.transpose || 0,
+      name: settings.voice
     }, engine.voice);
     const { items, warnings } = Parser.parse(text, { lang: settings.lang, tempo: settings.tempo });
     const built = Prosody.build(items, voice);
     built.vibDepth = base.monotone ? 0 : settings.vibrato;
     const segs = Prosody.segments(built.phones, voice);
-    if (engine.segments) engine.segments(segs, built.phones, voice);
     const fr = Prosody.frames(segs, built, voice, Klatt.SR, Klatt.STEP);
     if (engine.shape) engine.shape(fr, built, voice, segs);
     const samples = Klatt.normalize(engine.render(fr, voice));

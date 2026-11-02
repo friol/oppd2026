@@ -249,8 +249,24 @@ const App = {
     return this.result;
   },
 
-  speak() {
+  // Engines with external data (MBROLA voices) load it first; resolves false on failure
+  async prepare() {
+    const eng = ENGINES[this.settings.engine];
+    if (!eng.prepare) return true;
+    this.setStatus('LOADING VOICE', 'busy');
+    try {
+      await eng.prepare(this.settings, this.text.value);
+      return true;
+    } catch (err) {
+      this.$('warnings').textContent = 'Could not load the ' + eng.label + ' engine: ' + err.message;
+      this.setStatus('READY');
+      return false;
+    }
+  },
+
+  async speak() {
     this.stop();
+    if (!await this.prepare()) return;
     this.setStatus('SYNTHESIZING', 'busy');
     // Let the status repaint before the (synchronous) synthesis
     setTimeout(() => {
@@ -295,7 +311,9 @@ const App = {
     this.draw();
   },
 
-  download() {
+  async download() {
+    if (!await this.prepare()) return;
+    this.setStatus('READY');
     const r = this.render();
     const blob = new Blob([TTS.wav(r.samples, r.sampleRate)], { type: 'audio/wav' });
     const a = document.createElement('a');
