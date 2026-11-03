@@ -136,14 +136,16 @@ const Panels = (() => {
     }
 
     // appear: seconds since panels started appearing (negative = hidden)
-    function update(time, dt, appear, camZ, shift) {
+    // beat: music pulse from 0 to 1, or null to use each panel's own slow breath
+    function update(time, dt, appear, camZ, shift, beat) {
       for (const p of panels) {
         p.mesh.position.z += shift;
         if (p.mesh.position.z > camZ + 2) place(p, p.mesh.position.z - opts.depth - 2);
         p.progress += p.rate * dt;
         const u = p.mat.uniforms;
         u.uAlpha.value = Math.min(Math.max((appear - p.delay) / 1.5, 0), 1);
-        u.uPulse.value = 0.6 + 0.4 * Math.sin(time * p.pulse + p.phase);
+        const breath = Math.sin(time * p.pulse + p.phase);
+        u.uPulse.value = beat === null ? 0.6 + 0.4 * breath : 0.45 + 0.8 * beat + 0.08 * breath;
         u.uProgress.value = p.progress;
         u.uTime.value = time;
       }

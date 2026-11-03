@@ -50,6 +50,12 @@
     anisotropy: renderer.capabilities.getMaxAnisotropy()
   });
 
+  // Point size scale: drawing buffer pixels per world unit at distance 1
+  const pointScale = () => renderer.getPixelRatio() * window.innerHeight / (2 * Math.tan(camera.fov * Math.PI / 360));
+  const models = Models.create(scene, {
+    count: 6, fogNear: FOG_NEAR, fogFar: FOG_FAR, pointScale: pointScale()
+  });
+
   const smooth = x => {
     x = Math.min(Math.max(x, 0), 1);
     return x * x * x * (x * (x * 6 - 15) + 10);
@@ -58,6 +64,7 @@
   let time = 0;
   let z = 0;
   let paused = false;
+  let started = false;  // false during the prologue
   let roll = 0;
   const wrapLength = Rain.WRAP * CELL.x;
 
@@ -72,7 +79,9 @@
     let shift = 0;
     if (z < -wrapLength) shift = wrapLength;
     z += shift;
-    panels.update(time, dt, time - HOLD, z, shift);
+    const pulse = beat.update(dt);
+    panels.update(time, dt, time - HOLD, z, shift, pulse);
+    models.update(time, dt, time - HOLD - TURN, z, shift, pulse);
 
     // Facing -X (the first plane) at the start, facing -Z (down the corridor) at the end
     camera.rotation.y = Math.PI / 2 * (1 - turn) + 0.04 * Math.sin(time * 0.17) * drift;
@@ -92,8 +101,10 @@
   function frame(now) {
     const dt = Math.min((now - last) / 1000, 0.1);
     last = now;
-    if (!paused) update(dt);
-    renderer.render(scene, camera);
+    if (started) {
+      if (!paused) update(dt);
+      renderer.render(scene, camera);
+    } else renderer.clear();
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
@@ -102,13 +113,43 @@
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+    models.resize(pointScale());
   });
 
+  // Background music in a loop, from the start of the effect. Browsers usually block
+  // autoplay with sound, so if that is refused it starts on the next key press or click.
+  const music = document.getElementById('music');
+  music.volume = 0.8;
+  const beat = Beat.create(music);
+  const playMusic = () => { if (started && !paused) music.play().catch(() => {}); };
+  const retryMusic = () => { if (music.paused) playMusic(); };
+  window.addEventListener('pointerdown', retryMusic);
+  window.addEventListener('keydown', retryMusic);
+
+  // Prologue on a black screen, then the effect, the music and the help line
   const hint = document.getElementById('hint');
-  setTimeout(() => hint.classList.add('hidden'), 5000);
+  let hintTimer = 0;
+  const prologue = Prologue.create(document.getElementById('prologue'));
+  function begin() {
+    started = false;
+    time = 0; z = 0; roll = 0; panels.reset(); models.reset();
+    music.pause();
+    music.currentTime = 0;
+    clearTimeout(hintTimer);
+    hint.classList.add('hidden');
+    prologue.play('The matrix has you, Neo.', () => {
+      started = true;
+      playMusic();
+      hint.classList.remove('hidden');
+      hintTimer = setTimeout(() => hint.classList.add('hidden'), 5000);
+    });
+  }
+  begin();
   window.addEventListener('keydown', e => {
-    if (e.code === 'Space') paused = !paused;
-    else if (e.code === 'KeyR') { time = 0; z = 0; roll = 0; panels.reset(); }
+    if (e.code === 'Space') {
+      paused = !paused;
+      if (paused) music.pause(); else playMusic();
+    } else if (e.code === 'KeyR') begin(); else if (e.code === 'KeyM') beat.toggleMute();
     else if (e.code === 'KeyF') {
       if (document.fullscreenElement) document.exitFullscreen();
       else document.documentElement.requestFullscreen();

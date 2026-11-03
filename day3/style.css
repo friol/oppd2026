@@ -25,3 +25,39 @@ canvas {
 #hint.hidden {
   opacity: 0;
 }
+
+#prologue {
+  position: fixed;
+  left: 7vw;
+  top: 9vh;
+  right: 7vw;
+  font: clamp(18px, 2.4vw, 40px) "Courier New", Courier, monospace;
+  color: #5f9;
+  text-shadow: 0 0 4px rgba(80, 255, 140, 0.8), 0 0 14px rgba(40, 255, 100, 0.35);
+  white-space: pre-wrap;
+  pointer-events: none;
+}
+
+#prologue.hidden {
+  display: none;
+}
+
+#prologue .cursor {
+  display: inline-block;
+  width: 0.6em;
+  height: 1.05em;
+  margin-left: 0.05em;
+  vertical-align: text-bottom;
+  background: #5f9;
+  box-shadow: 0 0 8px rgba(80, 255, 140, 0.8);
+  animation: blink 1s steps(1) infinite;
+}
+
+/* The cursor stays lit while typing and blinks when idle */
+#prologue.typing .cursor {
+  animation: none;
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
