@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Interstellar’s labyrinth</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <header id="hud">
+    <h1>Interstellar’s labyrinth</h1>
+    <p id="subtitle">“can you draw in one minute a labyrinth that takes more than one minute to solve?”</p>
+    <div id="timer">60.0</div>
+    <div id="record"></div>
+  </header>
+  <div id="menu" class="hidden">
+    <div class="box">
+      <p class="box-title">Choose your labyrinth</p>
+      <p class="box-sub">One minute to get from the centre to the only exit.</p>
+      <div class="buttons">
+        <button type="button" data-level="easy">Easy</button>
+        <button type="button" data-level="medium">Medium</button>
+        <button type="button" data-level="hard">Hard</button>
+      </div>
+    </div>
+  </div>
+  <div id="message" class="hidden">
+    <div class="box">
+      <p id="msg-text" class="box-title"></p>
+      <p id="msg-sub" class="box-sub"></p>
+      <div class="buttons">
+        <button id="again" type="button">Draw another one</button>
+        <button id="change-level" type="button" class="secondary">Change level</button>
+      </div>
+    </div>
+  </div>
+  <footer id="help">Arrows / WASD or drag the sphere · Enter: new maze · Esc: levels · M: sound</footer>
+  <script src="js/audio.js"></script>
+  <script src="js/maze.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
