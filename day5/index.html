@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ModAmp — tracker module player</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <div class="col col-left">
+      <section class="win" id="main-win">
+        <header class="titlebar"><span class="grip"></span><h1>ModAmp</h1><span class="grip"></span></header>
+        <div class="win-body">
+          <canvas id="lcd" title="Click the time to switch elapsed/remaining, the scope to switch oscilloscope/spectrum"></canvas>
+          <div id="seek" class="slider h seek" title="Song position"></div>
+          <div class="transport">
+            <button id="btn-prev" class="tbtn" title="Previous order (Z)"><svg viewBox="0 0 16 16"><path d="M3 3h2v10H3zM13 3v10L6 8z"/></svg></button>
+            <button id="btn-play" class="tbtn play" title="Play / pause (X, Space)">
+              <svg class="i-play" viewBox="0 0 16 16"><path d="M4 2.5v11L13.5 8z"/></svg>
+              <svg class="i-pause" viewBox="0 0 16 16"><path d="M3.5 2.5h3v11h-3zM9.5 2.5h3v11h-3z"/></svg>
+            </button>
+            <button id="btn-stop" class="tbtn" title="Stop (V)"><svg viewBox="0 0 16 16"><path d="M3.5 3.5h9v9h-9z"/></svg></button>
+            <button id="btn-next" class="tbtn" title="Next order (B)"><svg viewBox="0 0 16 16"><path d="M11 3h2v10h-2zM3 3v10l7-5z"/></svg></button>
+            <button id="btn-open" class="tbtn" title="Open modules (L)"><svg viewBox="0 0 16 16"><path d="M8 2.5l5.5 6h-11zM2.5 10.5h11v2.5h-11z"/></svg></button>
+            <span class="spacer"></span>
+            <button id="btn-repeat" class="led-btn" title="Repeat the song (R)">REP</button>
+          </div>
+          <div class="mixer">
+            <div class="ctl"><span class="lbl">Volume</span><div id="vol" class="slider h"></div><span id="vol-val" class="val"></span></div>
+            <div class="ctl"><span class="lbl">Pan sep.</span><div id="sep" class="slider h"></div><span id="sep-val" class="val"></span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="win" id="eq-win">
+        <header class="titlebar"><span class="grip"></span><h2>Equalizer</h2><span class="grip"></span></header>
+        <div class="win-body">
+          <div class="eq-top">
+            <button id="eq-on" class="led-btn" title="Equalizer on/off (E)">ON</button>
+            <canvas id="eq-curve"></canvas>
+            <select id="eq-preset" title="Presets"></select>
+          </div>
+          <div class="eq-bands">
+            <div class="band pre"><div id="eq-pre" class="slider v"></div><span>PRE</span></div>
+            <div class="band-sep"></div>
+            <div id="eq-sliders" class="eq-sliders"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="win" id="pl-win">
+        <header class="titlebar"><span class="grip"></span><h2>Playlist</h2><span class="grip"></span></header>
+        <div class="win-body">
+          <ol id="playlist"><li class="empty">Drop .mod .s3m .xm .it files here</li></ol>
+          <div class="pl-bar">
+            <button id="pl-add" class="small-btn" title="Add files (L)">+ ADD</button>
+            <button id="pl-rem" class="small-btn" title="Remove the selected file">− REM</button>
+            <button id="pl-clr" class="small-btn" title="Clear the playlist">CLR</button>
+            <span class="spacer"></span>
+            <span id="pl-total" class="pl-total"></span>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="col col-right">
+      <section class="win grow" id="pat-win">
+        <header class="titlebar"><span class="grip"></span><h2 id="pat-title">Patterns</h2><span class="grip"></span></header>
+        <div class="win-body">
+          <div class="view-tabs" title="Switch view (P)">
+            <button class="small-btn on" data-view="patterns">PATTERNS</button><button class="small-btn" data-view="samples">SAMPLES</button>
+          </div>
+          <div id="smp-panel" class="smp-panel" hidden>
+            <div id="smp-list" class="smp-list"></div>
+            <div class="smp-detail">
+              <div id="smp-wave" class="smp-wave"><canvas id="smp-canvas"></canvas></div>
+              <div class="smp-bar">
+                <button id="smp-play" class="small-btn" title="Listen to the sample (Enter)">&#9654; LISTEN</button>
+                <span id="smp-meta" class="smp-meta"></span>
+              </div>
+            </div>
+          </div>
+          <div id="pat-scroll" class="pat-scroll">
+            <canvas id="pattern"></canvas>
+            <div id="pat-spacer" class="pat-spacer"></div>
+          </div>
+          <div id="pat-legend" class="legend">
+            <span class="k note">note</span><span class="k ins">instrument</span><span class="k volume">volume</span>
+            <span class="k pitch">pitch</span><span class="k pan">panning</span><span class="k global">song flow</span><span class="k misc">other</span>
+            <span class="hint">M / S on a channel header: mute / solo (header click: mute, shift+click: solo)</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="win" id="ch-win">
+        <header class="titlebar"><span class="grip"></span><h2>Channels</h2><span class="grip"></span></header>
+        <div class="win-body">
+          <div id="channels" class="channels"></div>
+          <div class="ch-bar">
+            <button id="ch-reset" class="small-btn" title="Unmute all channels (0)">ALL ON</button>
+            <span class="hint">M mute · S solo · keys 1–9 mute, shift+1–9 solo</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="win" id="smp-win">
+        <header class="titlebar"><span class="grip"></span><h2>Samples</h2><span class="grip"></span></header>
+        <div class="win-body">
+          <canvas id="samples" title="Click a sample to hear it"></canvas>
+          <div id="smp-info" class="smp-info">&nbsp;</div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <input type="file" id="file" accept=".mod,.s3m,.xm,.it,.MOD,.S3M,.XM,.IT" multiple hidden>
+  <div id="drop" class="drop"><div>Drop modules to add them to the playlist</div></div>
+  <div id="toast" class="toast"></div>
+
+  <script src="js/formats.js"></script>
+  <script src="js/player.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
