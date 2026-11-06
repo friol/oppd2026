@@ -912,5 +912,226 @@ const UI = (() => {
     ctx.shadowBlur = 0;
   }
 
-  return { Slider, Lcd, PatternView, ChannelsView, SamplesView, SampleBrowser, drawEqCurve, fitCanvas, fmtTime };
+  // ------------------------------------------------------------ visualizer
+
+  // Winamp-style visualization: oscilloscope and spectrum drawn over a feedback buffer (the previous
+  // frame zoomed, rotated, faded and hue shifted), with colors cycling all the time. The effect changes
+  // by itself every few seconds (sometimes on a strong beat); a click switches to the next one.
+  const VIS_MODES = [
+    // zoom / rotation per frame (at 60 fps), vertical drift in css px, fade of the old frame
+    { name: 'Tunnel', zoom: 1.035, rot: 0.004, dy: 0, fade: 0.9 },
+    { name: 'Flow', zoom: 1.008, rot: 0, dy: -2.5, fade: 0.93 },
+    { name: 'Kaleidoscope', zoom: 0.965, rot: 0.012, dy: 0, fade: 0.9 },
+    { name: 'Spectrum', zoom: 1.004, rot: 0, dy: -3, fade: 0.9 },
+    { name: 'Starburst', zoom: 1.02, rot: 0.02, dy: 0, fade: 0.88 },
+    { name: 'Phase', zoom: 0.99, rot: 0.01, dy: 0, fade: 0.92 },
+  ];
+
+  class Visualizer {
+    constructor(box, canvas, label) {
+      this.box = box;
+      this.canvas = canvas;
+      this.label = label;
+      this.ctx = canvas.getContext('2d');
+      this.back = document.createElement('canvas');
+      this.bctx = this.back.getContext('2d');
+      this.filter = 'filter' in this.ctx;
+      this.mode = Math.floor(Math.random() * VIS_MODES.length);
+      this.modeTime = 0;
+      this.t = 0;
+      this.hue = Math.random() * 360;
+      this.avg = 0;
+      this.beat = 0;
+      this.cool = 0;
+      this.peak = 0.2;
+      this.spin = 0;
+      this.labelTimer = 0;
+      box.addEventListener('click', () => this.next());
+      box.title = 'Click: next effect';
+      this.showLabel();
+    }
+
+    next() {
+      this.mode = (this.mode + 1) % VIS_MODES.length;
+      this.modeTime = 0;
+      this.showLabel();
+    }
+
+    showLabel() {
+      this.label.textContent = VIS_MODES[this.mode].name;
+      this.label.classList.add('show');
+      clearTimeout(this.labelTimer);
+      this.labelTimer = setTimeout(() => this.label.classList.remove('show'), 1800);
+    }
+
+    resize() {
+      const dpr = DPR(), w = Math.round(this.box.clientWidth * dpr), h = Math.round(this.box.clientHeight * dpr);
+      if (!w || !h) return false;
+      if (this.canvas.width !== w || this.canvas.height !== h) {
+        this.canvas.width = this.back.width = w;
+        this.canvas.height = this.back.height = h;
+        this.ctx.fillStyle = '#000';
+        this.ctx.fillRect(0, 0, w, h);
+      }
+      return true;
+    }
+
+    draw(wave, freq, dt, active) {
+      if (!this.resize()) return;
+      const c = this.ctx, W = this.canvas.width, H = this.canvas.height, dpr = DPR();
+      const cx = W / 2, cy = H / 2, m = Math.min(W, H), k = dt * 60, mode = VIS_MODES[this.mode];
+      this.t += dt;
+      this.modeTime += dt;
+
+      // audio features: bass energy with beat detection, wave peak for an automatic gain
+      let bass = 0;
+      for (let i = 1; i < 12; i++) bass += freq[i];
+      bass /= 11 * 255;
+      let pk = 0;
+      for (let i = 0; i < wave.length; i += 4) pk = Math.max(pk, Math.abs(wave[i]));
+      this.peak += (Math.max(pk, 0.05) - this.peak) * Math.min(1, dt * (pk > this.peak ? 8 : 0.8));
+      const g = 0.9 / this.peak;
+      this.avg += (bass - this.avg) * Math.min(1, dt * 1.5);
+      this.cool -= dt;
+      let kick = false;
+      if (active && bass > this.avg * 1.25 + 0.04 && this.cool <= 0) {
+        kick = true;
+        this.cool = 0.28;
+        this.beat = 1;
+      }
+      this.beat = Math.max(0, this.beat - dt * 3);
+      if (this.modeTime > 18 || (kick && this.modeTime > 10 && Math.random() < 0.2)) this.next();
+      this.hue = (this.hue + dt * (35 + 140 * bass) + (kick ? 45 : 0)) % 360;
+      this.spin += dt * (0.25 + bass);
+      const h0 = this.hue, beat = this.beat;
+
+      // feedback: the previous frame, transformed and faded
+      this.bctx.globalCompositeOperation = 'copy';
+      this.bctx.drawImage(this.canvas, 0, 0);
+      c.globalCompositeOperation = 'source-over';
+      c.globalAlpha = 1;
+      c.fillStyle = '#000';
+      c.fillRect(0, 0, W, H);
+      c.save();
+      c.globalAlpha = Math.pow(mode.fade, k);
+      if (this.filter) c.filter = `hue-rotate(${(2 * k).toFixed(2)}deg)`;
+      const zoom = Math.pow(mode.zoom + (mode.zoom >= 1 ? 0.04 : -0.02) * beat, k);
+      c.translate(cx, cy + mode.dy * dpr * k);
+      c.rotate(mode.rot * k * Math.sin(this.t * 0.37 + 1));
+      c.scale(zoom, zoom);
+      c.drawImage(this.back, -cx, -cy);
+      c.restore();
+      if (this.filter) c.filter = 'none';
+
+      // new shapes, added with a glow
+      c.globalCompositeOperation = 'lighter';
+      c.lineJoin = c.lineCap = 'round';
+      const glow = (hue, width) => {
+        c.strokeStyle = `hsla(${hue % 360},100%,55%,0.35)`;
+        c.lineWidth = width * 3.5 * dpr;
+        c.stroke();
+        c.strokeStyle = `hsla(${hue % 360},100%,78%,0.95)`;
+        c.lineWidth = width * dpr;
+        c.stroke();
+      };
+      const N = 256, step = Math.floor(wave.length / N);
+      const w = (i) => Math.max(-1.2, Math.min(1.2, wave[(i * step) % wave.length] * g));
+
+      switch (mode.name) {
+        case 'Tunnel':
+          for (let ring = 0; ring < 2; ring++) {
+            const R = m * (ring ? 0.1 : 0.2) * (1 + beat * 0.35), amp = m * (ring ? 0.06 : 0.12);
+            c.beginPath();
+            for (let i = 0; i <= N; i++) {
+              const a = (i / N) * Math.PI * 2 + this.spin * (ring ? -1 : 1), r = R + w(i % N) * amp * (ring ? -1 : 1);
+              const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+              if (i) c.lineTo(x, y); else c.moveTo(x, y);
+            }
+            glow(h0 + ring * 180, 1.6);
+          }
+          break;
+        case 'Flow':
+          for (let line = 0; line < 3; line++) {
+            const amp = H * (0.32 - line * 0.09), sign = line === 1 ? -1 : 1;
+            c.beginPath();
+            for (let i = 0; i < N; i++) {
+              const x = (i / (N - 1)) * W, y = cy + sign * w(i + line * 37) * amp;
+              if (i) c.lineTo(x, y); else c.moveTo(x, y);
+            }
+            glow(h0 + line * 120, 1.8 - line * 0.4);
+          }
+          break;
+        case 'Kaleidoscope': {
+          const S = 6, len = m * 0.48;
+          for (let s = 0; s < S; s++) {
+            c.save();
+            c.translate(cx, cy);
+            c.rotate((s / S) * Math.PI * 2 + this.spin * 0.5);
+            if (s & 1) c.scale(1, -1);
+            c.beginPath();
+            for (let i = 0; i < N / 2; i++) {
+              const x = (i / (N / 2)) * len, y = w(i) * m * 0.1 * (0.3 + i / N);
+              if (i) c.lineTo(x, y); else c.moveTo(x, y);
+            }
+            c.restore();
+            glow(h0 + s * 60, 1.3);
+          }
+          break;
+        }
+        case 'Spectrum': {
+          const B = 64, bw = W / B / 2;
+          for (let i = 0; i < B; i++) {
+            const bin = Math.floor(Math.pow(i / B, 1.6) * freq.length * 0.7) + 1;
+            const v = Math.pow(freq[bin] / 255, 1.6) * H * 0.42;
+            c.fillStyle = `hsla(${(h0 + i * 5) % 360},100%,55%,0.5)`;
+            c.fillRect(cx + i * bw, cy - v, bw * 0.75, v * 2);
+            c.fillRect(cx - (i + 1) * bw, cy - v, bw * 0.75, v * 2);
+          }
+          c.beginPath();
+          for (let i = 0; i < N; i++) {
+            const x = (i / (N - 1)) * W, y = H * 0.12 + w(i) * H * 0.08;
+            if (i) c.lineTo(x, y); else c.moveTo(x, y);
+          }
+          glow(h0 + 180, 1.2);
+          break;
+        }
+        case 'Starburst': {
+          // symmetric: the spectrum (log scale) goes round the circle and back
+          const B = 96, r0 = m * (0.05 + beat * 0.04);
+          for (let i = 0; i < B; i++) {
+            const j = i < B / 2 ? i : B - 1 - i;
+            const v = Math.pow(freq[Math.floor(Math.pow(j / (B / 2), 1.8) * freq.length * 0.35) + 1] / 255, 1.1);
+            const a = (i / B) * Math.PI * 2 + this.spin;
+            c.beginPath();
+            c.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0);
+            c.lineTo(cx + Math.cos(a) * (r0 + v * m * 0.42), cy + Math.sin(a) * (r0 + v * m * 0.42));
+            glow(h0 + i * 3.75, 1.1);
+          }
+          break;
+        }
+        default: {   // Phase: x = signal, y = signal a few samples later, slowly rotating
+          const d = 9, a = this.spin * 0.6, ca = Math.cos(a), sa = Math.sin(a), s = m * 0.55;
+          c.beginPath();
+          for (let i = 0; i < 400; i++) {
+            const j = i * 2, x = Math.max(-1.2, Math.min(1.2, wave[j] * g)), y = Math.max(-1.2, Math.min(1.2, wave[j + d] * g));
+            const px = cx + (x * ca - y * sa) * s, py = cy + (x * sa + y * ca) * s;
+            if (i) c.lineTo(px, py); else c.moveTo(px, py);
+          }
+          glow(h0, 1);
+        }
+      }
+
+      // beat flash
+      if (beat > 0.05) {
+        const grd = c.createRadialGradient(cx, cy, 0, cx, cy, m * 0.6);
+        grd.addColorStop(0, `hsla(${(h0 + 90) % 360},100%,60%,${(beat * 0.22).toFixed(3)})`);
+        grd.addColorStop(1, 'hsla(0,0%,0%,0)');
+        c.fillStyle = grd;
+        c.fillRect(0, 0, W, H);
+      }
+      c.globalCompositeOperation = 'source-over';
+    }
+  }
+
+  return { Slider, Lcd, PatternView, ChannelsView, SamplesView, SampleBrowser, Visualizer, drawEqCurve, fitCanvas, fmtTime };
 })();

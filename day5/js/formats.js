@@ -59,6 +59,7 @@ const Tracker = (() => {
       name: '', sampleMap: new Int16Array(120).fill(-1), noteMap,
       volEnv: null, panEnv: null, pitchEnv: null,
       fadeout: 0, nna: 0, dct: 0, dca: 0, globalVol: 1, pan: -1, cutoff: -1, resonance: -1,
+      volSwing: 0, panSwing: 0,
     }, o);
   }
 
@@ -440,9 +441,10 @@ const Tracker = (() => {
 
   // ---------------------------------------------------------------- IT
 
+  // disabled envelopes are kept (on: false): S78 / S7A / S7C can turn them on
   function readITEnv(u8, dv, o, center) {
     const flags = u8[o], n = Math.min(u8[o + 1], 25);
-    if (!(flags & 1) || !n) return null;
+    if (!n) return null;
     const points = [];
     for (let i = 0; i < n; i++) {
       const v = center ? dv.getInt8(o + 6 + i * 3) : u8[o + 6 + i * 3];
@@ -450,7 +452,7 @@ const Tracker = (() => {
     }
     const tick = (i) => points[Math.min(i, n - 1)].t;
     return {
-      points, end: points[n - 1].t, filter: !!(flags & 128),
+      points, end: points[n - 1].t, on: !!(flags & 1), filter: !!(flags & 128),
       loop: !!(flags & 2), loopStart: tick(u8[o + 2]), loopEnd: tick(u8[o + 3]),
       sus: !!(flags & 4), susStart: tick(u8[o + 4]), susEnd: tick(u8[o + 5]),
     };
@@ -526,6 +528,8 @@ const Tracker = (() => {
           ins.fadeout = dv.getUint16(o + 0x14, true) / 1024;
           ins.globalVol = Math.min(u8[o + 0x18], 128) / 128;
           ins.pan = u8[o + 0x19] & 128 ? -1 : Math.min(u8[o + 0x19], 64) * 4;
+          ins.volSwing = Math.min(u8[o + 0x1A], 100) / 100;
+          ins.panSwing = Math.min(u8[o + 0x1B], 64) * 4;
           if (u8[o + 0x3A] & 128) ins.cutoff = u8[o + 0x3A] & 127;
           if (u8[o + 0x3B] & 128) ins.resonance = u8[o + 0x3B] & 127;
           ins.volEnv = readITEnv(u8, dv, o + 0x130, false);
@@ -615,10 +619,11 @@ const Tracker = (() => {
     });
 
     const stereo = flags & 1;
-    const chanPan = [], chanVol = [];
+    const chanPan = [], chanVol = [], chanSurround = [];
     for (let c = 0; c < nch; c++) {
       const p = u8[0x40 + c] & 127;
       chanPan.push(stereo && p <= 64 ? p * 4 : 128);
+      chanSurround.push(stereo && p === 100);
       chanVol.push(Math.min(u8[0x80 + c], 64));
     }
     let message = '';
@@ -634,8 +639,8 @@ const Tracker = (() => {
       type: 'it', format: 'IT', title: text(u8, 4, 26), tracker: dv.getUint16(0x28, true) >= 0x5000 ? 'OpenMPT' : 'Impulse Tracker',
       channels: nch, orders, restart: 0, patterns, samples, instruments, useInstruments,
       speed: u8[0x32] || 6, tempo: u8[0x33] >= 32 ? u8[0x33] : 125, globalVol: Math.min(u8[0x30], 128),
-      chanPan, chanVol, linear: !!(flags & 8), linkG: !!(flags & 32), oldEffects: !!(flags & 16),
-      octaveShift: 0, rowHighlight: u8[0x1E] || 4, message,
+      chanPan, chanVol, chanSurround, linear: !!(flags & 8), linkG: !!(flags & 32), oldEffects: !!(flags & 16),
+      extFilter: !!(flags & 0x1000), octaveShift: 0, rowHighlight: u8[0x1E] || 4, message,
     };
   }
 

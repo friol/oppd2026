@@ -289,6 +289,34 @@ button { font: inherit; color: inherit; }
 .view-tabs { display: flex; gap: 2px; }
 .view-tabs .small-btn.on { color: #fff; background: linear-gradient(180deg, #2b4a78, #1d3a63); box-shadow: inset 1px 1px 0 #4f86d6; }
 
+/* ------------------------------------------------------------ visualizer */
+
+.vis-panel {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 120px;
+  overflow: hidden;
+  background: #000;
+  border: 1px solid #000;
+  box-shadow: 1px 1px 0 #5b6172;
+  cursor: pointer;
+}
+#vis { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.vis-label {
+  position: absolute;
+  left: 8px;
+  top: 6px;
+  font: bold 10px var(--mono);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow: 0 0 6px #000;
+  opacity: 0;
+  transition: opacity 0.6s;
+  pointer-events: none;
+}
+.vis-label.show { opacity: 0.85; }
+
 /* ------------------------------------------------------------ sample browser */
 
 .smp-panel {
@@ -476,7 +504,7 @@ button { font: inherit; color: inherit; }
 @media (max-width: 980px) {
   body { overflow: auto; }
   #app { grid-template-columns: minmax(0, 1fr); height: auto; }
-  .pat-scroll, .smp-panel { height: 360px; flex: none; }
+  .pat-scroll, .smp-panel, .vis-panel { height: 360px; flex: none; }
   .smp-list { flex-basis: 40%; }
   #pl-win { flex: none; }
   #playlist { max-height: 200px; }

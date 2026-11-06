@@ -58,6 +58,7 @@
             <button id="pl-add" class="small-btn" title="Add files (L)">+ ADD</button>
             <button id="pl-rem" class="small-btn" title="Remove the selected file">− REM</button>
             <button id="pl-clr" class="small-btn" title="Clear the playlist">CLR</button>
+            <button id="pl-loop" class="led-btn" title="Loop the playlist">LOOP</button>
             <span class="spacer"></span>
             <span id="pl-total" class="pl-total"></span>
           </div>
@@ -70,7 +71,7 @@
         <header class="titlebar"><span class="grip"></span><h2 id="pat-title">Patterns</h2><span class="grip"></span></header>
         <div class="win-body">
           <div class="view-tabs" title="Switch view (P)">
-            <button class="small-btn on" data-view="patterns">PATTERNS</button><button class="small-btn" data-view="samples">SAMPLES</button>
+            <button class="small-btn on" data-view="patterns">PATTERNS</button><button class="small-btn" data-view="samples">SAMPLES</button><button class="small-btn" data-view="scope">SCOPE</button>
           </div>
           <div id="smp-panel" class="smp-panel" hidden>
             <div id="smp-list" class="smp-list"></div>
@@ -81,6 +82,10 @@
                 <span id="smp-meta" class="smp-meta"></span>
               </div>
             </div>
+          </div>
+          <div id="vis-panel" class="vis-panel" hidden>
+            <canvas id="vis"></canvas>
+            <div id="vis-label" class="vis-label"></div>
           </div>
           <div id="pat-scroll" class="pat-scroll">
             <canvas id="pattern"></canvas>
@@ -121,6 +126,7 @@
 
   <script src="js/formats.js"></script>
   <script src="js/player.js"></script>
+  <script src="js/engine.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/main.js"></script>
 </body>

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tetraphon</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <script>try { if (localStorage.getItem('oppd2026.day6.theme') === 'light') document.documentElement.dataset.theme = 'light'; } catch (e) {}</script>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <h1 id="brand">Tetraphon</h1>
+      <p class="tag" id="tag">Four voices. One memory.</p>
+    </div>
+    <div class="controls">
+      <div class="modes" role="radiogroup" aria-label="Device">
+        <button type="button" role="radio" data-variant="tetra" title="Tetraphon: four pads (O to switch)">4 pads</button>
+        <button type="button" role="radio" data-variant="octa" title="Octaphon: eight pads, a whole octave (O to switch)">8 pads</button>
+      </div>
+      <div class="modes" role="radiogroup" aria-label="Mode">
+        <button type="button" role="radio" data-mode="classic">Forward</button>
+        <button type="button" role="radio" data-mode="reverse">Reverse</button>
+      </div>
+      <select id="voices" aria-label="Sounds of the pads" title="Sounds of the pads (V)"></select>
+      <button type="button" id="replay" hidden>Replay</button>
+      <button type="button" id="start" class="primary">Start</button>
+      <button type="button" id="theme" aria-label="Switch to light mode" title="Switch to light mode">☀</button>
+    </div>
+  </header>
+  <main>
+    <canvas id="view" aria-label="Tetraphon device: four pads around a central display"></canvas>
+    <dl class="stats">
+      <div><dt>Round</dt><dd id="round">–</dd></div>
+      <div><dt>Best</dt><dd id="best">0</dd></div>
+      <div><dt>Tempo</dt><dd id="tempo">1.6/s</dd></div>
+    </dl>
+    <div id="toast" role="status" aria-live="polite">
+      <p class="toast-kind"></p>
+      <p class="toast-title"></p>
+      <p class="toast-sub"></p>
+    </div>
+  </main>
+  <footer>
+    <p id="status" aria-live="polite"></p>
+    <p class="help">Pads: click, or ↑ → ↓ ← / WASD / 1–4 (Octaphon: 1–8) · Space: start · O: 4 or 8 pads · P: replay after a game over · H: achievements · L: light/dark · R: mode · V: sounds · M: sound on/off · drag to turn the device
+      <button type="button" id="ach-btn" class="link">Achievements</button>
+      <button type="button" id="sound" class="link">Sound on</button></p>
+  </footer>
+  <dialog id="achievements" aria-labelledby="ach-heading">
+    <h2 id="ach-heading">Achievements</h2>
+    <p id="ach-count" class="ach-count"></p>
+    <table>
+      <thead><tr><th>Notes</th><th>Title</th><th>Forward</th><th>Reverse</th></tr></thead>
+      <tbody id="ach-list"></tbody>
+    </table>
+    <button type="button" id="ach-close">Close</button>
+  </dialog>
+  <script src="js/game.js"></script>
+  <script src="js/gl.js"></script>
+  <script src="js/device.js"></script>
+  <script src="js/matrix.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/achievements.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

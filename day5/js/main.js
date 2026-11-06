@@ -21,7 +21,7 @@
   };
 
   const settings = Object.assign({
-    volume: 0.8, separation: 0.7, eqOn: true, preamp: 0, bands: PRESETS.Flat.slice(), preset: 'Flat', repeat: false, view: 'patterns',
+    volume: 0.8, separation: 0.7, eqOn: true, preamp: 0, bands: PRESETS.Flat.slice(), preset: 'Flat', repeat: false, loop: false, view: 'patterns',
   }, readSettings());
 
   function readSettings() {
@@ -34,7 +34,6 @@
   // ------------------------------------------------------------ audio graph
 
   const ctx = new (window.AudioContext || window.webkitAudioContext)();
-  const node = ctx.createScriptProcessor(BUFFER, 0, 2);
   const preamp = ctx.createGain();
   const filters = BANDS.map((f, i) => {
     const b = ctx.createBiquadFilter();
@@ -53,7 +52,6 @@
   limiter.ratio.value = 16;
   limiter.attack.value = 0.002;
   limiter.release.value = 0.12;
-  node.connect(preamp);
   let last = preamp;
   for (const f of filters) { last.connect(f); last = f; }
   last.connect(analyser);
@@ -66,44 +64,85 @@
     if (ctx.state === 'suspended') ctx.resume();
   }
 
+  // ------------------------------------------------------------ audio engine
+
+  // The replayer runs in an AudioWorklet (js/engine.js), on the audio thread, so a busy or
+  // background page does not cause dropouts. The worklet source is built from the functions of
+  // player.js and engine.js (no file to fetch, so it also works from file://). Without AudioWorklet
+  // the same engine runs here in a ScriptProcessor.
+  let send = null, pending = [];
+  function post(m) {
+    if (send) send(m); else pending.push(m);
+  }
+
+  async function setupAudio() {
+    try {
+      const T = { FX: Tracker.FX, VC: Tracker.VC, NOTE_FADE: Tracker.NOTE_FADE, NOTE_CUT: Tracker.NOTE_CUT, NOTE_OFF: Tracker.NOTE_OFF, CELL: Tracker.CELL };
+      const src = `'use strict';
+${definePlayer}
+${defineEngine}
+(${workletMain})(${JSON.stringify(T)}, definePlayer, defineEngine);
+`;
+      // a blob: URL works over http, a data: URL also from file:// (where blob: has a null origin)
+      const url = URL.createObjectURL(new Blob([src], { type: 'application/javascript' }));
+      try {
+        await ctx.audioWorklet.addModule(url);
+      } catch (e) {
+        await ctx.audioWorklet.addModule('data:application/javascript;charset=utf-8,' + encodeURIComponent(src));
+      }
+      URL.revokeObjectURL(url);
+      const node = new AudioWorkletNode(ctx, 'modamp', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2] });
+      node.port.onmessage = (e) => fromEngine(e.data);
+      node.connect(preamp);
+      send = (m) => node.port.postMessage(m);
+      document.documentElement.dataset.engine = 'worklet';
+    } catch (err) {
+      console.warn('ModAmp: AudioWorklet not available, playing through a ScriptProcessor', err);
+      const Engine = defineEngine(Player);
+      const engine = new Engine(ctx.sampleRate, fromEngine);
+      const node = ctx.createScriptProcessor(BUFFER, 0, 2);
+      node.onaudioprocess = (e) => {
+        const L = e.outputBuffer.getChannelData(0), R = e.outputBuffer.getChannelData(1);
+        engine.process(L, R, e.playbackTime > 0 ? e.playbackTime : ctx.currentTime + L.length / ctx.sampleRate);
+      };
+      node.connect(preamp);
+      send = (m) => engine.command(m);
+      document.documentElement.dataset.engine = 'script';
+    }
+    pending.forEach((m) => send(m));
+    pending = [];
+  }
+
+  function fromEngine(m) {
+    if (m.gen !== gen) return;
+    if (m.type === 'idle') {
+      cur = m.snap;
+      mixGain = m.mixGain;
+    } else if (m.type === 'snaps') {
+      for (const s of m.list) {
+        if (s.end) songFinished(s.time);
+        else queue.push(s);
+      }
+      // without animation frames (page in the background) keep only what is still to come
+      const t = ctx.currentTime;
+      while (queue.length > 1 && queue[0].time <= t) cur = queue.shift();
+    }
+  }
+
   // ------------------------------------------------------------ playback state
 
-  let player = null, song = null, item = null;
+  let loaded = false, song = null, item = null, mixGain = 1;
   let playing = false, finished = false;
   let queue = [], cur = null;
-  let rendered = 0, timeBase = 0;
+  let gen = 0;   // bumped by every command that makes the snapshots on their way obsolete
   let mute = new Uint8Array(0), solo = new Uint8Array(0);
   const playlist = [];
   let current = -1, selected = -1;
 
-  node.onaudioprocess = (e) => {
-    const L = e.outputBuffer.getChannelData(0), R = e.outputBuffer.getChannelData(1);
-    if (!player || !playing || finished) { L.fill(0); R.fill(0); return; }
-    const sr = ctx.sampleRate, p = player, base = rendered;
-    const t0 = e.playbackTime > 0 ? e.playbackTime : ctx.currentTime + L.length / sr;
-    p.render(L, R, (off) => {
-      const snap = p.snapshot();
-      snap.time = t0 + off / sr;
-      if (snap.ended) {
-        if (!settings.repeat) {
-          finished = true;
-          queue.push({ time: snap.time, end: true });
-          return false;
-        }
-        timeBase = item.info.orderTimes[snap.order] - (base + off) / sr;
-      }
-      snap.songTime = timeBase + (base + off) / sr;
-      queue.push(snap);
-      return true;
-    });
-    rendered += L.length;
-  };
-
-  function idleSnapshot() {
-    const s = player.snapshot();
-    s.songTime = timeBase;
-    s.time = 0;
-    return s;
+  function mutedChannels() {
+    const any = solo.some((v) => v), m = new Uint8Array(mute.length);
+    for (let i = 0; i < mute.length; i++) m[i] = any ? (solo[i] ? 0 : 1) : mute[i];
+    return m;
   }
 
   function play(index) {
@@ -114,16 +153,13 @@
     item = it;
     song = it.song;
     current = selected = index;
-    player = new Player.Player(song, ctx.sampleRate);
-    player.mixGain *= it.gain;
-    player.separation = settings.separation;
+    loaded = true;
     mute = new Uint8Array(song.channels);
     solo = new Uint8Array(song.channels);
-    rendered = 0;
-    timeBase = 0;
     queue = [];
     finished = false;
-    cur = idleSnapshot();
+    cur = null;
+    post({ type: 'load', gen: ++gen, song, gain: it.gain, separation: settings.separation, orderTimes: it.info.orderTimes, muted: mutedChannels(), play: true });
     patternView.setSong(song);
     channelsView.setSong(song);
     samplesView.setSong(song);
@@ -136,14 +172,15 @@
 
   function togglePlay() {
     resumeAudio();
-    if (!player) {
+    if (!loaded) {
       const i = selected >= 0 ? selected : playlist.findIndex((p) => p.song);
       if (i >= 0) play(i); else $('file').click();
       return;
     }
     if (finished) { stop(); }
     playing = !playing;
-    if (!playing) queue = [];
+    queue = [];
+    post({ type: 'play', gen: ++gen, value: playing });
     updateButtons();
   }
 
@@ -151,48 +188,57 @@
     playing = false;
     finished = false;
     queue = [];
-    if (player) {
-      player.seek(0);
-      rendered = 0;
-      timeBase = 0;
-      cur = idleSnapshot();
+    if (loaded) {
+      post({ type: 'play', gen: ++gen, value: false });
+      post({ type: 'seek', gen, order: 0 });
     }
     updateButtons();
   }
 
   function seekOrder(order) {
-    if (!player) return;
+    if (!loaded) return;
     order = Math.max(0, Math.min(song.orders.length - 1, order));
-    player.seek(order);
-    rendered = 0;
-    timeBase = item.info.orderTimes[order];
     queue = [];
     finished = false;
-    cur = idleSnapshot();
+    post({ type: 'seek', gen: ++gen, order });
   }
 
   function step(dir) {
-    if (!player) return;
+    if (!loaded) return;
     const order = cur ? cur.order : 0;
-    if (dir > 0 && order >= song.orders.length - 1) { if (current + 1 < playlist.length) next(); return; }
+    if (dir > 0 && order >= song.orders.length - 1) { if (nextIndex() >= 0) next(); return; }
     seekOrder(order + dir);
   }
 
-  function next() {
-    for (let i = current + 1; i < playlist.length; i++) if (playlist[i].song) { play(i); return; }
-    stop();
+  // next playable entry after the current one; with LOOP it wraps to the top
+  function nextIndex() {
+    for (let i = current + 1; i < playlist.length; i++) if (playlist[i].song) return i;
+    if (settings.loop) for (let i = 0; i < playlist.length; i++) if (playlist[i].song) return i;
+    return -1;
   }
 
-  function songEnded() {
-    finished = false;
-    if (playlist.slice(current + 1).some((p) => p.song)) next();
-    else stop();
+  function next() {
+    const i = nextIndex();
+    if (i >= 0) play(i); else stop();
+  }
+
+  // the engine reached the end of the song: move on when the end is audible
+  // (a timer, so that it also happens while the page is in the background)
+  function songFinished(time) {
+    finished = true;
+    const g = gen;
+    setTimeout(() => {
+      if (g !== gen) return;
+      finished = false;
+      next();
+    }, Math.max(0, (time - ctx.currentTime) * 1000));
   }
 
   function updateButtons() {
     $('btn-play').classList.toggle('playing', playing);
     $('btn-repeat').classList.toggle('on', settings.repeat);
     $('eq-on').classList.toggle('on', settings.eqOn);
+    $('pl-loop').classList.toggle('on', settings.loop);
   }
 
   // ------------------------------------------------------------ mute / solo
@@ -210,8 +256,7 @@
   }
 
   function applyMutes() {
-    const any = solo.some((v) => v);
-    if (player) for (let i = 0; i < mute.length; i++) player.muted[i] = any ? (solo[i] ? 0 : 1) : mute[i];
+    if (loaded) post({ type: 'muted', muted: mutedChannels() });
     patternView.setMutes(mute, solo);
     channelsView.setMutes(mute, solo);
   }
@@ -230,13 +275,17 @@
   $('smp-play').addEventListener('click', () => previewSample(sampleBrowser.sel));
 
   // the Patterns window shows either the pattern or the sample browser
+  const VIEWS = ['patterns', 'samples', 'scope'];
+  const VIEW_TITLES = { patterns: 'Patterns', samples: 'Sample browser', scope: 'Visualizer' };
+  const visualizer = new UI.Visualizer($('vis-panel'), $('vis'), $('vis-label'));
   function setView(view) {
-    settings.view = view === 'samples' ? 'samples' : 'patterns';
-    const smp = settings.view === 'samples';
-    $('smp-panel').hidden = !smp;
-    $('pat-scroll').hidden = smp;
-    $('pat-legend').hidden = smp;
-    $('pat-title').textContent = smp ? 'Sample browser' : 'Patterns';
+    settings.view = VIEWS.includes(view) ? view : 'patterns';
+    const v = settings.view;
+    $('smp-panel').hidden = v !== 'samples';
+    $('vis-panel').hidden = v !== 'scope';
+    $('pat-scroll').hidden = v !== 'patterns';
+    $('pat-legend').hidden = v !== 'patterns';
+    $('pat-title').textContent = VIEW_TITLES[v];
     document.querySelectorAll('.view-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.view === settings.view));
     patternView.dirty = true;
     saveSettings();
@@ -250,7 +299,7 @@
     onInput: (v) => { seekDrag = v; },
     onChange: (v) => {
       seekDrag = -1;
-      if (!player) return;
+      if (!loaded) return;
       const target = v * item.info.duration, times = item.info.orderTimes;
       let o = 0;
       for (let i = 0; i < times.length; i++) if (times[i] <= target + 0.01) o = i;
@@ -275,7 +324,7 @@
     $('vol-val').textContent = Math.round(settings.volume * 100) + '%';
   }
   function applySeparation() {
-    if (player) player.separation = settings.separation;
+    post({ type: 'separation', value: settings.separation });
     $('sep-val').textContent = Math.round(settings.separation * 100) + '%';
   }
 
@@ -326,8 +375,15 @@
     saveSettings();
   }
 
+  function toggleLoop() {
+    settings.loop = !settings.loop;
+    updateButtons();
+    saveSettings();
+  }
+
   function toggleRepeat() {
     settings.repeat = !settings.repeat;
+    post({ type: 'repeat', value: settings.repeat });
     updateButtons();
     saveSettings();
   }
@@ -339,6 +395,7 @@
   $('btn-open').addEventListener('click', () => $('file').click());
   $('btn-repeat').addEventListener('click', toggleRepeat);
   $('eq-on').addEventListener('click', toggleEq);
+  $('pl-loop').addEventListener('click', toggleLoop);
   $('ch-reset').addEventListener('click', resetChannels);
   $('file').addEventListener('change', (e) => { addFiles(e.target.files); e.target.value = ''; });
 
@@ -474,7 +531,7 @@
       case 'l': $('file').click(); break;
       case 'r': toggleRepeat(); break;
       case 'e': toggleEq(); break;
-      case 'p': setView(settings.view === 'samples' ? 'patterns' : 'samples'); break;
+      case 'p': setView(VIEWS[(VIEWS.indexOf(settings.view) + 1) % VIEWS.length]); break;
       case 'arrowup': case 'arrowdown':
         if (settings.view !== 'samples') return;
         sampleBrowser.move(e.key === 'ArrowUp' ? -1 : 1);
@@ -495,11 +552,7 @@
     const dt = Math.min(0.1, (now - lastFrame) / 1000);
     lastFrame = now;
     const t = ctx.currentTime;
-    while (queue.length && queue[0].time <= t) {
-      const s = queue.shift();
-      if (s.end) { songEnded(); break; }
-      cur = s;
-    }
+    while (queue.length && queue[0].time <= t) cur = queue.shift();
 
     let elapsed = cur ? cur.songTime : 0;
     if (cur && playing && cur.time) elapsed += Math.max(0, Math.min(0.05, t - cur.time));
@@ -513,7 +566,7 @@
       ? `${current + 1}. ${song.title || item.file} (${UI.fmtTime(duration)})`
       : 'MODAMP  ·  DROP A .MOD .S3M .XM OR .IT FILE, OR PRESS L TO OPEN ONE';
     lcd.draw({
-      state: playing ? 'play' : player && (elapsed > 0 || cur && cur.order > 0) ? 'pause' : 'stop',
+      state: playing ? 'play' : loaded && (elapsed > 0 || cur && cur.order > 0) ? 'pause' : 'stop',
       time: elapsed, duration, title, wave: waveBuf, freq: freqBuf,
       format: song && song.format, channels: song ? song.channels : 0, rate: ctx.sampleRate, linear: song && song.linear,
       separation: settings.separation, tracker: song && song.tracker,
@@ -523,9 +576,10 @@
     });
 
     if (settings.view === 'samples') sampleBrowser.update(playing ? cur : null);
+    else if (settings.view === 'scope') visualizer.draw(waveBuf, freqBuf, dt, playing);
     else if (cur) patternView.update(cur.order, cur.row);
     else patternView.update(-1, -1);
-    channelsView.update(playing ? cur : null, player ? player.mixGain : 1, song ? song.octaveShift : 0, dt);
+    channelsView.update(playing ? cur : null, mixGain, song ? song.octaveShift : 0, dt);
     samplesView.update(playing ? cur : null, dt);
     requestAnimationFrame(frame);
   }
@@ -535,6 +589,8 @@
     UI.drawEqCurve($('eq-curve'), filters, settings.eqOn);
   });
 
+  setupAudio();
+  post({ type: 'repeat', value: settings.repeat });
   applyVolume();
   applySeparation();
   applyEq();

@@ -1,8 +1,9 @@
 'use strict';
 
 // Module replayer: interprets the song tick by tick and mixes the voices in stereo.
-const Player = (() => {
-  const T = typeof Tracker !== 'undefined' ? Tracker : require('./formats.js');
+// It is a plain function of the Tracker constants so that main.js can also run its source
+// inside the AudioWorklet (definePlayer.toString()).
+function definePlayer(T) {
   const { FX, VC, NOTE_FADE, NOTE_CUT, NOTE_OFF, CELL } = T;
 
   const AMIGA_CLOCK = 14317056;   // freq = AMIGA_CLOCK / period (periods are 4x the ProTracker ones)
@@ -33,6 +34,7 @@ const Player = (() => {
   }
 
   const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+  const envOn = (e) => !!e && e.on !== false;
 
   function envValue(env, pos) {
     const pts = env.points;
@@ -96,6 +98,7 @@ const Player = (() => {
       return {
         idx: i, note: -1, ins: 0, insObj: null, smp: null, voice: null,
         period: 0, target: 0, vol: 64, pan: this.song.chanPan[i], chanVol: this.song.chanVol[i],
+        surround: !!(this.song.chanSurround && this.song.chanSurround[i]),
         fx: 0, param: 0, vc: 0, vp: 0, nna: 0,
         vibPos: 0, vibSpeed: 0, vibDepth: 0, vibWave: 0, c5: 8363,
         tremPos: 0, tremSpeed: 0, tremDepth: 0, tremWave: 0,
@@ -116,6 +119,8 @@ const Player = (() => {
         if (orders[order] === 255) { order = orders.length; continue; }
         break;
       }
+      // S3M (as in OpenMPT): a new pattern starts with the loop start back on row 0
+      if (this.song.type === 's3m' && this.channels) for (const ch of this.channels) { ch.loopRow = 0; ch.loopCount = 0; }
       this.order = order;
       this.pattern = this.song.patterns[orders[order]] || EMPTY;
       this.row = row < this.pattern.rows ? row : 0;
@@ -197,6 +202,7 @@ const Player = (() => {
         ch.vc = d ? d[o + 2] : 0;
         ch.vp = d ? d[o + 3] : 0;
         ch.delayTick = -1;
+        ch.rowNote = note > 0 && note <= 120;
         const sub = param >> 4;
         if (((fx === FX.EXT && this.mx) || fx === FX.SPECIAL) && sub === 0xD && (param & 15)) {
           ch.delayTick = param & 15;
@@ -288,10 +294,10 @@ const Player = (() => {
 
       if (ins && instr) {
         const smp = triggered ? ch.smp : song.samples[instr.sampleMap[ch.note >= 0 ? ch.note : 60]] || ch.smp;
-        if (instr.pan >= 0 && triggered) ch.pan = instr.pan;
+        if (instr.pan >= 0 && triggered) this.setPan(ch, instr.pan);
         if (smp) {
           ch.vol = smp.volume;
-          if (smp.pan >= 0) ch.pan = smp.pan;
+          if (smp.pan >= 0) this.setPan(ch, smp.pan);
         }
         if (type === 'xm' && !triggered && ch.voice && ch.voice.active && note !== NOTE_OFF) {
           const v = ch.voice;
@@ -339,10 +345,12 @@ const Player = (() => {
       const v = {
         active: true, stopping: false, bg: false, owner: ch.idx, ins: instr, smp, note,
         pos: 0, dir: 1, step: 0, keyOn: true, fade: 1, fading: false,
-        volPos: 0, panPos: 0, pitchPos: 0, volEnvOn: !!instr.volEnv, panEnvOn: !!instr.panEnv, pitchEnvOn: !!instr.pitchEnv,
+        volPos: 0, panPos: 0, pitchPos: 0, volEnvOn: envOn(instr.volEnv), panEnvOn: envOn(instr.panEnv), pitchEnvOn: envOn(instr.pitchEnv),
         avPos: 0, avTick: 0, avAmp: 0, freq: 0, vol: 0, pan: 128,
         l: 0, r: 0, tl: 0, tr: 0, dl: 0, dr: 0, ramp: 0, peak: 0, fresh: true,
         cutoff: 127, resonance: 0, flt: false, fkey: -1, fa: 1, fb0: 0, fb1: 0, y1: 0, y2: 0,
+        // IT random volume / pan variation of the instrument, chosen once per note
+        swing: 1 + (Math.random() * 2 - 1) * instr.volSwing, panSwing: Math.round((Math.random() * 2 - 1) * instr.panSwing),
       };
       this.voices.push(v);
       ch.voice = v;
@@ -466,7 +474,7 @@ const Player = (() => {
         case VC.SLIDEDN: if (t > 0) ch.vol = Math.max(0, ch.vol - p); break;
         case VC.PORTADN: if (t > 0) this.slide(ch, 16 * p); break;
         case VC.PORTAUP: if (t > 0) this.slide(ch, -16 * p); break;
-        case VC.PAN: if (t === 0) ch.pan = Math.min(256, p * 4); break;
+        case VC.PAN: if (t === 0) this.setPan(ch, Math.min(256, p * 4)); break;
         case VC.PANL: if (t > 0) ch.pan = Math.max(0, ch.pan - p); break;
         case VC.PANR: if (t > 0) ch.pan = Math.min(256, ch.pan + p); break;
         case VC.VIBSPEED: if (t === 0 && p) ch.vibSpeed = p; break;
@@ -524,8 +532,8 @@ const Player = (() => {
           break;
         case FX.PAN:
           if (first) {
-            if (type === 's3m') { if (p <= 0x80) ch.pan = p * 2; }
-            else ch.pan = p === 255 ? 256 : p;
+            if (type === 's3m') { if (p <= 0x80) this.setPan(ch, p * 2); else if (p === 0xA4) ch.surround = true; }
+            else this.setPan(ch, p === 255 ? 256 : p);
           }
           break;
         case FX.VOLSLIDE:
@@ -673,13 +681,34 @@ const Player = (() => {
         case 5: if (first) ch.panbWave = y; break;
         case 6: if (first) this.extraTicks += y; break;
         case 7: if (first) this.noteAction(ch, y); break;
-        case 8: if (first) ch.pan = Math.round(y * 256 / 15); break;
+        case 8: if (first) this.setPan(ch, Math.round(y * 256 / 15)); break;
+        case 9:
+          if (first && y < 2) ch.surround = y === 1;
+          else if (first) this.playDirection(ch, y);
+          break;
         case 0xA: if (first) ch.offsetHi = y; break;
         case 0xB: if (first) this.patternLoop(ch, y); break;
         case 0xC: if (t === (y || (this.song.type === 'it' ? 1 : -1))) ch.vol = 0; break;
         case 0xE: if (first && !this.patDelay) this.patDelay = y; break;
         case 0xF: if (first) ch.macro = y; break;
       }
+    }
+
+    // setting the panning also turns surround off
+    setPan(ch, p) {
+      ch.pan = p;
+      ch.surround = false;
+    }
+
+    // S9E / S9F (OpenMPT extension): play the sample forward / backward; a backward note
+    // that has not moved yet starts from the end of the sample (or of its loop)
+    playDirection(ch, y) {
+      const v = ch.voice;
+      if (!v || !v.active || (y !== 0xE && y !== 0xF)) return;
+      if (y === 0xE) { v.dir = 1; return; }
+      const s = v.smp, sus = s.susType && v.keyOn, loop = sus || s.loopType;
+      if (v.pos === 0 && (ch.rowNote || !loop)) v.pos = Math.max(0, (sus ? s.susEnd : loop ? s.loopEnd : s.length) - 1e-6);
+      v.dir = -1;
     }
 
     noteAction(ch, y) {
@@ -718,6 +747,7 @@ const Player = (() => {
       const vol = ch.tremorOff ? 0 : clamp(ch.vol + ch.tremDelta, 0, 64);
       v.vol = vol / 64 * ch.chanVol / 64;
       v.pan = clamp(ch.pan + ch.panDelta, 0, 256);
+      v.surround = ch.surround;
       v.cutoff = ch.cutoff;
       v.resonance = ch.resonance;
     }
@@ -727,7 +757,7 @@ const Player = (() => {
       for (const v of this.voices) {
         if (!v.active || v.stopping) continue;
         const ins = v.ins, smp = v.smp;
-        let env = 1, pan = v.pan, freq = v.freq;
+        let env = 1, pan = clamp(v.pan + v.panSwing, 0, 256), freq = v.freq;
         if (v.volEnvOn) {
           const e = ins.volEnv;
           env = envValue(e, v.volPos) / 64;
@@ -773,9 +803,10 @@ const Player = (() => {
           if (v.fade <= 0) { v.fade = 0; this.stopVoice(v); continue; }
         }
         v.step = freq / this.sampleRate;
-        const gain = this.muted[v.owner] ? 0 : v.vol * env * v.fade * smp.globalVol / 64 * ins.globalVol * gv;
-        const p = (pan / 256 - 0.5) * sep + 0.5;
-        const tl = gain * (2 - 2 * p), tr = gain * 2 * p;
+        const gain = this.muted[v.owner] ? 0 : v.vol * env * v.fade * Math.min(1, smp.globalVol / 64 * ins.globalVol * v.swing) * gv;
+        const p = v.surround ? 0.5 : (pan / 256 - 0.5) * sep + 0.5;
+        // surround (IT/S3M): centered, right channel in opposite phase as much as the stereo separation
+        const tl = gain * (2 - 2 * p), tr = v.surround ? gain * (1 - 2 * sep) : gain * 2 * p;
         if (v.fresh) {
           v.fresh = false;
           v.l = v.r = 0;
@@ -788,19 +819,30 @@ const Player = (() => {
       }
     }
 
-    // IT resonant low-pass filter, same formula as Impulse Tracker / OpenMPT
+    // IT resonant low-pass filter, same formulas as Impulse Tracker / OpenMPT
+    // (OpenMPT's "extended filter range" header flag widens the cutoff scale and uses the ModPlug coefficients)
     setupFilter(v, fmod) {
       const cutoff = v.cutoff, res = v.resonance;
       const key = cutoff * 1e6 + res * 1e3 + fmod;
       if (key === v.fkey) return;
       v.fkey = key;
       if (cutoff >= 127 && res === 0 && fmod === 256) { v.flt = false; return; }
-      let fc = 110 * Math.pow(2, 0.25 + cutoff * (fmod + 256) / (24 * 512));
+      let fc = 110 * Math.pow(2, 0.25 + cutoff * (fmod + 256) / ((this.song.extFilter ? 20 : 24) * 512));
       fc = clamp(Math.round(fc), 120, Math.min(20000, this.sampleRate / 2)) * 2 * Math.PI / this.sampleRate;
       const damp = Math.pow(10, -res * (24 / 128) / 20);
-      let d = Math.min(2, (1 - 2 * damp) * fc);
-      d = (2 * damp - d) / fc;
-      const e = 1 / (fc * fc), n = 1 + d + e;
+      let d, e;
+      if (!this.song.extFilter) {
+        // Impulse Tracker coefficients
+        const r = 1 / fc;
+        d = damp * r + damp - 1;
+        e = r * r;
+      } else {
+        // ModPlug coefficients, used by OpenMPT with the extended filter range
+        d = Math.min(2, (1 - 2 * damp) * fc);
+        d = (2 * damp - d) / fc;
+        e = 1 / (fc * fc);
+      }
+      const n = 1 + d + e;
       if (!v.flt) { v.y1 = v.y2 = 0; }
       v.flt = true;
       v.fa = 1 / n;
@@ -854,7 +896,12 @@ const Player = (() => {
             }
           } else {
             pos -= step;
-            if (pos < ls) { pos = Math.min(le - 1, ls + (ls - pos) % (le - ls)); dir = 1; }
+            if (pos < ls) {
+              if (lt === 0) { v.active = false; break; }
+              const len = le - ls;
+              if (lt === 1) pos = Math.min(le - 1e-6, le - (ls - pos) % len);
+              else { pos = Math.min(le - 1, ls + (ls - pos) % len); dir = 1; }
+            }
           }
         }
         v.pos = pos;
@@ -959,6 +1006,7 @@ const Player = (() => {
   }
 
   return { Player, scan, measureGain };
-})();
+}
 
+const Player = definePlayer(typeof Tracker !== 'undefined' ? Tracker : require('./formats.js'));
 if (typeof module !== 'undefined') module.exports = Player;
