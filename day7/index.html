@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shadow tic tac toe</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <script>
+    // Apply the theme before the first paint: "auto" follows the system.
+    (function () {
+      var pref = 'auto';
+      try { pref = localStorage.getItem('oppd2026.day7.theme') || 'auto'; } catch (e) {}
+      var dark = pref === 'auto' ? matchMedia('(prefers-color-scheme: dark)').matches : pref === 'dark';
+      document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    })();
+  </script>
+</head>
+<body>
+  <div class="page">
+  <main class="sheet">
+    <header>
+      <div class="brand">
+        <h1>Shadow tic tac toe</h1>
+      </div>
+      <div class="tools">
+        <button type="button" id="hints" class="tool" title="Hints (cheat): suggest the best move (H)" aria-label="Hints" hidden>?</button>
+        <button type="button" id="theme" class="tool" title="Theme: auto, paper or chalk (L)"></button>
+        <button type="button" id="sound" class="tool" title="Sound effects on/off (M)" aria-label="Sound effects"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9.2c1.2 1.4 1.2 4.2 0 5.6M18.2 7c2.4 2.7 2.4 7.3 0 10"/></svg></button>
+        <button type="button" id="music-btn" class="tool" title="Background music on/off (B)" aria-label="Music"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 17.5V6l9-2v11.5"/><ellipse cx="6.8" cy="17.6" rx="2.4" ry="1.9"/><ellipse cx="15.8" cy="15.6" rx="2.4" ry="1.9"/></svg></button>
+      </div>
+    </header>
+
+    <section class="options" aria-label="Game options">
+      <div class="row">
+        <span class="label">Mode</span>
+        <div class="seg" role="group" aria-label="Mode">
+          <button type="button" data-opt="mode" data-value="classic" title="Classic tic-tac-toe">Classic</button>
+          <button type="button" data-opt="mode" data-value="vanish" title="Three marks each: a fourth erases the oldest">Vanishing</button>
+        </div>
+      </div>
+      <div class="row">
+        <span class="label">Against</span>
+        <div class="seg" role="group" aria-label="Opponent">
+          <button type="button" data-opt="opponent" data-value="cpu">Computer</button>
+          <button type="button" data-opt="opponent" data-value="friend">A friend</button>
+        </div>
+      </div>
+      <div class="row" id="levels">
+        <span class="label">Level</span>
+        <div class="seg" role="group" aria-label="Level">
+          <button type="button" data-opt="level" data-value="easy">Easy</button>
+          <button type="button" data-opt="level" data-value="medium">Medium</button>
+          <button type="button" data-opt="level" data-value="hard">Hard</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="score" aria-label="Score">
+      <div class="side" id="side-x">
+        <svg class="sym x" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 4 L16 16 M16 4 L4 16"/></svg>
+        <span class="who" id="who-x">You</span>
+        <span class="num" id="score-x">0</span>
+      </div>
+      <div class="side draws">
+        <span class="who">Draws</span>
+        <span class="num" id="score-d">0</span>
+      </div>
+      <div class="side" id="side-o">
+        <svg class="sym o" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="6.5"/></svg>
+        <span class="who" id="who-o">Computer</span>
+        <span class="num" id="score-o">0</span>
+      </div>
+    </div>
+
+    <div class="board" id="board">
+      <svg viewBox="0 0 300 300" aria-hidden="true">
+        <defs>
+          <!-- Chalk: rough edges and a grainy, broken coverage. -->
+          <filter id="chalk" x="-10%" y="-10%" width="120%" height="120%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="3" result="noise"/>
+            <feDisplacementMap in="SourceGraphic" in2="noise" scale="3.5" xChannelSelector="R" yChannelSelector="G" result="rough"/>
+            <feTurbulence type="fractalNoise" baseFrequency="1.7" numOctaves="1" seed="11" result="grain"/>
+            <feColorMatrix in="grain" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  4.2 0 0 0 -1.15" result="mask"/>
+            <feComposite in="rough" in2="mask" operator="in"/>
+          </filter>
+          <!-- Ink: a slight tremor of the hand and a soft bleed into the paper. -->
+          <filter id="ink" x="-10%" y="-10%" width="120%" height="120%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" seed="5" result="noise"/>
+            <feDisplacementMap in="SourceGraphic" in2="noise" scale="2.5" xChannelSelector="R" yChannelSelector="G" result="shaky"/>
+            <feGaussianBlur in="shaky" stdDeviation="0.35"/>
+          </filter>
+        </defs>
+        <g id="grid"></g>
+        <g id="hint-marks"></g>
+        <g id="marks"></g>
+      </svg>
+      <div class="cells" id="cells"></div>
+    </div>
+
+    <p class="status" id="status" aria-live="polite"></p>
+    <p class="hint" id="hint"></p>
+
+    <footer>
+      <p class="moves" aria-live="off">Moves <b id="moves">0</b></p>
+      <button type="button" id="new" class="primary">New game</button>
+      <button type="button" id="reset" class="link">Reset score</button>
+      <p class="keys">1–9 play · N new game<span id="hint-key" hidden> · H hints</span> · L theme · M sound · B music</p>
+    </footer>
+  </main>
+  <div class="corner" id="corner" title="Fold or unfold the corner" aria-hidden="true"><div class="flap"><div class="front"></div><div class="back"></div></div></div>
+  </div>
+
+  <audio id="music" src="music/Tabletop%20Ambience.mp3" loop preload="auto"></audio>
+
+  <script src="js/game.js"></script>
+  <script src="js/ai.js"></script>
+  <script src="js/solver.js"></script>
+  <script src="js/sketch.js"></script>
+  <script src="js/sound.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

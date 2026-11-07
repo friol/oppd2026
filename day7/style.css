@@ -1,0 +1,535 @@
+/* Two skins on the same layout: graph paper with ink (light) and a framed
+   blackboard with chalk (dark). All colors are variables. */
+
+:root {
+  --font: "Segoe Print", "Chalkboard SE", "Bradley Hand", "Comic Neue", "Comic Sans MS", cursive;
+  --page: #e8e2d4;
+  --page-glow: #f3efe6;
+  --sheet: #fdfcf6;
+  --square: rgba(64, 128, 200, 0.16);
+  --margin: rgba(214, 72, 72, 0.42);
+  --text: #26313f;
+  --muted: #6c7480;
+  --line: #3a434f;
+  --soft: rgba(38, 49, 63, 0.35);
+  --x: #2150b6;
+  --o: #c4372d;
+  --win: #1f8a4c;
+  --mark-w: 6;
+  --grid-w: 3.2;
+  --stroke-filter: url(#ink);
+  --grain-alpha: 0.05;
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  --ear: 46px;               /* size of the folded corner of the paper */
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --page: #14110e;
+  --page-glow: #2a231c;
+  --sheet: #24302a;
+  --text: #eeece4;
+  --muted: rgba(238, 236, 228, 0.6);
+  --line: rgba(242, 240, 230, 0.88);
+  --soft: rgba(238, 236, 228, 0.35);
+  --x: #f6b9c9;
+  --o: #a3d6f2;
+  --win: #f7e27c;
+  --mark-w: 8;
+  --grid-w: 5;
+  --stroke-filter: url(#chalk);
+  --grain-alpha: 0.07;
+  --wood: #7a5232;
+  --wood-dark: #4d3220;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; min-height: 100%; }
+
+body {
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 16px 16px 18px;
+  background: radial-gradient(ellipse at 50% 20%, var(--page-glow), var(--page) 70%) fixed, var(--page);
+  color: var(--text);
+  font-family: var(--font);
+  -webkit-tap-highlight-color: transparent;
+}
+
+button { font: inherit; color: inherit; }
+
+/* ---- The sheet / blackboard ---- */
+
+/* The paper casts its shadow from here, so the cut corner has none, and the
+   slight tilt is here too, shared by the sheet and its corner. */
+.page {
+  position: relative;
+  width: 100%;
+  max-width: 600px;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.08)) drop-shadow(0 12px 18px rgba(60, 45, 20, 0.15));
+  transform: rotate(-0.4deg);
+}
+
+:root[data-theme="dark"] .page { filter: none; transform: none; }
+
+.sheet {
+  position: relative;
+  width: 100%;
+  padding: 14px 24px 12px 64px;
+  background-color: var(--sheet);
+  background-image:
+    var(--grain),
+    linear-gradient(90deg, transparent 46px, var(--margin) 46px, var(--margin) 48px, transparent 48px),
+    linear-gradient(var(--square) 1px, transparent 1px),
+    linear-gradient(90deg, var(--square) 1px, transparent 1px);
+  background-size: 160px 160px, 100% 100%, 22px 22px, 22px 22px;
+  background-position: 0 0, 0 0, -1px -1px, -1px -1px;
+  background-blend-mode: soft-light, normal, normal, normal;
+  /* Bottom right corner cut along the diagonal (the corner piece below fills it);
+     the margins leave room for the tape. */
+  clip-path: polygon(-40px -40px, calc(100% + 40px) -40px, calc(100% + 40px) calc(100% - var(--ear) - 40px),
+    calc(100% - var(--ear) - 40px) calc(100% + 40px), -40px calc(100% + 40px));
+}
+
+/* The corner of the paper, a triangle that turns in 3D around the diagonal:
+   folded (180deg) it shows the back of the paper over the sheet, open (0deg)
+   the front fills the cut, with a faint crease left along the fold.
+   --ox / --oy (set by main.js) align its squares with those of the sheet. */
+.corner {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: var(--ear);
+  height: var(--ear);
+  cursor: pointer;
+  filter: drop-shadow(-2px -2px 3px rgba(60, 45, 20, 0.18)) drop-shadow(-1px -1px 0.5px rgba(60, 45, 20, 0.1));
+  transition: filter 0.6s;
+  -webkit-tap-highlight-color: transparent;
+}
+.corner.open { filter: none; }
+
+.flap {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transform: perspective(300px) rotate3d(1, -1, 0, 180deg);
+  transition: transform 0.65s cubic-bezier(0.45, 0.05, 0.25, 1);
+}
+.corner.open .flap { transform: perspective(300px) rotate3d(1, -1, 0, 0deg); }
+
+.flap > div {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.front {
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
+  background-color: var(--sheet);
+  background-image:
+    linear-gradient(to bottom right, transparent 50%, rgba(70, 60, 40, 0.16) calc(50% + 0.6px),
+      rgba(255, 255, 255, 0.5) calc(50% + 1.4px), transparent calc(50% + 2.2px)),
+    linear-gradient(to bottom right, transparent 50%, rgba(70, 60, 40, 0.035) 62%, transparent 85%),
+    var(--grain),
+    linear-gradient(var(--square) 1px, transparent 1px),
+    linear-gradient(90deg, var(--square) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 160px 160px, 22px 22px, 22px 22px;
+  background-position: 0 0, 0 0,
+    calc(0px - var(--ox, 0px)) calc(0px - var(--oy, 0px)),
+    calc(-1px - var(--ox, 0px)) calc(-1px - var(--oy, 0px)),
+    calc(-1px - var(--ox, 0px)) calc(-1px - var(--oy, 0px));
+  background-blend-mode: normal, normal, soft-light, normal, normal;
+}
+
+.back {
+  transform: rotate3d(1, -1, 0, 180deg);
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+  background:
+    linear-gradient(rgba(64, 128, 200, 0.07) 1px, transparent 1px) 0 0 / 22px 22px,
+    linear-gradient(90deg, rgba(64, 128, 200, 0.07) 1px, transparent 1px) 0 0 / 22px 22px,
+    linear-gradient(315deg, #e2dccb 0%, #efebdf 40%, #fbf9f3 100%);
+}
+
+:root[data-theme="dark"] .corner { display: none; }
+
+/* Two strips of tape holding the paper. */
+.sheet::before, .sheet::after {
+  content: "";
+  position: absolute;
+  top: -12px;
+  width: 92px;
+  height: 26px;
+  background: rgba(250, 236, 170, 0.62);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.sheet::before { left: 18px; transform: rotate(-7deg); }
+.sheet::after { right: 18px; transform: rotate(6deg); }
+
+:root[data-theme="dark"] body { padding-bottom: 34px; }
+
+:root[data-theme="dark"] .sheet {
+  padding: 14px 24px 12px;
+  border: 16px solid var(--wood);
+  border-image: repeating-linear-gradient(100deg, var(--wood) 0 9px, #84593a 9px 13px, #6c4629 13px 21px, var(--wood) 21px 28px) 16;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.09 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E"),
+    radial-gradient(ellipse 60% 30% at 28% 22%, rgba(255, 255, 255, 0.07), transparent 70%),
+    radial-gradient(ellipse 50% 26% at 72% 64%, rgba(255, 255, 255, 0.05), transparent 70%),
+    radial-gradient(ellipse 40% 20% at 40% 88%, rgba(255, 255, 255, 0.04), transparent 70%);
+  background-size: 160px 160px, 100% 100%, 100% 100%, 100% 100%;
+  background-blend-mode: normal;
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.45), 0 22px 50px rgba(0, 0, 0, 0.6);
+  transform: none;
+  clip-path: none;
+}
+
+/* The chalk tray with a stick of chalk. */
+:root[data-theme="dark"] .sheet::before { display: none; }
+:root[data-theme="dark"] .sheet::after {
+  top: auto;
+  bottom: -30px;
+  left: -22px;
+  right: -22px;
+  width: auto;
+  height: 14px;
+  transform: none;
+  background:
+    linear-gradient(#f4f1e7, #cfc9bb) 74% 1px / 44px 7px no-repeat,
+    linear-gradient(#efe9de, #c9c2b3) 81% 2px / 22px 6px no-repeat,
+    linear-gradient(#8a5f3d, var(--wood-dark));
+  border-radius: 2px;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.5);
+}
+
+/* ---- Header ---- */
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+h1 {
+  margin: 0;
+  white-space: nowrap;
+  font-size: 2.1rem;
+  line-height: 1.05;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+
+:root[data-theme="dark"] h1,
+:root[data-theme="dark"] .status { text-shadow: 0 0 1px rgba(255, 255, 255, 0.5), 0 0 6px rgba(255, 255, 255, 0.12); }
+
+.brand { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+
+.tools { display: flex; gap: 5px; }
+
+/* Hand-drawn box: uneven radii on each corner. */
+.tool, .seg button, .primary {
+  border: 2px solid var(--soft);
+  border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.tool {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 30px;
+  padding: 0;
+  font-family: "Segoe UI Symbol", "Segoe UI", system-ui, sans-serif;
+  font-size: 1.05rem;
+  line-height: 1;
+  color: var(--muted);
+}
+.tool:hover { color: var(--text); border-color: var(--line); }
+#hints { font-family: var(--font); font-weight: 700; font-size: 1.1rem; }
+.tool svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+/* Off: a hand-drawn stroke across the icon. */
+.tool.off { opacity: 0.6; }
+.tool.off::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: 50%;
+  border-top: 2px solid currentColor;
+  border-radius: 2px;
+  transform: rotate(-38deg);
+}
+
+/* ---- Options ---- */
+
+.options {
+  margin: 8px 0 4px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 22px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.row.off { opacity: 0.35; }
+
+.label {
+  width: auto;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.seg { display: flex; flex-wrap: wrap; gap: 4px; }
+
+.seg button {
+  padding: 1px 12px;
+  border-color: transparent;
+  color: var(--muted);
+  font-size: 0.95rem;
+  transition: color 0.15s, border-color 0.15s;
+}
+.seg button:hover:not(:disabled) { color: var(--text); }
+.seg button[aria-pressed="true"] { color: var(--text); border-color: var(--line); }
+.seg button:disabled { cursor: default; }
+
+/* ---- Score ---- */
+
+.score {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: end;
+  gap: 8px;
+  margin: 4px 0 2px;
+}
+
+.side {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 6px 4px;
+  border-bottom: 2.5px solid transparent;
+  transition: border-color 0.2s;
+}
+#side-o { justify-content: flex-end; }
+#side-o .sym { order: 3; }
+#side-o .num { order: -1; }
+.side.draws { justify-content: center; gap: 6px; color: var(--muted); font-size: 0.85rem; }
+.side.draws .num { font-size: 1.1rem; color: var(--muted); }
+.side.active { border-bottom-color: currentColor; }
+#side-x.active { color: var(--x); }
+#side-o.active { color: var(--o); }
+.side.active .who { color: var(--text); }
+
+.sym { width: 22px; height: 22px; fill: none; stroke-width: 2.6; stroke-linecap: round; flex: none; }
+.sym.x { stroke: var(--x); }
+.sym.o { stroke: var(--o); }
+.who { font-size: 0.95rem; }
+.num { font-family: "Ink Free", "Segoe UI", system-ui, sans-serif; font-size: 1.45rem; font-weight: 700; color: var(--text); }
+
+/* ---- Board ---- */
+
+.board {
+  position: relative;
+  width: min(100%, 420px, calc(100vh - 402px));
+  width: min(100%, 420px, calc(100dvh - 402px));
+  min-width: 230px;
+  aspect-ratio: 1;
+  margin: 2px auto 0;
+}
+
+.board svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+#grid, #marks { filter: var(--stroke-filter); }
+
+.ink {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1 2;
+  stroke-dashoffset: 1;
+  animation: draw 0.3s cubic-bezier(0.35, 0.1, 0.3, 1) both;
+}
+
+@keyframes draw {
+  0% { stroke-dashoffset: 1; opacity: 0; }
+  1% { opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 1; }
+}
+
+.grid { color: var(--line); }
+.grid .ink { stroke-width: var(--grid-w); }
+.mark .ink, .strike .ink { stroke-width: var(--mark-w); }
+.mark.x { color: var(--x); }
+.mark.o { color: var(--o); }
+.strike { color: var(--win); }
+.strike .ink { stroke-width: calc(var(--mark-w) * 0.9); }
+
+.mark { transition: opacity 0.3s; }
+/* The mark that disappears with the next move of its owner. */
+.mark.doomed { opacity: 0.35; animation: doomed 1.6s ease-in-out infinite; }
+@keyframes doomed { 50% { opacity: 0.55; } }
+
+/* Hint (cheat): a faint, pulsing X where the solver would play. */
+#hint-marks { filter: var(--stroke-filter); pointer-events: none; }
+.mark.hint { color: var(--win); opacity: 0.4; animation: hint 1.8s ease-in-out 0.6s infinite; }
+@keyframes hint { 50% { opacity: 0.18; } }
+.tool[aria-pressed="true"]#hints { color: var(--win); border-color: var(--win); }
+
+#marks.tied .mark { opacity: 0.45; transition: opacity 0.6s; }
+
+.mark.erase, .strike.erase {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: erase 0.45s ease-in forwards;
+}
+@keyframes erase {
+  0% { opacity: 1; }
+  100% { opacity: 0; transform: translate(5px, 2px) scale(1.04); filter: blur(4px); }
+}
+.mark.doomed.erase { animation: erase 0.45s ease-in forwards; }
+
+.cells {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+}
+
+.cell {
+  position: relative;
+  border: 0;
+  margin: 8px;
+  padding: 0;
+  background: transparent;
+  border-radius: 14px;
+  cursor: pointer;
+}
+.cell.taken, .board.waiting .cell { cursor: default; }
+.board.over .cell { cursor: pointer; }
+.cell:focus { outline: none; }
+.cell:focus-visible { outline: 2px dashed var(--soft); outline-offset: -2px; }
+
+/* A faint preview of the next mark under the pointer. */
+@media (hover: hover) {
+  .board:not(.over):not(.waiting) .cell:not(.taken):hover::after {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-size: 4.6rem;
+    line-height: 1;
+    opacity: 0.16;
+    pointer-events: none;
+  }
+  .board[data-turn="x"]:not(.over):not(.waiting) .cell:not(.taken):hover::after { content: "×"; color: var(--x); }
+  .board[data-turn="o"]:not(.over):not(.waiting) .cell:not(.taken):hover::after { content: "○"; color: var(--o); font-size: 3.6rem; }
+}
+
+/* ---- Status and footer ---- */
+
+.status {
+  margin: 4px 0 0;
+  min-height: 1.4em;
+  line-height: 1.3;
+  text-align: center;
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.hint {
+  margin: 0 0 6px;
+  min-height: 1.4em;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 14px;
+}
+
+.moves {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+.moves b {
+  display: inline-block;
+  min-width: 1.4em;
+  font-family: "Ink Free", "Segoe UI", system-ui, sans-serif;
+  font-size: 1.45rem;
+  font-weight: 700;
+  color: var(--text);
+  text-align: left;
+}
+
+.primary {
+  padding: 1px 18px;
+  border-color: var(--line);
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+.primary:hover { color: var(--x); border-color: var(--x); }
+
+.link {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.link:hover { color: var(--text); }
+
+.keys {
+  margin: 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+button:focus-visible { outline: 2px dashed var(--soft); outline-offset: 2px; }
+
+@media (max-width: 520px) {
+  body { padding-top: 20px; }
+  :root { --ear: 34px; }
+  .sheet { padding: 16px 14px 14px 40px; background-position: 0 0, -22px 0, -1px -1px, -1px -1px; }
+  :root[data-theme="dark"] .sheet { padding: 16px 14px 16px; border-width: 12px; }
+  h1 { font-size: 1.6rem; white-space: normal; }
+  .label { min-width: 3.6em; }
+  .options { display: grid; }
+  .keys { display: none; }   /* no keyboard on a phone */
+  .tools { flex: none; }
+  .board { width: 100%; }
+}
+
+/* The strokes are drawn even with reduced motion: they are short and the heart of the game. */
+@media (prefers-reduced-motion: reduce) {
+  .mark.doomed, .mark.hint { animation: none; }
+}
