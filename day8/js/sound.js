@@ -38,6 +38,23 @@ const Sound = (() => {
     o.start(t); o.stop(t + dur + 0.05);
   }
 
+  // a soft note that wavers (vibrato), for ghostly tunes
+  function ghostNote(f, start, dur, peak) {
+    const t = ac.currentTime + start;
+    const o = ac.createOscillator(), g = ac.createGain(), lfo = ac.createOscillator(), lg = ac.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(f, t);
+    lfo.frequency.value = 5.5;
+    lg.gain.value = f * 0.012;
+    lfo.connect(lg).connect(o.frequency);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + 0.08);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(master);
+    o.start(t); lfo.start(t);
+    o.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+  }
+
   function noise(filter, freq, q, dur, peak = 0.3, delay = 0, f1 = freq) {
     const t = ac.currentTime + delay;
     const src = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
@@ -88,6 +105,31 @@ const Sound = (() => {
     meow: () => { tone('triangle', 620, 1050, 0.16, 0.1); tone('triangle', 1050, 560, 0.28, 0.1, 0.15); },
     purr: () => { for (let i = 0; i < 12; i++) noise('lowpass', 160, 1, 0.045, 0.14, i * 0.055); },
     gong: () => { tone('sine', 140, 136, 2.4, 0.22); tone('sine', 211, 205, 2, 0.12); tone('triangle', 350, 340, 1.2, 0.06); noise('lowpass', 900, 1, 0.2, 0.15); },
+    cluck: () => { for (let i = 0; i < 3; i++) tone('square', 700 + Math.random() * 200, 400, 0.05, 0.06, i * 0.07); },
+    squeak: () => { tone('sine', 2200, 2900, 0.06, 0.06); tone('sine', 2600, 3200, 0.05, 0.05, 0.08); },
+    xylo: () => { const f = [523, 587, 659, 784, 880, 1047][Math.random() * 6 | 0]; tone('triangle', f, f, 0.22, 0.07); tone('sine', f * 3, f * 3, 0.1, 0.03); },
+    lute: () => [392, 494, 587, 784, 587, 494, 659].forEach((f, i) => { tone('triangle', f, f * 0.995, 0.35, 0.08, i * 0.14); tone('sine', f * 2, f * 2, 0.15, 0.02, i * 0.14); }),
+    firework: () => { tone('sine', 300, 1400, 0.4, 0.05); noise('lowpass', 2500, 0.7, 0.5, 0.25, 0.4, 400); for (let i = 0; i < 6; i++) noise('highpass', 5000, 1, 0.03, 0.08, 0.55 + Math.random() * 0.5); },
+    laugh: () => { for (let i = 0; i < 4; i++) tone('square', 300 - i * 20, 220 - i * 20, 0.08, 0.06, i * 0.11); },
+    // a little fanfare for the winner
+    victory: () => [[523, 0], [659, 0.15], [784, 0.3], [1047, 0.45], [784, 0.75], [1047, 0.9], [1319, 1.1]].forEach(([f, t]) => {
+      tone('square', f, f, t > 1 ? 0.8 : 0.22, 0.07, t); tone('triangle', f / 2, f / 2, t > 1 ? 0.8 : 0.22, 0.08, t);
+    }),
+    // the funeral march of Chopin, on a wheezy accordion
+    funeral: () => [[233, 0, 0.5], [233, 0.6, 0.38], [233, 1.0, 0.12], [233, 1.2, 0.5], [277, 1.8, 0.38], [262, 2.2, 0.12], [262, 2.4, 0.38], [233, 2.8, 0.12], [233, 3.0, 0.38], [220, 3.4, 0.12], [233, 3.6, 0.9]].forEach(([f, t, d]) => {
+      tone('sawtooth', f, f, d, 0.05, t); tone('sawtooth', f * 1.006, f * 1.006, d, 0.05, t); tone('square', f / 2, f / 2, d, 0.03, t);
+    }),
+    // meeting your own shade: a slow music box in a minor key, wavering, with an echo, over a cold wind
+    shade: () => {
+      noise('bandpass', 700, 4, 4.2, 0.05, 0, 1600);
+      const tune = [[659, 0], [587, 0.45], [523, 0.9], [494, 1.35], [440, 1.8], [523, 2.4], [494, 2.85], [415, 3.3], [440, 3.9]];
+      for (const [f, t] of tune) {
+        ghostNote(f, t, 1.1, 0.09);
+        ghostNote(f * 2, t, 0.5, 0.02);   // the bell of the music box
+        ghostNote(f, t + 0.3, 0.9, 0.03); // the echo
+      }
+      ghostNote(220, 0, 4.6, 0.04);       // a low drone underneath
+    },
     plop: () => { tone('sine', 900, 280, 0.14, 0.2); noise('bandpass', 1200, 2, 0.2, 0.08, 0.06, 500); },
   };
 

@@ -59,7 +59,7 @@
     $('title').hidden = name !== 'title';
     $('choose').hidden = name !== 'choose';
     $('over').hidden = name !== 'over';
-    for (const id of ['scroll-menu', 'shop-menu', 'log-menu']) $(id).hidden = true;
+    for (const id of ['scroll-menu', 'shop-menu', 'log-menu', 'ask-menu']) $(id).hidden = true;
     const playing = name === 'game' || name === 'over';
     for (const id of ['hud', 'log', 'keys']) $(id).hidden = !playing;
     $('minimap').hidden = !playing || !settings.minimap;
@@ -120,7 +120,7 @@
     dropSave();
     Sound.unlock();
     const heir = store.get('heir', null);
-    s = Game.create(undefined, store.get('past', null), settings.cls, heir);
+    s = Game.create(undefined, store.get('past', null), settings.cls, heir, store.get('graffiti', []));
     snaps = []; digging = false; pendingDeath = false;
     $('log').innerHTML = '';
     history = [];
@@ -128,6 +128,7 @@
     show('game');
     Sound.play('start');
     msg(s.hero.name + ' enters the ' + s.theme.name + '. Find the stairs down, and watch your step.', 'magic');
+    if (s.hero.lantern) msg('You carry the lantern of your family. It burns a little brighter with every generation (' + s.hero.lantern + '/5).', 'gold');
     if (heir) msg('You are the child of ' + heir.from + (heir.item ? ', and you carry what they left you: ' + heir.item.name + '.' : '.'), 'hint');
     hud();
   }
@@ -194,6 +195,9 @@
       $('over-icon').dataset.s = 'hourglass';
       icon($('over-icon'), 'hourglass');
       $('cause').textContent = s.hero.name + (/^succumbed/.test(s.cause) ? ' ' : ' was ') + s.cause + '.';
+      $('verse').hidden = true;
+      $('over-icon').classList.remove('pulse');
+      $('over').classList.remove('won');
       $('summary').innerHTML = '';
       $('record').textContent = '';
       $('rewind-offer').hidden = false;
@@ -230,10 +234,21 @@
     $('over-icon').dataset.s = s.won ? 'artifact' : 'skull';
     icon($('over-icon'), $('over-icon').dataset.s);
     // every cause reads after "was", except the poison
+    // the words scratched on a wall for the descendants, and the bard's song if there is one
+    const graffiti = store.get('graffiti', []);
+    graffiti.push(Game.graffitiFor(s));
+    store.set('graffiti', graffiti.slice(-10));
+    $('verse').hidden = !h.verse;
+    $('verse').textContent = h.verse ? 'The bard sang of you: "' + h.verse + '"' : '';
+    $('over-icon').classList.toggle('pulse', !!s.won);
+    $('over').classList.toggle('won', !!s.won);
     $('cause').textContent = s.won ? h.name + ' escaped the dungeon with the Heart of the Deep!'
       : h.name + (/^succumbed/.test(s.cause) ? ' ' : ' was ') + s.cause + '.';
     Sound.ambient(null);
-    const rows = [['Hero', h.name], ['Class', Game.CLASSES[h.cls].name], ['Deepest', s.maxDepth], ['Level', h.lvl], ['Strength', h.str], ['Weapon', Game.GEAR[h.weapon].name], ['Armour', h.armor ? Game.GEAR[h.armor].name : 'none'], ['Foes slain', h.kills], ['Gold', h.gold], ['Score', score]];
+    Sound.play(s.won ? 'victory' : 'funeral');
+    const rows = [['Hero', h.name + (h.parent ? ', child of ' + h.parent : '')], ['Class', Game.CLASSES[h.cls].name], ['Deepest', s.maxDepth], ['Level', h.lvl], ['Strength', h.str], ['Weapon', Game.GEAR[h.weapon].name], ['Armour', h.armor ? Game.GEAR[h.armor].name : 'none'], ['Foes slain', h.kills], ['Gold', h.gold], ['Score', score]];
+    if (h.lantern) rows.push(['Lantern', h.lantern + '/5']);
+    if (s.won) rows.push(['Lineage', lineage.slice(-5).map(p => p.name).join(' → ')]);
     $('summary').innerHTML = rows.map(([k, v]) => '<dt>' + k + '</dt><dd>' + v + '</dd>').join('');
     $('record').textContent = rank === 0 ? 'A new record!' : rank < MAX_SCORES ? 'Hall of fame: #' + (rank + 1) : '';
     if (screen !== 'over') setTimeout(() => { if (s && s.over) show('over'); }, OVER_DELAY);
@@ -261,7 +276,7 @@
 
   function pickHeir(i) {
     const it = heirItems[i] || null;
-    store.set('heir', { from: s.hero.name, item: it });
+    store.set('heir', { from: s.hero.name, item: it, lantern: s.hero.lantern || 0 });
     [...$('heir-list').querySelectorAll('button')].forEach((b, k) => b.setAttribute('aria-checked', k === i));
   }
 
@@ -294,6 +309,7 @@
     $('scrolls').textContent = scrolls;
     $('use-potion').classList.toggle('empty', !h.potions);
     $('use-scroll').classList.toggle('empty', !scrolls);
+    $('view').classList.toggle('trippy', h.trip > 0);
     $('use-hourglass').hidden = !h.hourglass;
     $('hourglass').textContent = h.hourglass;
     $('use-pick').hidden = !h.digs;
@@ -305,6 +321,7 @@
     if (h.invisible) st.push('Invisible ' + h.invisible);
     if (h.invincible) st.push('Invincible ' + h.invincible);
     if (digging) st.push('Digging: which way?');
+    if (h.trip) st.push('Seeing colours ' + h.trip);
     if (s.dread && s.dread.m) st.push('Hunted!');
     if (s.debt) {
       const left = s.debt.due - s.levels;
@@ -409,6 +426,7 @@
 
   function fillShop() {
     $('shop-gold').textContent = s.hero.gold;
+    $('shop-name').textContent = s.merchant ? s.merchant.name : 'Merchant';
     const ol = $('shop-list');
     ol.innerHTML = '';
     Game.shopItems(s).forEach((it, i) => {
@@ -439,8 +457,38 @@
 
   function closeShop() { $('shop-menu').hidden = true; }
 
+  // ---- a question with a few answers (the forgetful knight) ---------------------
+
+  let askCount = 0;
+  function openAsk(e) {
+    if (!s || s.over) return;
+    $('ask-title').textContent = e.title;
+    $('ask-text').textContent = e.text;
+    const ol = $('ask-list');
+    ol.innerHTML = '';
+    askCount = e.options.length;
+    e.options.forEach((o, i) => {
+      const li = document.createElement('li');
+      const b = document.createElement('button');
+      b.innerHTML = '<kbd>' + (i + 1) + '</kbd><b>' + o + '</b>';
+      b.addEventListener('click', () => answer(i));
+      li.appendChild(b);
+      ol.appendChild(li);
+    });
+    $('ask-menu').hidden = false;
+    ol.querySelector('button').focus();
+  }
+
+  function answer(i) {
+    $('ask-menu').hidden = true;
+    if (i < 0) { msg('"Take your time... I have plenty of it."', 'hint'); return; }
+    if (!s || s.over) return;
+    Render.play(s, Game.act(s, { type: 'answer', choice: i }), hooks);
+    hud();
+  }
+
   const hooks = {
-    msg, hud, shop: openShop,
+    msg, hud, shop: openShop, ask: openAsk,
     sound: (name) => Sound.play(name),
     dead: gameOver,
     level: () => { hud(); saveRun(); },
@@ -559,6 +607,12 @@
       else if (k === 'Escape') { e.preventDefault(); closeShop(); }
       return;
     }
+    if (!$('ask-menu').hidden) {
+      const n = parseInt(k, 10);
+      if (n >= 1 && n <= askCount) { e.preventDefault(); answer(n - 1); }
+      else if (k === 'Escape') { e.preventDefault(); answer(-1); }
+      return;
+    }
     if (!$('log-menu').hidden) {
       if (k === 'Escape' || k === 'p') { e.preventDefault(); closeLog(); }
       return; // arrows and Page Up/Down scroll the list
@@ -619,6 +673,7 @@
   $('scroll-menu').addEventListener('pointerdown', (e) => { if (e.target.id === 'scroll-menu') closeScrolls(); });
   $('shop-menu').addEventListener('pointerdown', (e) => { if (e.target.id === 'shop-menu') closeShop(); });
   $('log-menu').addEventListener('pointerdown', (e) => { if (e.target.id === 'log-menu') closeLog(); });
+  $('ask-menu').addEventListener('pointerdown', (e) => { if (e.target.id === 'ask-menu') answer(-1); });
   $('open-log').addEventListener('click', openLog);
   $('use-hourglass').addEventListener('click', turnHourglass);
   $('use-pick').addEventListener('click', startDig);

@@ -43,9 +43,18 @@
 
   <div id="shop-menu" class="screen dialog" hidden>
     <div class="panel" role="dialog" aria-labelledby="shop-title">
-      <h2 id="shop-title"><i data-s="merchant"></i> Merchant <span class="purse"><i data-s="coins"></i><span id="shop-gold"></span></span></h2>
+      <h2 id="shop-title"><i data-s="merchant"></i> <span id="shop-name">Merchant</span> <span class="purse"><i data-s="coins"></i><span id="shop-gold"></span></span></h2>
       <ol id="shop-list" class="pick-list"></ol>
       <p class="help">Press a number or click to buy · <kbd>Esc</kbd> leave</p>
+    </div>
+  </div>
+
+  <div id="ask-menu" class="screen dialog" hidden>
+    <div class="panel" role="dialog" aria-labelledby="ask-title">
+      <h2 id="ask-title"></h2>
+      <p id="ask-text"></p>
+      <ol id="ask-list" class="pick-list"></ol>
+      <p class="help">Press a number or click to answer · <kbd>Esc</kbd> say nothing</p>
     </div>
   </div>
 
@@ -64,7 +73,6 @@
       <p class="actions"><button id="continue" hidden>Continue</button> <button id="start">New game</button></p>
       <p class="help" id="saved-run" hidden></p>
       <div id="best"></div>
-      <p class="help">Explore the dark, open chests, beware of hidden traps and find the stairs down. Kill monsters to gain levels: HP and strength grow as you do. At depth 30 lies the Heart of the Deep: take it and climb back to the surface to win.</p>
     </div>
   </section>
 
@@ -82,6 +90,7 @@
       <i data-s="skull" class="big" id="over-icon"></i>
       <h1 id="over-title">You died</h1>
       <p id="cause"></p>
+      <p id="verse" hidden></p>
       <dl id="summary"></dl>
       <p id="record"></p>
       <div id="rewind-offer" hidden>

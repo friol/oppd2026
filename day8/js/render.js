@@ -45,7 +45,7 @@ const Render = (() => {
     gold: { glow: '255,215,90', tint: [90, 70, 10], r: 3 },
     sleep: { glow: '190,140,255', tint: [50, 25, 100], r: 4 },
   };
-  const decorColor = (o) => LIGHT_COLORS[o.kind === 'crystals' ? 'crystal' : o.kind] || LIGHT_COLORS.candle;
+  const decorColor = (o) => (o.magic ? LIGHT_COLORS.magic : LIGHT_COLORS[o.kind === 'crystals' ? 'crystal' : o.kind] || LIGHT_COLORS.candle);
   const AMBIENT = 0.16;
   const REMEMBERED = 0.8;      // darkness of cells seen before but not in view
   const ITEM_SPRITES = { coins: 'coins', gem: 'gem', crown: 'crown', potion: 'potion', scroll: 'scroll', ring: 'ring', heart: 'heart', artifact: 'artifact', pickaxe: 'pickaxe', hourglass: 'hourglass' };
@@ -64,6 +64,7 @@ const Render = (() => {
   let prints = new Map();     // footprints in snow and sand: cell -> { x, y, dx, dy, turn }
   const mapCache = new WeakMap(); // per map: lava cells and sun shafts
   let bats = [], nextBat = 0;     // bats flying over the dark, only for the mood
+  let rolls = new Map();          // coins rolling to their cell: cell -> { from, t0 }
   let reveal = null;              // mapping wave: { t0, x, y, before }
   let grass = new Map();          // grass cells stepped on: cell -> last time someone stood there
   const veiled = (c, now) => !!reveal && !reveal.before[c] &&
@@ -202,6 +203,14 @@ const Render = (() => {
           fx.push({ kind: 'text', text: e.text, cls: e.cls, x: e.x, y: e.y, t0: t + 150, dur: 1100 });
           t += 60;
           break;
+        case 'drop':
+          rolls.set(idx(e.x, e.y), { from: e.from, t0: t });
+          break;
+        case 'lost': {
+          const a = Math.random() * Math.PI * 2;
+          fx.push({ kind: 'lostcoin', x: e.x, y: e.y, t0: t, dur: 900, dx: Math.cos(a) * 1.6, dy: Math.sin(a) * 1.6 });
+          break;
+        }
         case 'pickup':
           fx.push({ kind: 'rise', name: e.sprite || ITEM_SPRITES[e.kind], x: e.x, y: e.y, t0: t, dur: 700 });
           break;
@@ -226,7 +235,7 @@ const Render = (() => {
           fx.push({ kind: 'sprite', name: TRAP_SPRITES[e.kind], x: e.x, y: e.y, t0: t, dur: 500, size: 1.1 });
           break;
         case 'level':
-          fx = []; shots = []; parts = []; prints = new Map(); bats = []; nextBat = t + 5000; reveal = null; grass = new Map();
+          fx = []; shots = []; parts = []; prints = new Map(); bats = []; nextBat = t + 5000; reveal = null; grass = new Map(); rolls = new Map();
           s.hero.anim = null; s.hero.lunge = null;
           cam.snap = true;
           fadeStart = t;
@@ -247,6 +256,9 @@ const Render = (() => {
         case 'shop':
           at(t + 120, () => hooks.shop());
           break;
+        case 'ask':
+          at(t + 120, () => hooks.ask(e));
+          break;
         case 'msg':
           at(t, () => hooks.msg(e.text, e.cls));
           break;
@@ -263,11 +275,73 @@ const Render = (() => {
     at(t, () => hooks.hud());
   }
 
+  // fireworks over the screen while the winner looks at the victory panel
+  let rockets = [], nextRocket = 0;
+  function fireworks(s, dt, now) {
+    if (!(s.over && s.won)) { rockets = []; return; }
+    if (now > nextRocket) {
+      nextRocket = now + 300 + Math.random() * 600;
+      const x = vw * (0.15 + Math.random() * 0.7), y = vh * (0.1 + Math.random() * 0.45);
+      const hue = Math.floor(Math.random() * 360), n = 40 + (Math.random() * 30 | 0);
+      for (let i = 0; i < n; i++) {
+        const a = Math.PI * 2 * i / n, sp = 150 + Math.random() * 200;
+        rockets.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, age: 0, life: 1 + Math.random() * 0.8, hue: hue + Math.random() * 30 });
+      }
+      if (typeof Sound !== 'undefined') Sound.play('firework');
+    }
+    ctx.globalCompositeOperation = 'lighter';
+    for (const r of rockets) {
+      r.age += dt; r.x += r.vx * dt; r.y += r.vy * dt; r.vy += 60 * dt; r.vx *= 0.985; r.vy *= 0.985;
+      const a = Math.max(0, 1 - r.age / r.life);
+      // a short trail and a glowing spark
+      ctx.strokeStyle = 'hsla(' + r.hue + ',100%,60%,' + a * 0.6 + ')';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(r.x, r.y); ctx.lineTo(r.x - r.vx * 0.06, r.y - r.vy * 0.06); ctx.stroke();
+      ctx.fillStyle = 'hsla(' + r.hue + ',100%,75%,' + a + ')';
+      ctx.beginPath(); ctx.arc(r.x, r.y, 3.2, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    rockets = rockets.filter(r => r.age < r.life);
+  }
+
+  // the name of the level in big letters, for a moment, on every arrival
+  let card = { key: null, t0: 0, title: '', sub: '' };
+  const CARD_TIME = 2800;
+  function titleCard(s, now) {
+    const key = s.levels + ':' + s.depth;
+    if (card.key !== key) card = { key, t0: now + 250, title: s.title || s.theme.name, sub: 'Depth ' + s.depth + (s.ascending ? ' — on the way up' : '') };
+    const p = (now - card.t0) / CARD_TIME;
+    if (p < 0 || p > 1) return;
+    const a = p < 0.15 ? p / 0.15 : p > 0.7 ? (1 - p) / 0.3 : 1;
+    const y = vh * 0.3 - (1 - a) * 8;
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.textAlign = 'center';
+    const big = Math.round(Math.min(44, vw / 14));
+    ctx.font = 'bold ' + Math.round(big * 0.4) + 'px Consolas, "Lucida Console", monospace';
+    ctx.fillStyle = '#c9c0d8';
+    ctx.lineWidth = 4; ctx.strokeStyle = '#000';
+    ctx.strokeText(card.sub.toUpperCase(), vw / 2, y - big * 0.9);
+    ctx.fillText(card.sub.toUpperCase(), vw / 2, y - big * 0.9);
+    ctx.font = 'bold ' + big + 'px Georgia, "Times New Roman", serif';
+    ctx.lineWidth = 6;
+    ctx.strokeText(card.title, vw / 2, y);
+    const g = ctx.createLinearGradient(0, y - big, 0, y);
+    g.addColorStop(0, '#fff3c0'); g.addColorStop(1, '#ffb02e');
+    ctx.fillStyle = g;
+    ctx.fillText(card.title, vw / 2, y);
+    const w = Math.min(vw * 0.6, ctx.measureText(card.title).width + 60) * Math.min(1, p * 4);
+    ctx.fillStyle = 'rgba(255,176,46,0.7)';
+    ctx.fillRect(vw / 2 - w / 2, y + big * 0.3, w, 2);
+    ctx.restore();
+  }
+
   // the screen flashes and ripples after the hourglass is turned
   let rewound = -1e9;
   const rewindFlash = () => { rewound = performance.now(); };
 
   function reset() {
+    card.key = null;
     fx = []; shots = []; jobs = []; parts = []; prints = new Map(); bats = []; nextBat = performance.now() + 5000; reveal = null; grass = new Map(); busyUntil = 0; cam.snap = true; fadeStart = performance.now();
   }
 
@@ -298,6 +372,12 @@ const Render = (() => {
 
   function monsterSprite(m, now) {
     if (m.type === 'mimic') return 'chest';
+    if (m.type === 'reflection') return m.cls + '_' + (m.dir || 'down');
+    if (m.type === 'rat') return 'rat' + (Math.floor((now + m.id * 77) / 140) % 2);
+    if (m.type === 'golem') return 'statue';
+    if (m.type === 'wisp') return 'candle';
+    if (m.type === 'doormimic') return 'door';
+    if (m.type === 'chicken') return 'chicken' + (Math.floor((now + m.id * 137) / 300) % 4 === 0 ? 1 : 0);
     if (m.type === 'shade') return (m.past.cls || 'hero') + '_' + (m.dir || 'down');
     const frame = Math.floor((now + m.id * 137) / 420) % 2;
     return m.type + '_' + (m.look + frame * m.def.cols);
@@ -394,19 +474,45 @@ const Render = (() => {
     }
     for (const d of s.decor.values()) {
       if (!onScreen(d)) continue;
+      if (d.treasurer) {
+        const fl = Math.sin(now / 260 + d.x) * tile * 0.05;
+        ctx.globalAlpha = 0.8;
+        ctx.filter = 'sepia(1) saturate(2.5) brightness(1.1)';
+        spr('ghost_' + (Math.floor(now / 420) % 2 ? 2 : 0), ox + d.x * tile, oy + d.y * tile - tile * 0.05 + fl, tile);
+        ctx.filter = 'none';
+        ctx.globalAlpha = 1;
+        spr('coins', ox + d.x * tile + tile * 0.3, oy + d.y * tile + tile * 0.55 + fl * 0.5, tile * 0.4);
+        continue;
+      }
       if (d.plant) {
         const ps = tile * 1.15;
         sway(d.kind, ox + d.x * tile + (tile - ps) / 2, oy + d.y * tile + tile - ps, ps, d.x * 1.3 + d.y, now);
         continue;
       }
       if (d.kind === 'crystal' || d.kind === 'crystals') ctx.filter = 'brightness(' + (1.1 + 0.3 * Math.sin(now / 650 + d.x * 2 + d.y)) + ')';
-      const k2 = d.block ? 1 : d.kind === 'web' ? 0.9 : 0.62;
+      const k2 = d.tomb ? 0.72 : d.block ? 1 : d.kind === 'web' ? 0.9 : 0.62;
       const px = ox + d.x * tile + tile * (1 - k2) / 2;
       const py = d.kind === 'web' ? oy + d.y * tile : oy + d.y * tile + tile * (1 - k2) * 0.8;
       if (d.searched || (d.well && !d.uses)) ctx.filter = 'brightness(0.6) saturate(0.6)';
+      if (d.magic) ctx.filter = 'hue-rotate(' + Math.round(now / 8 % 360) + 'deg) brightness(1.3)';
       if (d.kind === 'web') web(s, d, px, py, tile * k2, now);
       else spr(d.kind, px, py, tile * k2);
       ctx.filter = 'none';
+      if (d.word) {
+        ctx.font = 'bold ' + Math.round(tile * (d.word.length > 6 ? 0.16 : 0.22)) + 'px Consolas, monospace';
+        ctx.textAlign = 'center';
+        ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+        ctx.strokeText(d.word, ox + (d.x + 0.5) * tile, oy + (d.y + 0.55) * tile);
+        ctx.fillStyle = '#f4f0e6';
+        ctx.fillText(d.word, ox + (d.x + 0.5) * tile, oy + (d.y + 0.55) * tile);
+        ctx.textAlign = 'start';
+      }
+      if (d.statue) {
+        const hp2 = pos(s.hero, now), k = tile / 16;
+        const ex = Math.max(-0.4, Math.min(0.4, (hp2.x - d.x) * 0.15)), ey = Math.max(-0.3, Math.min(0.4, (hp2.y - d.y) * 0.15));
+        ctx.fillStyle = '#1a1420';
+        for (const sx of [6, 9]) ctx.fillRect(px + (sx + 0.25 + ex) * k, py + (3.25 + ey) * k, k * 0.55, k * 0.55);
+      }
       if (d.nest && d.hp < d.maxHp) {
         const w = tile * 0.7, bx = ox + d.x * tile + (tile - w) / 2, by = oy + d.y * tile - tile * 0.02;
         ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(bx - 1, by - 1, w + 2, 5);
@@ -419,6 +525,23 @@ const Render = (() => {
     for (const it of s.items.values()) {
       if (!onScreen(it)) continue;
       const bob = Math.sin(now / 300 + it.x + it.y) * tile * 0.04;
+      // a coin that has just dropped rolls and bounces to its place
+      const rl = rolls.get(idx(it.x, it.y));
+      if (rl) {
+        const p = (now - rl.t0) / 600;
+        if (p >= 1) rolls.delete(idx(it.x, it.y));
+        else {
+          const q = Math.max(0, p), k = 1 - (1 - q) * (1 - q);
+          const rx = rl.from.x + (it.x - rl.from.x) * k, ry = rl.from.y + (it.y - rl.from.y) * k;
+          const hop = Math.abs(Math.sin(q * Math.PI * 2.5)) * (1 - q) * tile * 0.3;
+          ctx.save();
+          ctx.translate(ox + (rx + 0.5) * tile, oy + (ry + 0.48) * tile - hop);
+          ctx.rotate(q * 9);
+          spr('coins', -tile * 0.32, -tile * 0.32, tile * 0.64);
+          ctx.restore();
+          continue;
+        }
+      }
       spr(it.kind === 'gear' ? it.id : ITEM_SPRITES[it.kind], ox + it.x * tile + tile * 0.18, oy + it.y * tile + tile * 0.16 + bob, tile * 0.64);
     }
     for (const tc of s.torches) {
@@ -514,12 +637,31 @@ const Render = (() => {
           if (wounded && !flashing) hurtTint(monsterSprite(m, now), px - (bs - tile) / 2, py - (bs - tile) * 0.92 + float, bs, now, m.id);
         } else {
           if (m.def.hunter && !flashing) ctx.filter = 'hue-rotate(190deg) saturate(1.3) brightness(0.9)';
+          // the shy ghost is pale and small, the reflection is a bluish copy of the hero
+          if (m.def.shy && !flashing) { ctx.filter = 'brightness(1.5) saturate(0.25)'; ctx.globalAlpha = 0.6; }
+          if (m.def.ally && !flashing) { ctx.filter = 'hue-rotate(180deg) brightness(1.2) saturate(0.7)'; ctx.globalAlpha = 0.8 + 0.1 * Math.sin(now / 200); }
+          if (m.def.mob && !flashing) ctx.filter = 'sepia(0.6) saturate(3) hue-rotate(-30deg)';
+          if (m.def.knight && !flashing) ctx.filter = 'grayscale(1) brightness(1.35) contrast(1.2)';
+          if (m.def.pet && !flashing) ctx.filter = 'hue-rotate(160deg) saturate(1.3)';
+          if (m.def.wisp) {
+            ctx.globalCompositeOperation = 'lighter';
+            glowAt(px + tile / 2, py + tile * 0.4, tile * 0.6, 0.35 + 0.1 * Math.sin(now / 120 + m.id), '255,200,110');
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = 0.85;
+          }
+          const big = m.def.thief ? 0.6 : m.def.mama ? 1.45 : m.def.pet ? 0.5 + 0.12 * ((s.pet && s.pet.size) || 0) : m.def.wisp ? 0.55 : 1;
           // a mimic gnashes, bobbing up and down
-          const gnash = m.type === 'mimic' ? Math.abs(Math.sin(now / 120 + m.id)) * tile * 0.06 : 0;
-          spr(monsterSprite(m, now), px, py + float - gnash, tile);
+          const gnash = m.type === 'mimic' || m.type === 'doormimic' ? Math.abs(Math.sin(now / (m.def.shy ? 70 : 120) + m.id)) * tile * 0.06 : 0;
+          const bsz = tile * big;
+          spr(monsterSprite(m, now), px + (tile - bsz) / 2, py + float - gnash + (tile - bsz) * (m.def.wisp ? 0.4 : 0.92) - (m.def.wisp ? Math.sin(now / 300 + m.id) * tile * 0.06 : 0), bsz);
           ctx.filter = 'none';
           if (wounded && !flashing) hurtTint(monsterSprite(m, now), px, py + float - gnash, tile, now, m.id);
-          if (m.type === 'mimic') {
+          if (m.type === 'golem') {
+            ctx.globalCompositeOperation = 'lighter';
+            for (const sx of [6.5, 9.5]) glowAt(px + tile * sx / 16, py + float + tile * 3.5 / 16, tile * 0.08, 1, '255,60,30');
+            ctx.globalCompositeOperation = 'source-over';
+          }
+          if ((m.type === 'mimic' && !m.def.shy) || m.type === 'doormimic') {
             ctx.fillStyle = '#f4f0e0';
             for (let i = 0; i < 5; i++) {
               const tx = px + tile * (0.24 + i * 0.12), ty = py + tile * 0.5 - gnash;
@@ -536,6 +678,12 @@ const Render = (() => {
       ctx.filter = 'none';
       if (!a.hero && !a.cat) {
         const m = a.e;
+        if (m.surrender) {
+          const fx2 = px + tile * 0.72, fy2 = py - tile * 0.2 + Math.sin(now / 150) * tile * 0.02;
+          ctx.fillStyle = '#6a4422'; ctx.fillRect(fx2, fy2, tile * 0.04, tile * 0.42);
+          ctx.fillStyle = '#f4f0e6'; ctx.fillRect(fx2 + tile * 0.04, fy2 + Math.sin(now / 90) * tile * 0.01, tile * 0.2, tile * 0.13);
+        }
+        if (m.def.friend) spr('heart', px + tile * 0.37, py - tile * 0.16 + Math.sin(now / 300 + m.id) * tile * 0.04, tile * 0.26);
         if (m.peaceful) spr('heart', px + tile * 0.37, py - tile * 0.16 + Math.sin(now / 300 + m.id) * tile * 0.04, tile * 0.26);
         if (m.hp < m.maxHp && !m.def.boss) {
           const w = tile * 0.7, bx = px + (tile - w) / 2, by = py - tile * 0.02;
@@ -597,7 +745,15 @@ const Render = (() => {
         glowAt(cx + tile / 2, cy + tile / 2, tile * 1.8, 0.4 * (1 - p), LIGHT_COLORS[f.name].glow);
         ctx.globalCompositeOperation = 'source-over';
       }
-      if (f.kind === 'ring') {
+      if (f.kind === 'lostcoin') {
+        const hop = Math.abs(Math.sin(p * Math.PI * 3)) * (1 - p) * tile * 0.25;
+        ctx.globalAlpha = 1 - p;
+        ctx.save();
+        ctx.translate(cx + tile / 2 + f.dx * p * tile, cy + tile * 0.5 + f.dy * p * tile - hop);
+        ctx.rotate(p * 14);
+        spr('coins', -tile * 0.2, -tile * 0.2, tile * 0.4 * (1 - p * 0.6));
+        ctx.restore();
+      } else if (f.kind === 'ring') {
         const r = f.r * tile * (1 - (1 - p) * (1 - p));
         ctx.globalCompositeOperation = 'lighter';
         ctx.strokeStyle = 'rgba(' + f.color + ',' + 0.75 * (1 - p) + ')';
@@ -687,6 +843,8 @@ const Render = (() => {
       ctx.fillRect(0, 0, vw, vh);
     }
     vignette(th, s.night || 0);
+    titleCard(s, now);
+    fireworks(s, dt, now);
     const rw = (now - rewound) / 900;
     if (rw >= 0 && rw < 1) {
       ctx.fillStyle = 'rgba(180,210,255,' + 0.55 * (1 - rw) + ')';
@@ -1127,7 +1285,7 @@ const Render = (() => {
     ctx.globalCompositeOperation = 'lighter';
     for (const m of s.monsters) {
       const c = idx(m.x, m.y);
-      if (s.vis[c] || !m.seenOnce || m.asleep || !s.seen[c] || Math.abs(m.x - h.x) + Math.abs(m.y - h.y) > EYES_RANGE) continue;
+      if (s.vis[c] || !m.seenOnce || m.asleep || m.def.ally || m.def.shy || m.def.musician || m.def.friend || m.def.weaver || m.def.pet || m.def.wisp || m.def.knight || m.def.picnic || !s.seen[c] || Math.abs(m.x - h.x) + Math.abs(m.y - h.y) > EYES_RANGE) continue;
       if ((now / 1000 + m.id * 0.37) % 3.2 < 0.14) continue; // a blink
       const p = pos(m, now);
       const big = m.def.boss ? Game.BOSS_SIZE : 1;
@@ -1289,7 +1447,7 @@ const Render = (() => {
   // kinds drawn under the lightmap (they fade in the dark): dust, snow, sand, ash;
   // kinds that shine on top of it, only where the hero can see: ember, fly
 
-  const GLOWING = { ember: 1, fly: 1, spark: 1 };
+  const GLOWING = { ember: 1, fly: 1, spark: 1, note: 1 };
 
   function particles(s, dt, now, ox, oy, x0, y0, x1, y1, th) {
     const count = (rate) => { const k = rate * dt; let n = Math.floor(k); if (Math.random() < k - n) n++; return n; };
@@ -1330,6 +1488,15 @@ const Render = (() => {
           break;
         }
       }
+    }
+    // notes from the bard and the skeleton musicians
+    for (const m of s.monsters) {
+      if (!m.def.musician || !s.vis[idx(m.x, m.y)]) continue;
+      for (let i = count(1.5); i--;) add({ k: 'note', x: m.x + rnd(0.2, 0.8), y: m.y + 0.2, vx: rnd(-0.2, 0.2), vy: rnd(-0.7, -0.4), life: rnd(1, 1.6), size: 1, ph: rnd(0, 6) });
+    }
+    for (const d of s.decor.values()) {
+      if (!d.bard || !s.vis[idx(d.x, d.y)]) continue;
+      for (let i = count(d.sung ? 2.5 : 0.8); i--;) add({ k: 'note', x: d.x + rnd(0.3, 0.9), y: d.y + 0.2, vx: rnd(-0.2, 0.2), vy: rnd(-0.7, -0.4), life: rnd(1, 1.6), size: 1, ph: rnd(0, 6) });
     }
     // the Dread trails black smoke
     for (const m of s.monsters) {
@@ -1451,6 +1618,11 @@ const Render = (() => {
           ctx.fillRect(-r * 0.7, -r * 0.4, r * 1.4, r * 0.8);
           ctx.restore();
           break;
+        case 'note':
+          ctx.font = 'bold ' + Math.round(tile * 0.28) + 'px Georgia, serif';
+          ctx.fillStyle = 'rgba(255,230,150,' + fade + ')';
+          ctx.fillText(p.ph > 3 ? '♪' : '♫', x + Math.sin(p.age * 5 + p.ph) * tile * 0.05, y);
+          break;
         case 'ember':
           ctx.fillStyle = 'rgba(255,' + Math.round(200 - t * 120) + ',60,' + fade * 0.9 + ')';
           ctx.fillRect(x - r / 2, y - r / 2, r, r);
@@ -1552,7 +1724,7 @@ const Render = (() => {
     const ambient = (th.ambient ?? AMBIENT) * (1 - 0.72 * night) * dim;
     const d = ldata.data;
     const flick = 1 + Math.sin(now / 130) * 0.025 + Math.sin(now / 53) * 0.02;
-    const sources = [{ x: hp.x, y: hp.y, r: HERO_LIGHT * flick * (s.special === 'gauntlet' ? 0.55 : 1), k: 1, tint: null }];
+    const sources = [{ x: hp.x, y: hp.y, r: HERO_LIGHT * flick * (s.special === 'gauntlet' ? 0.55 : 1) * (1 + 0.08 * (s.hero.lantern || 0)), k: 1, tint: null }];
     for (const tc of s.torches) {
       const f = 1 + Math.sin(now / 90 + tc.phase) * 0.05;
       sources.push({ x: tc.x, y: tc.y + 0.6, r: TORCH_LIGHT * f, k: 0.9, tint: LIGHT_COLORS.torch.tint });
@@ -1563,6 +1735,7 @@ const Render = (() => {
       const r = o.light * (crystal ? 1 + 0.12 * Math.sin(now / 650 + o.x * 2 + o.y) : 1);
       sources.push({ x: o.x, y: o.y, r, k: crystal ? 0.45 : 0.7, tint: decorColor(o).tint });
     }
+    for (const m of s.monsters) if (m.def.wisp && s.vis[idx(m.x, m.y)]) sources.push({ x: m.x, y: m.y, r: 2.4, k: 0.6, tint: LIGHT_COLORS.candle.tint });
     const lavaCells = cache(s).lava.filter(c => s.seen[c]);
     for (const c of lavaCells) {
       const x = c % W, y = (c / W) | 0;
