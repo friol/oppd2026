@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>roguelAIke</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="view" aria-label="Dungeon view"></canvas>
+
+  <header id="hud" hidden>
+    <i id="portrait" class="portrait" title="Hero"></i>
+    <div class="stat hp" title="Hit points"><i data-s="heart"></i><div class="bar"><b id="hp-bar"></b><span id="hp"></span></div></div>
+    <div class="stat" title="Strength: grows with levels and kills"><span class="k">STR</span><span id="str"></span></div>
+    <div class="stat" id="weapon" title="Weapon"><i data-s="dagger"></i><span class="k">ATK</span><span id="atk"></span></div>
+    <div class="stat" id="armor" title="Armour"><i data-s="leather"></i><span class="k">DEF</span><span id="def"></span></div>
+    <div class="stat lv" title="Level and experience"><span class="k">LV</span><span id="lvl"></span><div class="bar xp"><b id="xp-bar"></b></div></div>
+    <div class="stat" title="Depth"><i data-s="stairs_down"></i><span id="depth"></span></div>
+    <div class="stat" title="Gold"><i data-s="coins"></i><span id="gold"></span></div>
+    <div class="stat" title="Foes slain"><i data-s="skull"></i><span id="kills"></span></div>
+    <button class="stat use" id="use-potion" title="Drink a healing potion (Q)"><i data-s="potion"></i><span id="potions"></span><kbd>Q</kbd></button>
+    <button class="stat use" id="use-scroll" title="Read a scroll (R)"><i data-s="scroll"></i><span id="scrolls"></span><kbd>R</kbd></button>
+    <button class="stat use" id="use-hourglass" title="Turn the hourglass: back 10 turns (T)" hidden><i data-s="hourglass"></i><span id="hourglass"></span><kbd>T</kbd></button>
+    <button class="stat use" id="use-pick" title="Dig through a wall (G, then a direction)" hidden><i data-s="pickaxe"></i><span id="digs"></span><kbd>G</kbd></button>
+    <button class="stat use" id="open-log" title="Message log (P)"><span class="k">LOG</span><kbd>P</kbd></button>
+    <div class="status" id="status"></div>
+    <button class="icon-btn" id="sound-btn" title="Sound on/off (M)" aria-label="Sound on/off"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path class="wave" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path class="cross" d="M16 9l6 6M22 9l-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+  </header>
+
+  <canvas id="minimap" hidden title="Map (Tab)"></canvas>
+  <ol id="log" aria-live="polite" hidden></ol>
+  <footer id="keys" hidden>Arrows/WASD move &amp; attack · Space wait/search · Enter / &lt; stairs · Q potion · R scroll · P log · Tab map · M sound</footer>
+
+  <div id="scroll-menu" class="screen dialog" hidden>
+    <div class="panel" role="dialog" aria-labelledby="scroll-title">
+      <h2 id="scroll-title"><i data-s="scroll"></i> Scrolls</h2>
+      <ol id="scroll-list" class="pick-list"></ol>
+      <p class="help">Press a number or click to read · <kbd>Esc</kbd> close</p>
+    </div>
+  </div>
+
+  <div id="shop-menu" class="screen dialog" hidden>
+    <div class="panel" role="dialog" aria-labelledby="shop-title">
+      <h2 id="shop-title"><i data-s="merchant"></i> Merchant <span class="purse"><i data-s="coins"></i><span id="shop-gold"></span></span></h2>
+      <ol id="shop-list" class="pick-list"></ol>
+      <p class="help">Press a number or click to buy · <kbd>Esc</kbd> leave</p>
+    </div>
+  </div>
+
+  <div id="log-menu" class="screen dialog" hidden>
+    <div class="panel" role="dialog" aria-labelledby="log-title">
+      <h2 id="log-title">Message log</h2>
+      <ol id="history" tabindex="0"></ol>
+      <p class="help"><kbd>P</kbd> or <kbd>Esc</kbd> close</p>
+    </div>
+  </div>
+
+  <section id="title" class="screen">
+    <img src="assets/roguelAIke.jpg" alt="roguelAIke: a hero with sword and shield faces a skeleton and a demon in a torch-lit dungeon">
+    <div class="menu">
+      <p class="blink" id="title-hint">Press <kbd>Enter</kbd> to begin your descent</p>
+      <p class="actions"><button id="continue" hidden>Continue</button> <button id="start">New game</button></p>
+      <p class="help" id="saved-run" hidden></p>
+      <div id="best"></div>
+      <p class="help">Explore the dark, open chests, beware of hidden traps and find the stairs down. Kill monsters to gain levels: HP and strength grow as you do. At depth 30 lies the Heart of the Deep: take it and climb back to the surface to win.</p>
+    </div>
+  </section>
+
+  <section id="choose" class="screen" hidden>
+    <div class="menu">
+      <h1>Choose your hero</h1>
+      <div id="classes" role="radiogroup" aria-label="Choose your class"></div>
+      <p class="actions"><button id="begin">Begin</button> <button id="back">Back</button></p>
+      <p class="help"><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> or the arrows to choose · <kbd>Enter</kbd> begin · <kbd>Esc</kbd> back</p>
+    </div>
+  </section>
+
+  <section id="over" class="screen" hidden>
+    <div class="panel">
+      <i data-s="skull" class="big" id="over-icon"></i>
+      <h1 id="over-title">You died</h1>
+      <p id="cause"></p>
+      <dl id="summary"></dl>
+      <p id="record"></p>
+      <div id="rewind-offer" hidden>
+        <p class="glow">The hourglass in your hand starts to glow...</p>
+        <p class="actions"><button id="do-rewind">Turn the hourglass</button> <button id="accept">Accept your fate</button></p>
+        <p class="help"><kbd>T</kbd> turn back 10 turns · <kbd>Enter</kbd> accept</p>
+      </div>
+      <div id="heir" hidden>
+        <p class="heir-title">Leave an heirloom to your heir:</p>
+        <ol id="heir-list" class="pick-list"></ol>
+      </div>
+      <div id="over-actions">
+        <p class="actions"><button id="again">Try again</button> <button id="to-title">Title</button></p>
+        <p class="help"><kbd>1</kbd>–<kbd>9</kbd> heirloom · <kbd>Enter</kbd> new game · <kbd>Esc</kbd> title</p>
+      </div>
+    </div>
+  </section>
+
+  <script src="js/atlas.js"></script>
+  <script src="js/dungeon.js"></script>
+  <script src="js/fov.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/sound.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
