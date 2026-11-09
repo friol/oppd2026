@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="260" viewBox="0 0 1600 260" preserveAspectRatio="xMidYMax slice">
+  <!-- Rome at night, in silhouette: pines, cypresses, a column, a dome,
+       an arch and the Colosseum, with a few warm lit windows -->
+  <defs>
+    <linearGradient id="haze" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1b1640" stop-opacity="0"/>
+      <stop offset="1" stop-color="#1b1640" stop-opacity="0.9"/>
+    </linearGradient>
+  </defs>
+
+  <!-- far city layer -->
+  <g fill="#161335">
+    <path d="M0 260V196h40v-10h34v14h30v-22h26v18h40v-8h36v16h44v-26h22v20h50v-12h30v20h60v-16h40v10h56v-30h28v26h60v-14h48v18h64v-22h40v16h70v-10h44v18h60v-26h36v22h58v-12h48v16h62v-20h44v14h60v-18h40v24h56v-10h48v14h54v-16h40v22h58v-12h38V260z"/>
+  </g>
+
+  <g fill="#0a0a1c">
+    <!-- umbrella pine, left -->
+    <path d="M70 260v-92h8v92z"/>
+    <path d="M74 172c-6-8-40-6-56-14-10-5-4-16 10-18 8-12 30-14 44-10 12-8 34-6 42 4 18 0 28 10 20 20-12 12-42 10-60 18z"/>
+    <!-- cypresses -->
+    <path d="M160 260c-14-40-12-120 6-170 18 50 20 130 6 170z"/>
+    <path d="M190 260c-10-34-9-96 5-136 14 40 15 102 5 136z"/>
+    <!-- broken column with capital -->
+    <path d="M300 260V118h-10v-10h48v10h-10v142z"/>
+    <path d="M286 108l4-8h48l4 8z"/>
+    <!-- houses -->
+    <path d="M220 260v-64l30-20 30 20v64z"/>
+    <path d="M350 260v-80h70v80z"/>
+    <path d="M346 182l39-24 39 24z"/>
+    <!-- St Peter's: drum, dome, lantern, cross, facade -->
+    <path d="M440 260v-70h220v70z"/>
+    <path d="M430 192h240v-12H430z"/>
+    <path d="M490 180v-40h120v40z"/>
+    <path d="M480 142c0-60 140-60 140 0z"/>
+    <path d="M538 92v-24h24v24z"/>
+    <path d="M532 70l18-14 18 14z"/>
+    <path d="M548 56v-18h4v18zM542 46h16v4h-16z"/>
+    <path d="M470 180v-26h16v26zM614 180v-26h16v26z"/>
+    <path d="M462 154c0-14 32-14 32 0zM606 154c0-14 32-14 32 0z"/>
+    <!-- rooftops -->
+    <path d="M660 260v-58h50v58zM700 260v-74h44v74z"/>
+    <path d="M696 188l26-16 26 16z"/>
+    <!-- arch of Constantine -->
+    <path fill-rule="evenodd" d="M760 260V150h170v110zM820 260v-62c0-30 50-30 50 0v62zM778 260v-38c0-14 24-14 24 0v38zM888 260v-38c0-14 24-14 24 0v38z"/>
+    <path d="M752 152h186v-14H752z"/>
+    <path d="M770 138v-22h150v22z"/>
+    <!-- Colosseum: the tall side on the right, ruined to the left -->
+    <path fill-rule="evenodd" d="M960 260V170c40-10 60-30 100-34 30-4 40 8 70-2 40-14 80-30 120-30 20 0 30 4 40 8V260z
+      M985 260v-34c0-12 18-12 18 0v34z M1020 260v-34c0-12 18-12 18 0v34z M1055 260v-34c0-12 18-12 18 0v34z
+      M1090 260v-34c0-12 18-12 18 0v34z M1125 260v-34c0-12 18-12 18 0v34z M1160 260v-34c0-12 18-12 18 0v34z
+      M1195 260v-34c0-12 18-12 18 0v34z M1230 260v-34c0-12 18-12 18 0v34z M1265 260v-34c0-12 18-12 18 0v34z"/>
+    <!-- cypresses and pine, right -->
+    <path d="M1335 260c-14-40-12-120 6-170 18 50 20 130 6 170z"/>
+    <path d="M1366 260c-10-34-9-96 5-136 14 40 15 102 5 136z"/>
+    <path d="M1486 260v-86h8v86z"/>
+    <path d="M1490 178c-8-6-44-6-60-14-10-6-2-16 12-18 10-12 34-12 46-6 14-8 36-4 44 6 20 2 28 14 18 22-14 10-42 4-60 10z"/>
+    <path d="M1540 260c-12-36-10-104 5-146 15 42 17 110 5 146z"/>
+    <path d="M1400 260v-60h60v60z"/>
+    <path d="M1396 202l34-20 34 20z"/>
+    <path d="M0 260v-12h1600v12z"/>
+  </g>
+
+  <!-- warm lights: Colosseum arches, windows -->
+  <g fill="#ffbe6a">
+    <g opacity="0.55">
+      <!-- three level tiers, in the same columns as the ground arcade, only where the wall stands -->
+      <path d="M987 208v-9c0-9 14-9 14 0v9zM1022 208v-9c0-9 14-9 14 0v9zM1057 208v-9c0-9 14-9 14 0v9zM1092 208v-9c0-9 14-9 14 0v9zM1127 208v-9c0-9 14-9 14 0v9zM1162 208v-9c0-9 14-9 14 0v9zM1197 208v-9c0-9 14-9 14 0v9zM1232 208v-9c0-9 14-9 14 0v9zM1267 208v-9c0-9 14-9 14 0v9z"/>
+      <path d="M1057 176v-9c0-9 14-9 14 0v9zM1092 176v-9c0-9 14-9 14 0v9zM1127 176v-9c0-9 14-9 14 0v9zM1162 176v-9c0-9 14-9 14 0v9zM1197 176v-9c0-9 14-9 14 0v9zM1232 176v-9c0-9 14-9 14 0v9zM1267 176v-9c0-9 14-9 14 0v9z"/>
+      <path d="M1197 144v-9c0-9 14-9 14 0v9zM1232 144v-9c0-9 14-9 14 0v9zM1267 144v-9c0-9 14-9 14 0v9z"/>
+    </g>
+    <g opacity="0.7">
+      <rect x="236" y="214" width="8" height="10"/><rect x="258" y="214" width="8" height="10"/>
+      <rect x="364" y="200" width="8" height="12"/><rect x="398" y="226" width="8" height="12"/>
+      <rect x="672" y="216" width="8" height="10"/><rect x="716" y="200" width="8" height="10"/><rect x="726" y="230" width="8" height="10"/>
+      <rect x="1414" y="216" width="8" height="10"/><rect x="1440" y="230" width="8" height="10"/>
+      <rect x="520" y="214" width="10" height="16"/><rect x="570" y="214" width="10" height="16"/>
+    </g>
+  </g>
+  <rect width="1600" height="260" fill="url(#haze)" opacity="0.35"/>
+</svg>

@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="640" viewBox="0 0 640 640">
+  <!-- Carrara marble: veins are contour lines of a fractal noise (a dark dip in the
+       transfer table around two noise levels), drawn on a rotated plane, on a warm white -->
+  <filter id="veins" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="0.0042 0.0016" numOctaves="6" seed="11"/>
+    <feColorMatrix type="matrix" values="1 0 0 0 0  1 0 0 0 0  1 0 0 0 0  0 0 0 0 1"/>
+    <feComponentTransfer>
+      <feFuncR type="table" tableValues="0.975 0.975 0.975 0.975 0.975 0.975 0.975 0.975 0.975 0.975 0.975 0.975 0.975 0.975 0.962 0.453 0.952 0.975 0.975 0.975 0.975 0.975 0.975 0.975 0.975 0.975 0.975 0.975 0.975 0.975 0.975 0.975 0.975"/>
+      <feFuncG type="table" tableValues="0.968 0.968 0.968 0.968 0.968 0.968 0.968 0.968 0.968 0.968 0.968 0.968 0.968 0.968 0.955 0.473 0.946 0.968 0.968 0.968 0.968 0.968 0.968 0.968 0.968 0.968 0.968 0.968 0.968 0.968 0.968 0.968 0.968"/>
+      <feFuncB type="table" tableValues="0.950 0.950 0.950 0.950 0.950 0.950 0.950 0.950 0.950 0.950 0.950 0.950 0.950 0.950 0.939 0.532 0.932 0.950 0.950 0.950 0.950 0.950 0.950 0.950 0.950 0.950 0.950 0.950 0.950 0.950 0.950 0.950 0.950"/>
+    </feComponentTransfer>
+  </filter>
+  <filter id="fine" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="0.009 0.004" numOctaves="5" seed="23"/>
+    <feColorMatrix type="matrix" values="1 0 0 0 0  1 0 0 0 0  1 0 0 0 0  0 0 0 0 1"/>
+    <feComponentTransfer>
+      <feFuncR type="table" tableValues="1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 0.625 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000"/>
+      <feFuncG type="table" tableValues="1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 0.634 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000"/>
+      <feFuncB type="table" tableValues="1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 0.684 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000"/>
+    </feComponentTransfer>
+  </filter>
+  <filter id="cloud" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="0.01" numOctaves="3" seed="4"/>
+    <feColorMatrix type="matrix" values="0 0 0 0 0.72  0 0 0 0 0.72  0 0 0 0 0.78  0.7 0 0 0 -0.3"/>
+  </filter>
+  <g transform="rotate(-34 320 320)">
+    <rect x="-220" y="-220" width="1080" height="1080" filter="url(#veins)"/>
+    <rect x="-220" y="-220" width="1080" height="1080" filter="url(#fine)" style="mix-blend-mode: multiply" opacity="0.7"/>
+  </g>
+  <rect width="640" height="640" filter="url(#cloud)" opacity="0.28"/>
+</svg>

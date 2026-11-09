@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Teleport Checkers</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <script>
+    // Apply the theme before the first paint: "auto" follows the system.
+    (function () {
+      var pref = 'auto';
+      try { pref = localStorage.getItem('oppd2026.day9.theme') || 'auto'; } catch (e) {}
+      var dark = pref === 'auto' ? matchMedia('(prefers-color-scheme: dark)').matches : pref === 'dark';
+      document.documentElement.dataset.theme = pref === 'rome' ? 'rome' : dark ? 'dark' : 'light';
+    })();
+  </script>
+</head>
+<body>
+  <div class="splash" id="splash" role="dialog" aria-label="Start screen" tabindex="-1">
+    <div class="splash-inner">
+      <img src="assets/splash.png" alt="Teleport Checkers: a draughts board in Rome with glowing portals">
+      <p class="lead">Classic Italian draughts, with a little magic hidden on the board.</p>
+      <ul class="features">
+        <li><span class="ico portal-sw" aria-hidden="true"></span><span><b>Two portals</b> send your piece across the board</span></li>
+        <li><span class="ico trap-sw" aria-hidden="true"></span><span><b>One trap</b> swallows men and uncrowns kings</span></li>
+        <li><span class="ico lvl" aria-hidden="true">★</span><span><b>Three levels</b>: easy, medium and hard, or play a friend</span></li>
+      </ul>
+      <button type="button" class="start" id="start">Click or press any key to play</button>
+    </div>
+  </div>
+
+  <div class="app">
+    <header class="top">
+      <div class="brand">
+        <h1>Teleport <em>Checkers</em></h1>
+        <p class="tagline">Italian draughts, with two portals and a trap</p>
+      </div>
+      <div class="tools">
+        <button type="button" id="theme" class="tool" title="Theme: auto, day, night or Rome at night (L)"></button>
+        <button type="button" id="voice" class="tool" title="Giulia's voice on/off (V)" aria-label="Giulia's voice"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h10.5a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H9l-4 3.2V15H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/><path d="M19.2 8.3c1 1.1 1 3.3 0 4.4M21.6 6.4c2 2.3 2 6 0 8.2"/></svg></button>
+        <button type="button" id="sound" class="tool" title="Sound on/off (M)" aria-label="Sound"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9.2c1.2 1.4 1.2 4.2 0 5.6M18.2 7c2.4 2.7 2.4 7.3 0 10"/></svg></button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="play" aria-label="Board">
+        <div class="side-bar" id="bar-top"></div>
+        <div class="frame">
+          <div class="files" id="files-top" aria-hidden="true"></div>
+          <div class="ranks" id="ranks-left" aria-hidden="true"></div>
+          <div class="board" id="board">
+            <div class="squares" id="squares" role="grid" aria-label="Draughts board"></div>
+            <div class="pieces" id="pieces" aria-hidden="true"></div>
+            <svg class="beams" id="beams" viewBox="0 0 8 8" aria-hidden="true">
+              <defs><filter id="beam-blur" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="0.07"/></filter></defs>
+            </svg>
+            <div class="preview" id="preview" aria-hidden="true"></div>
+            <div class="fx" id="fx" aria-hidden="true"></div>
+            <div class="result" id="result" hidden>
+              <div class="card">
+                <p class="title" id="result-title"></p>
+                <p class="sub" id="result-sub"></p>
+                <button type="button" class="btn primary" id="again">Play again</button>
+              </div>
+            </div>
+          </div>
+          <div class="ranks" id="ranks-right" aria-hidden="true"></div>
+          <div class="files" id="files-bottom" aria-hidden="true"></div>
+        </div>
+        <div class="side-bar" id="bar-bottom"></div>
+      </section>
+
+      <aside class="panel">
+        <div class="status-card">
+          <p class="status" id="status" aria-live="polite"></p>
+          <p class="event" id="event" aria-live="polite"></p>
+        </div>
+
+        <section class="options" aria-label="Game options">
+          <div class="row">
+            <span class="label">Opponent</span>
+            <div class="seg" role="group" aria-label="Opponent">
+              <button type="button" data-opt="opponent" data-value="computer">Computer</button>
+              <button type="button" data-opt="opponent" data-value="friend">A friend</button>
+            </div>
+          </div>
+          <div class="row">
+            <span class="label">Level</span>
+            <div class="seg" role="group" aria-label="Level">
+              <button type="button" data-opt="level" data-value="easy">Easy</button>
+              <button type="button" data-opt="level" data-value="medium">Medium</button>
+              <button type="button" data-opt="level" data-value="hard">Hard</button>
+            </div>
+          </div>
+          <div class="row">
+            <span class="label">You play</span>
+            <div class="seg" role="group" aria-label="Your side">
+              <button type="button" data-opt="side" data-value="white">White</button>
+              <button type="button" data-opt="side" data-value="black">Black</button>
+            </div>
+          </div>
+          <div class="row">
+            <span class="label">Magic</span>
+            <div class="seg" role="group" aria-label="Special squares">
+              <button type="button" data-opt="magic" data-value="fixed" title="The portals and the trap stay where they are">Fixed</button>
+              <button type="button" data-opt="magic" data-value="wander" title="Every 10 moves the portals and the trap move to new empty squares">Wandering</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="legend" aria-label="Special squares">
+          <div class="item"><span class="swatch portal-sw" aria-hidden="true"></span><p><b>Portals.</b> A piece that ends its move on one is sent to the other, if that one is empty.</p></div>
+          <div class="item"><span class="swatch trap-sw" aria-hidden="true"></span><p><b>Trap.</b> A man that ends its move here is lost; a king becomes a man.</p></div>
+          <p class="wander" id="wander" hidden></p>
+        </section>
+
+        <div class="actions">
+          <button type="button" class="btn primary" id="new">New game</button>
+          <button type="button" class="btn" id="undo">Undo</button>
+        </div>
+
+        <p class="score" id="score"></p>
+      </aside>
+    </main>
+  </div>
+
+  <canvas class="confetti" id="confetti" aria-hidden="true"></canvas>
+
+  <script src="js/rules.js"></script>
+  <script src="js/ai.js"></script>
+  <script src="js/sound.js"></script>
+  <script src="js/confetti.js"></script>
+  <script src="js/voice.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
