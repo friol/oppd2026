@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>RetroRun</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="stage">
+    <canvas id="screen" width="640" height="360" aria-label="RetroRun game screen"></canvas>
+    <canvas id="hud" aria-hidden="true"></canvas>
+    <div id="crt" aria-hidden="true"></div>
+  </main>
+
+  <div id="touch" aria-hidden="true">
+    <div class="pad left">
+      <button data-key="left">&#9664;</button>
+      <button data-key="right">&#9654;</button>
+    </div>
+    <div class="pad right">
+      <button data-key="horn">HORN</button>
+      <button data-key="brake">BRAKE</button>
+      <button data-key="gas">GAS</button>
+    </div>
+  </div>
+
+  <script src="js/font.js"></script>
+  <script src="js/atlas.js"></script>
+  <script src="js/gfx.js"></script>
+  <script src="js/track.js"></script>
+  <script src="js/engine_dsp.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
