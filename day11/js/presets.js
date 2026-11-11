@@ -103,58 +103,94 @@ const KITS = [
 ];
 
 // ---------- demo project ----------
-function bits(s) { return s.replace(/\s/g, '').split('').map(c => c === 'x' ? 1 : 0); }
+// "SEVEN SKIES": 7/4 (felt as 4+3), D minor, Dm7 - Bbmaj7 - Gm7 - A7sus over 4 bars of 28 steps.
+// Granular choir pad, wavefolded bass, modal (MACRO) bells and an electro kit with velocity, chance and ratchets.
+function bits(s) {
+  const a = s.replace(/\s/g, '').split('').map(c => c === 'x' ? 1 : 0);
+  return a.concat(new Array(Math.max(0, DRUM_MAX - a.length)).fill(0));
+}
+function drumPat(len, rows) { return { len, steps: rows.map(bits) }; }
 
 function demoProject() {
   const prj = newProject();
-  prj.name = 'DEMO';
-  prj.bpm = 120; prj.songMode = true;
+  prj.name = 'SEVEN SKIES';
+  prj.bpm = 104; prj.sig = SIGS.findIndex(x => x.name === '7/4'); prj.swing = 0.12; prj.songMode = true;
+  const BAR = 28;
+
+  // DRUM: one bar of 7/4 per pattern
   const dr = prj.parts[0];
-  applyKit(dr, '909 HOUSE');
-  dr.patterns[0].steps = [
-    bits('x... x... x..x x...'), bits('.... x... .... x..x'), bits('x.x. x.xx x.x. x.x.'), bits('.... .... .... x...'), bits('.... .... ..x. .x..')];
-  dr.patterns[1].steps = [
-    bits('x... x... x... x...'), bits('.... x... .... x...'), bits('xxxx xxx. xxxx xx.x'), bits('.... x... .... x...'), bits('...x ..x. ...x .x..')];
-  dr.patterns[2].steps = [
-    bits('x... x... x.x. xxxx'), bits('.... x... x.xx xxxx'), bits('x.x. x.x. .... ....'), bits('.... .... .... ..xx'), bits('.... ...x .... ....')];
-  dr.patterns[3].steps = [
-    bits('x... .... .... ....'), bits('.... .... .... ....'), bits('..x. ..x. ..x. ..xx'), bits('.... .... .... ....'), bits('.x.. ...x .x.. ..x.')];
+  applyKit(dr, 'ELECTRO');
+  dr.patterns = [
+    // A: main groove
+    drumPat(BAR, ['x... ..x. ..x. .... x... ..x. ....', '.... x... .... x... .... x... ..x.', 'x.x. x.x. x.x. x.x. x.x. x.x. x.xx',
+      '.... .... ..x. .... .... .... x...', '.... .... .... ...x .... .... ....']),
+    // B: intro / outro, kick on the 4 + 3 and ticking hats
+    drumPat(BAR, ['x... .... .... .... x... .... ....', '.... .... .... .... .... .... ....', '..x. ..x. ..x. ..x. ..x. ..x. ..x.',
+      '.... .... .... .... .... .... ....', '.... .... .... .... .... .... x...']),
+    // C: busy
+    drumPat(BAR, ['x... ..x. x.x. .... x..x ..x. x...', '.... x... .... x..x .... x... x.xx', 'xxxx x.xx xxxx x.xx xxxx x.xx xxxx',
+      'x... ..x. .... x... ..x. .... x...', '.... .... .... .... .... .... ..x.']),
+    // D: break, half-time with a snare roll into the next row
+    drumPat(BAR, ['x... .... .... .... .... .... ....', '.... .... .... .... x.x. x.xx xxxx', '.... x... .... x... .... .... ....',
+      '.... .... x... .... .... .... ....', 'x... .... .... .... .... .... ....'])
+  ];
+  dr.patterns.forEach(p => stepMeta(p));
+  const hatAccents = p => { for (let s = 0; s < BAR; s++) p.vel[2][s] = s % 4 === 0 ? 1 : s % 2 === 0 ? 0.6 : 0.4; };
+  hatAccents(dr.patterns[0]); hatAccents(dr.patterns[2]);
+  dr.patterns[0].rat[2][27] = 2;                                   // hat flam at the end of the bar
+  dr.patterns[0].vel[1][26] = 0.55;                                // ghost snare
+  [1, 5, 9, 13, 17, 21, 25].forEach(s => { dr.patterns[2].prob[2][s] = 0.5; });   // hats that come and go
+  dr.patterns[2].rat[1][26] = 3; dr.patterns[2].rat[1][27] = 2;
+  dr.patterns[2].prob[3][14] = 0.66; dr.patterns[2].prob[3][18] = 0.66;
+  [16, 18, 20, 22, 23, 24, 25, 26, 27].forEach((s, i) => { dr.patterns[3].vel[1][s] = 0.35 + i * 0.08; });
+  dr.patterns[3].rat[1][26] = 2; dr.patterns[3].rat[1][27] = 4;
+  dr.level = 0.78;
 
-  // SYNTH A: bass line over Am - F - C - G (4 bars)
-  setPreset(prj.parts[1], 'FUNK BASS');
-  const roots = [33, 29, 36, 31];
-  const pa = prj.parts[1].patterns[0];
-  pa.len = 64;
+  const roots = [38, 34, 31, 33];                                  // D2 Bb1 G1 A1
+  const chords = [[57, 60, 62, 65], [57, 58, 62, 65], [55, 58, 62, 65], [55, 57, 62, 64]];
+  const notes = (pat, list) => { list.forEach(([s, n, l]) => pat.notes.push({ s, n, l })); };
+
+  // SYNTH A: wavefolded bass, pattern A grouped 4+3, pattern B busier for the busy drums
+  setPreset(prj.parts[1], 'FOLDED BASS');
+  const ba = prj.parts[1].patterns[0], bb = prj.parts[1].patterns[1];
+  ba.len = bb.len = BAR * 4;
   roots.forEach((r, b) => {
-    [[0, 0, 2], [3, 12, 1], [6, 0, 2], [8, 0, 2], [11, 12, 1], [14, 7, 2]].forEach(([s, o, l]) => pa.notes.push({ s: b * 16 + s, n: r + o, l }));
+    notes(ba, [[0, 0, 3], [6, 0, 2], [8, 12, 2], [12, 0, 2], [16, 0, 3], [22, 7, 2], [24, 10, 3]].map(([s, o, l]) => [b * BAR + s, r + o, l]));
+    notes(bb, [[0, 0, 2], [2, 12, 1], [4, 0, 2], [6, 0, 1], [8, 12, 2], [10, 0, 1], [12, 7, 2], [14, 0, 1],
+      [16, 0, 2], [18, 12, 1], [20, 0, 2], [22, 10, 2], [24, 12, 2], [26, 7, 2]].map(([s, o, l]) => [b * BAR + s, r + o, l]));
   });
-  const pb = prj.parts[1].patterns[1];
-  pb.len = 64;
-  roots.forEach((r, b) => { for (let s = 0; s < 16; s += 2) pb.notes.push({ s: b * 16 + s, n: r + (s % 8 === 6 ? 12 : 0), l: 1 }); });
+  prj.parts[1].level = 0.72;
 
-  // SYNTH B: pad chords
-  setPreset(prj.parts[2], 'GLASS PAD');
-  const chords = [[57, 60, 64], [53, 57, 60], [55, 60, 64], [55, 59, 62]];
+  // SYNTH B: granular choir holding the chords
+  setPreset(prj.parts[2], 'FROZEN CHOIR');
   const pp = prj.parts[2].patterns[0];
-  pp.len = 64;
-  chords.forEach((ch, b) => ch.forEach(n => pp.notes.push({ s: b * 16, n, l: 16 })));
-  prj.parts[2].level = 0.6;
+  pp.len = BAR * 4;
+  chords.forEach((ch, b) => ch.forEach(n => pp.notes.push({ s: b * BAR, n, l: BAR })));
+  prj.parts[2].level = 0.72;
 
-  // SYNTH C: arpeggiated folded bonks on the same chords, one octave up
-  setPreset(prj.parts[3], 'ARP FOLD');
-  const pc = prj.parts[3].patterns[0];
-  pc.len = 64;
-  chords.forEach((ch, b) => ch.forEach(n => pc.notes.push({ s: b * 16, n: n + 12, l: 16 })));
-  prj.parts[3].level = 0.55;
+  // SYNTH C: modal bells, pattern A = melody, pattern B = sparse bell calls
+  setPreset(prj.parts[3], 'MODAL BELLS');
+  const la = prj.parts[3].patterns[0], lb = prj.parts[3].patterns[1];
+  la.len = lb.len = BAR * 4;
+  const melody = [
+    [[0, 81, 4], [4, 77, 2], [6, 74, 2], [8, 76, 4], [12, 77, 4], [16, 81, 3], [19, 84, 3], [22, 81, 6]],
+    [[0, 86, 4], [4, 84, 2], [6, 81, 2], [8, 77, 4], [12, 79, 4], [16, 81, 6], [22, 77, 6]],
+    [[0, 79, 4], [4, 81, 2], [6, 82, 2], [8, 86, 4], [12, 84, 4], [16, 82, 3], [19, 81, 3], [22, 79, 6]],
+    [[0, 76, 4], [4, 79, 4], [8, 81, 8], [16, 76, 3], [19, 74, 3], [22, 73, 6]]
+  ];
+  melody.forEach((bar, b) => notes(la, bar.map(([s, n, l]) => [b * BAR + s, n, l])));
+  roots.forEach((r, b) => notes(lb, [[b * BAR, r + 36, 4], [b * BAR + 16, r + 43, 4]]));
+  prj.parts[3].level = 0.42;
 
+  // song: intro, groove, melody, busy, break, busy, outro (each row = 4 bars of 7/4)
   prj.song = [
-    { p: [-1, -1, 0, -1], rep: 1 },
-    { p: [3, 0, 0, -1], rep: 1 },
+    { p: [1, -1, 0, -1], rep: 1 },
+    { p: [1, 0, 0, 1], rep: 1 },
     { p: [0, 0, 0, 0], rep: 2 },
-    { p: [1, 1, 0, 0], rep: 1 },
-    { p: [2, -1, -1, -1], rep: 1 },
-    { p: [1, 0, 0, 0], rep: 2 },
-    { p: [3, -1, 0, 0], rep: 1 }
+    { p: [2, 1, 0, 0], rep: 1 },
+    { p: [3, -1, 0, 1], rep: 1 },
+    { p: [2, 1, 0, 0], rep: 2 },
+    { p: [1, 0, 0, 1], rep: 1 }
   ];
   return prj;
 }
