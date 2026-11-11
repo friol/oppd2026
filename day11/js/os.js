@@ -215,6 +215,7 @@ function projectPage() {
     hint: 'SELECT = MENU',
     select() {
       OS.openMenu('PROJECT', [
+        { name: 'TIME SIGNATURE ' + sig().name, fn: sigMenu },
         { name: 'SAVE SONG', fn: () => APP.saveSong(false) },
         { name: 'SAVE SONG AS...', fn: () => APP.saveSong(true) },
         { name: 'LOAD SONG', fn: () => APP.loadSong() },
@@ -227,6 +228,13 @@ function projectPage() {
     },
     draw: drawProject
   };
+}
+
+function sigMenu() {
+  OS.openMenu('TIME SIGNATURE', SIGS.map((sg, i) => ({
+    name: (i === (PRJ.sig || 0) ? '* ' : '  ') + sg.name + '  ' + sg.groups.join('+'),
+    fn: () => { setSig(i); OS.toast(sg.name + ' · ' + barSteps() + ' STEPS PER BAR'); }
+  })).concat([{ name: 'CANCEL' }]));
 }
 
 function fxPage(pi, k) {
@@ -252,6 +260,17 @@ function patternMenu(pi) {
     { name: 'COPY TO NEXT', fn: () => { const nx = (part.cur + 1) % 4; part.patterns[nx] = clone(part.patterns[part.cur]); part.cur = nx; OS.toast('COPIED TO ' + PAT_NAMES[nx]); } },
     { name: 'CANCEL' }
   ]);
+}
+
+// pattern length knob: any length (polymeter), pressing it jumps to the next whole number of bars
+function lenKnob(part, max, set) {
+  const pat = () => part.patterns[part.cur];
+  const k = kInt('LENGTH', () => pat().len, set, 1, max, lenLabel, 3);
+  k.press = () => {
+    const bar = barSteps(), nb = Math.floor(pat().len / bar) + 1;
+    set(nb * bar > max ? bar : nb * bar);
+  };
+  return k;
 }
 
 function setPatLen(part, len) {
@@ -303,8 +322,9 @@ function synthPages(pi, part) {
         kNorm('LEVEL', () => part.level, v => { part.level = v; applyMix(pi); }, pct),
         kNorm('PAN', () => part.pan, v => { part.pan = v; applyMix(pi); }, fmtPan),
         kInt('OCTAVE', () => part.octave, v => { part.octave = v; }, -3, 3, v => (v > 0 ? '+' : '') + v),
-        kInt('PAT LEN', () => PAT_LENS.indexOf(pat().len), v => setPatLen(part, PAT_LENS[v]), 0, PAT_LENS.length - 1, v => PAT_LENS[v] + ' st')
+        lenKnob(part, SYNTH_MAX, len => setPatLen(part, len))
       ],
+      hint: 'K4 PRESS = NEXT WHOLE BAR',
       draw: g => drawMix(g, pi)
     },
     {
@@ -374,10 +394,10 @@ function drumPages(pi, part) {
       knobs: [
         kNorm('LEVEL', () => part.level, v => { part.level = v; applyMix(pi); }, pct),
         kNorm('PAN', () => part.pan, v => { part.pan = v; applyMix(pi); }, fmtPan),
-        kNorm('SWING', () => PRJ.swing, v => { PRJ.swing = v; }, pct),
+        lenKnob(part, DRUM_MAX, len => { part.patterns[part.cur].len = len; }),
         Object.assign(kInt('PATTERN', () => part.cur, v => { part.cur = v; }, 0, 3, v => PAT_NAMES[v]), { press: () => patternMenu(pi) })
       ],
-      hint: 'K4 PRESS = PATTERN MENU',
+      hint: 'K3 PRESS = NEXT WHOLE BAR · K4 PRESS = MENU',
       draw: g => drawMix(g, pi)
     },
     {
@@ -422,6 +442,7 @@ function drawHeader(g, title) {
   let x = 390;
   T(g, PRJ.bpm + ' BPM', x, 14, 10, C.accent, 'right');
   x -= g.measureText(PRJ.bpm + ' BPM').width + 10;
+  if (PRJ.sig) { T(g, sig().name, x, 14, 10, C.ink, 'right'); x -= g.measureText(sig().name).width + 10; }
   T(g, PRJ.songMode ? 'SONG' : 'LOOP', x, 14, 10, C.dim, 'right');
   x -= g.measureText('SONG').width + 10;
   // transport icon
@@ -565,19 +586,19 @@ function drawSong(g) {
       T(g, pv < 0 ? '---' : PAT_NAMES[pv], x, y + 9, 9, cur && sc.col === pi ? '#141716' : (pv < 0 ? C.dim : C.ink), 'left', 600);
     });
     T(g, 'x' + r.rep, 226, y + 9, 9, C.ink);
-    T(g, String(rowSteps(r) * r.rep / 16), 266, y + 9, 9, C.dim);
+    T(g, String(+(rowSteps(r) * r.rep / barSteps()).toFixed(1)), 266, y + 9, 9, C.dim);
   }
   T(g, PRJ.songMode ? 'SONG' : 'LOOP', 390, 60, 16, PRJ.songMode ? C.accent : C.ink, 'right', 700, SANS);
   T(g, 'MODE', 390, 72, 8, C.dim, 'right');
-  const total = PRJ.song.reduce((a, r) => a + rowSteps(r) * r.rep / 16, 0);
-  T(g, total + ' BARS', 390, 86, 8.5, C.dim, 'right');
+  const total = PRJ.song.reduce((a, r) => a + rowSteps(r) * r.rep, 0) / barSteps();
+  T(g, +total.toFixed(1) + ' BARS', 390, 86, 8.5, C.dim, 'right');
 }
 
 function drawProject(g) {
   T(g, String(PRJ.bpm), 12, 78, 40, C.ink, 'left', 700, SANS);
   T(g, 'BPM', 12, 92, 9, C.dim);
-  const lines = [['PROJECT', PRJ.name || '-'], ['SWING', pct(PRJ.swing)], ['MASTER', pct(PRJ.master)], ['CLICK', PRJ.click ? 'ON' : 'OFF'], ['SONG', PRJ.song.length + ' ROWS']];
-  lines.forEach(([a, b], i) => { T(g, a, 170, 48 + i * 12, 9, C.dim); T(g, b, 240, 48 + i * 12, 9, C.ink); });
+  const lines = [['PROJECT', PRJ.name || '-'], ['SWING', pct(PRJ.swing)], ['MASTER', pct(PRJ.master)], ['CLICK', PRJ.click ? 'ON' : 'OFF'], ['TIME', sig().name + ' · ' + sig().groups.join('+')], ['SONG', PRJ.song.length + ' ROWS']];
+  lines.forEach(([a, b], i) => { T(g, a, 170, 46 + i * 11, 9, C.dim); T(g, b, 240, 46 + i * 11, 9, C.ink); });
 }
 
 function drawSound(g, pi) {
@@ -710,8 +731,8 @@ function drawMix(g, pi) {
   T(g, 'L', 34, 86, 8, C.dim); T(g, 'R', 190, 86, 8, C.dim, 'right');
   const pat = p.patterns[p.cur];
   const lines = p.kind === 'drum'
-    ? ['PATTERN ' + PAT_NAMES[p.cur], '16 STEPS', 'SWING ' + pct(PRJ.swing)]
-    : ['PATTERN ' + PAT_NAMES[p.cur], pat.len + ' STEPS · ' + pat.notes.length + ' NOTES', 'OCTAVE ' + (p.octave > 0 ? '+' : '') + p.octave];
+    ? ['PATTERN ' + PAT_NAMES[p.cur], pat.len + ' STEPS · ' + sig().name, 'SWING ' + pct(PRJ.swing)]
+    : ['PATTERN ' + PAT_NAMES[p.cur], pat.len + ' STEPS · ' + pat.notes.length + ' NOTES · ' + sig().name, 'OCTAVE ' + (p.octave > 0 ? '+' : '') + p.octave];
   lines.forEach((s, i) => T(g, s, 388, 52 + i * 12, 9, i ? C.dim : C.ink, 'right'));
   drawScope(g, RT[pi].an, 210, 84, 178, 24, C.accent);
 }
@@ -729,9 +750,11 @@ function drawNotes(g, pi) {
     if (n % 12 === 0) T(g, noteName(n), 4, y0 + r * rh + 5.5, 6.5, C.dim);
   }
   // beat lines every 4 steps, stronger bar lines every 16
-  for (let s = 0; s <= len; s += 4) {
-    g.fillStyle = C.line; g.globalAlpha = s % 16 ? 0.45 : 1;
-    g.fillRect(x0 + s * cw, y0, s % 16 ? 1 : 1.5, rows * rh);
+  for (let s = 0; s <= len; s++) {
+    const b = s === len ? 0 : beatAt(s);
+    if (b < 0) continue;
+    g.fillStyle = C.line; g.globalAlpha = b ? 0.45 : 1;
+    g.fillRect(x0 + s * cw, y0, b ? 1 : 1.5, rows * rh);
   }
   g.globalAlpha = 1;
   const ph = UI.ph[pi];
@@ -750,7 +773,7 @@ function drawNotes(g, pi) {
   if (pat.notes.some(n => n.n <= top - rows && n.s < len)) T(g, '▼', 22, 110, 6, C.accent, 'right');
   g.strokeStyle = '#ffffff'; g.lineWidth = 1;
   g.strokeRect(x0 + c.step * cw + 0.5, y0 + (top - c.pitch) * rh + 0.5, Math.max(1, cw - 1), rh - 1);
-  T(g, 'PAT ' + PAT_NAMES[p.cur] + ' · ' + len + ' STEPS · BAR ' + (Math.floor(c.step / 16) + 1) + '/' + Math.ceil(len / 16), 26, 112, 8, C.dim);
+  T(g, 'PAT ' + PAT_NAMES[p.cur] + ' · ' + len + ' STEPS · ' + sig().name + ' · BAR ' + (Math.floor(c.step / barSteps()) + 1) + '/' + Math.ceil(len / barSteps()), 26, 112, 8, C.dim);
 }
 
 function drawPresets(g, pi, list, curName) {
@@ -839,8 +862,10 @@ function stepAudition(r, v) {
 }
 function stepPage() {
   const part = PRJ.parts[0], se = OS.stepEdit, pat = () => stepMeta(part.patterns[part.cur]);
-  const stepK = kInt('STEP', () => se.r * 16 + se.s, v => { se.r = Math.floor(v / 16); se.s = v % 16; part.rowSel = se.r; }, 0, 79,
-    v => 'R' + (Math.floor(v / 16) + 1) + '·' + String(v % 16 + 1).padStart(2, '0'), 6);
+  const L = () => part.patterns[part.cur].len;
+  se.s = Math.min(se.s, L() - 1);
+  const stepK = kInt('STEP', () => se.r * L() + se.s, v => { se.r = Math.floor(v / L()); se.s = v % L(); part.rowSel = se.r; }, 0, 5 * L() - 1,
+    v => 'R' + (Math.floor(v / L()) + 1) + '·' + String(v % L() + 1).padStart(2, '0'), 6);
   stepK.press = () => { const p = pat(); p.steps[se.r][se.s] = p.steps[se.r][se.s] ? 0 : 1; if (p.steps[se.r][se.s]) stepAudition(se.r, p.vel[se.r][se.s]); };
   const chanceIdx = () => { const p = pat().prob[se.r][se.s]; let bi = 0; STEP_CHANCE.forEach((c, i) => { if (Math.abs(c - p) < Math.abs(STEP_CHANCE[bi] - p)) bi = i; }); return bi; };
   return {
@@ -858,18 +883,18 @@ function stepPage() {
 }
 function drawStepEdit(g) {
   const part = PRJ.parts[0], se = OS.stepEdit, pat = stepMeta(part.patterns[part.cur]);
-  const col = ROW_COLORS[se.r], x0 = 12, w = 376, cw = w / 16, y0 = 40, H = 52;
+  const len = pat.len, col = ROW_COLORS[se.r], x0 = 12, w = 376, cw = w / len, y0 = 40, H = 52, pad = cw > 14 ? 2 : 1;
   const ph = UI.ph[0], phStep = SEQ.playing && ph && ph.pat === part.cur ? ph.step : -1;
-  for (let s = 0; s < 16; s++) {
-    const x = x0 + s * cw + 2, bw = cw - 4, on = pat.steps[se.r][s];
-    g.fillStyle = Math.floor(s / 4) % 2 ? C.hi : C.cell;
+  for (let s = 0; s < len; s++) {
+    const x = x0 + s * cw + pad, bw = cw - pad * 2, on = pat.steps[se.r][s];
+    g.fillStyle = beatIndex(s) % 2 ? C.hi : C.cell;
     g.fillRect(x, y0, bw, H);
     if (on) {
       const v = pat.vel[se.r][s], pr = pat.prob[se.r][s], n = pat.rat[se.r][s];
       const bh = Math.max(3, v * (H - 4)), seg = (bh - (n - 1) * 2) / n;
       g.globalAlpha = 0.35 + 0.65 * pr;          // fainter = less likely
       g.fillStyle = col;
-      for (let k = 0; k < n; k++) g.fillRect(x + 2, y0 + H - 2 - (k + 1) * seg - k * 2, bw - 4, seg);
+      for (let k = 0; k < n; k++) g.fillRect(x + pad, y0 + H - 2 - (k + 1) * seg - k * 2, bw - pad * 2, seg);
       g.globalAlpha = 1;
       if (pr < 1) { g.fillStyle = C.ink; g.beginPath(); g.arc(x + bw - 4, y0 + 4, 1.8, 0, Math.PI * 2); g.fill(); }
     }

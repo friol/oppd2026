@@ -4,7 +4,31 @@
 const PART_NAMES = ['DRUM', 'SYNTH A', 'SYNTH B', 'SYNTH C'];
 const ARP_MODES = ['OFF', 'UP', 'DOWN', 'UP/DN', 'RANDOM', 'ORDER', 'CHORD'];
 const ARP_RATES = [['1/4', 24], ['1/8', 12], ['1/8T', 8], ['1/16', 6], ['1/16T', 4], ['1/32', 3]];
-const PAT_LENS = [16, 32, 64];
+// time signatures: the bar in 16th steps, grouped into beats (x/8 beats are dotted quarters of 6 steps)
+const SIGS = [
+  { name: '4/4', groups: [4, 4, 4, 4] }, { name: '3/4', groups: [4, 4, 4] }, { name: '5/4', groups: [4, 4, 4, 4, 4] },
+  { name: '7/4', groups: [4, 4, 4, 4, 4, 4, 4] }, { name: '5/8', groups: [6, 4] }, { name: '6/8', groups: [6, 6] },
+  { name: '7/8', groups: [4, 4, 6] }, { name: '9/8', groups: [6, 6, 6] }, { name: '12/8', groups: [6, 6, 6, 6] }
+];
+const DRUM_MAX = 32, SYNTH_MAX = 128;    // longest pattern in steps
+const sig = () => SIGS[(PRJ && PRJ.sig) || 0];
+const barSteps = () => sig().groups.reduce((a, b) => a + b, 0);
+// position inside the bar -> 0 = bar start, 1 = beat start, -1 = other step
+function beatAt(pos) {
+  pos = ((pos % barSteps()) + barSteps()) % barSteps();
+  if (!pos) return 0;
+  let a = 0;
+  for (const g of sig().groups) { if (a === pos) return 1; a += g; }
+  return -1;
+}
+// beat index of a step (for the alternating shading of the grids)
+function beatIndex(pos) {
+  pos = ((pos % barSteps()) + barSteps()) % barSteps();
+  let a = 0, i = 0;
+  for (const g of sig().groups) { if (pos < a + g) return i; a += g; i++; }
+  return i;
+}
+const lenLabel = len => len % barSteps() ? len + ' st' : len / barSteps() + (len === barSteps() ? ' BAR' : ' BARS');
 const PPQ = 24, TPS = 6;           // clock ticks per quarter note, ticks per 16th step
 const PAT_NAMES = 'ABCD';
 
@@ -17,7 +41,7 @@ const clone = o => JSON.parse(JSON.stringify(o));
 
 // per-step drum data (velocity, chance, ratchet) lives beside the on/off grid, created on first edit
 const STEP_CHANCE = [1, 0.9, 0.75, 0.66, 0.5, 0.33, 0.25, 0.1];
-const grid5 = v => [0, 1, 2, 3, 4].map(() => new Array(16).fill(v));
+const grid5 = v => [0, 1, 2, 3, 4].map(() => new Array(DRUM_MAX).fill(v));
 function stepMeta(pat) {
   if (!pat.vel) { pat.vel = grid5(1); pat.prob = grid5(1); pat.rat = grid5(1); }
   return pat;
@@ -32,7 +56,7 @@ const defaultFx = () => ({ type: 'OFF', p1: 0.5, p2: 0.4, mix: 0.35 });
 function newDrumPart() {
   const p = {
     kind: 'drum', kit: '', rows: [], level: 0.8, pan: 0.5, mute: false, fx: [defaultFx(), defaultFx()], rowSel: 0, cur: 0,
-    patterns: [0, 1, 2, 3].map(() => ({ len: 16, steps: [0, 1, 2, 3, 4].map(() => new Array(16).fill(0)) }))
+    patterns: [0, 1, 2, 3].map(() => ({ len: 16, steps: [0, 1, 2, 3, 4].map(() => new Array(DRUM_MAX).fill(0)) }))
   };
   applyKit(p, KITS[0].name);
   return p;
@@ -48,7 +72,7 @@ function newSynthPart(preset) {
 }
 function newProject() {
   return {
-    v: 1, name: 'NEW', bpm: 120, swing: 0, master: 0.8, click: false, songMode: false,
+    v: 1, name: 'NEW', bpm: 120, sig: 0, swing: 0, master: 0.8, click: false, songMode: false,
     song: [{ p: [0, 0, 0, 0], rep: 1 }],
     parts: [newDrumPart(), newSynthPart('FUNK BASS'), newSynthPart('GLASS PAD'), newSynthPart('SAW LEAD')]
   };
@@ -167,7 +191,7 @@ const stepDur = () => tickDur() * TPS;
 function rowSteps(r) {
   let m = 0;
   r.p.forEach((pidx, pi) => { if (pidx >= 0) m = Math.max(m, PRJ.parts[pi].patterns[pidx].len); });
-  return m || 16;
+  return m || barSteps();
 }
 function partPattern(pi) {
   // pattern index a part plays right now (-1 = silent in this song row)
@@ -220,7 +244,6 @@ function processTick(tick, t) {
     if (tick % TPS === 0) stepEvent(t);
     if (tick % PPQ === 0) {
       SEQ.vis.push({ t, k: 'beat', n: tick / PPQ });
-      if (PRJ.click) clickSound(t, (tick / PPQ) % 4 === 0);
     }
   }
   for (let pi = 1; pi < 4; pi++) arpTick(pi, tick, t);
@@ -232,6 +255,7 @@ function stepEvent(t) {
   if (PRJ.songMode && SEQ.row >= PRJ.song.length) SEQ.row = 0;
   const rowDef = PRJ.songMode ? PRJ.song[SEQ.row] : null;
   const pidxs = [];
+  if (PRJ.click) { const b = beatAt(s); if (b >= 0) clickSound(t, b === 0); }   // the click follows the time signature
   for (let pi = 0; pi < 4; pi++) {
     const part = PRJ.parts[pi];
     const pidx = rowDef ? rowDef.p[pi] : part.cur;
@@ -433,7 +457,7 @@ function clearAllPatterns() {
   PRJ.parts.forEach((part, pi) => {
     part.patterns.forEach(p => {
       if (part.kind === 'drum') { p.steps = p.steps.map(r => r.map(() => 0)); resetStepMeta(p); }
-      else { p.notes = []; p.len = 16; }
+      else { p.notes = []; p.len = barSteps(); }
     });
     part.cur = 0;
     RT[pi].held = RT[pi].held.filter(h => h.src === 'l');
@@ -459,9 +483,30 @@ function loadProject(o) {
       else p.params = Object.assign(engineDefaults(p.engine), p.params);
     }
     p.fx = p.fx || [defaultFx(), defaultFx()];
+    if (p.kind === 'drum') p.patterns.forEach(pat => ['steps', 'vel', 'prob', 'rat'].forEach(k => {
+      // older saves have 16-step drum grids
+      if (pat[k]) pat[k] = pat[k].map(r => r.concat(new Array(Math.max(0, DRUM_MAX - r.length)).fill(k === 'steps' ? 0 : 1)));
+    }));
     CURSOR[i].step = 0;
   });
+  PRJ.sig = PRJ.sig || 0;
   if (!PRJ.song.length) PRJ.song.push({ p: [0, 0, 0, 0], rep: 1 });
   delete PRJ.gen;   // left over from saves made with the removed INSPIRE generator
   applyAll();
+}
+
+// change the time signature: patterns that were whole bars keep their number of bars (notes past the new end stay
+// in the pattern but are silent until it grows again)
+function setSig(i) {
+  const old = barSteps();
+  PRJ.sig = i;
+  const bar = barSteps();
+  PRJ.parts.forEach(part => part.patterns.forEach(p => {
+    if (p.len % old) return;
+    const max = part.kind === 'drum' ? DRUM_MAX : SYNTH_MAX;
+    let len = (p.len / old) * bar;
+    while (len > max && len > bar) len -= bar;
+    p.len = Math.min(max, len);
+  }));
+  PRJ.parts.forEach((part, pi) => { CURSOR[pi].step = Math.min(CURSOR[pi].step, part.patterns[part.cur].len - 1); });
 }

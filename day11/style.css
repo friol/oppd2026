@@ -246,6 +246,7 @@ button { font: inherit; color: inherit; }
   font-family: var(--mono); font-size: 10px; font-weight: 600; color: rgba(20, 23, 22, 0.75);
 }
 .cell.alt { background: var(--cell-alt); }
+.cell[hidden] { display: none; }
 /* velocity = colour strength, a dot = chance below 100%, xN = ratchet */
 .cell.on { background: color-mix(in srgb, var(--rc) calc(var(--v, 1) * 100%), var(--cell)); box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.18), var(--cell-glow); }
 .cell.pr::before { content: ''; position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; border-radius: 50%; background: #232725; opacity: 0.7; }

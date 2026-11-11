@@ -181,7 +181,7 @@ function highlightKeys() {
 }
 
 // ---------- build: step grid ----------
-const GRID = { rows: [], cells: [], leds: [], names: [], state: [] };
+const GRID = { rows: [], cells: [], leds: [], names: [], state: [], boxes: [], layout: '' };
 function buildGrid() {
   const root = $('seqRows');
   let paint = null, holdT = 0;
@@ -201,7 +201,7 @@ function buildGrid() {
     const cells = document.createElement('div');
     cells.className = 'cells';
     const rc = [];
-    for (let s = 0; s < 16; s++) {
+    for (let s = 0; s < DRUM_MAX; s++) {
       const c = document.createElement('button');
       c.className = 'cell';
       c.setAttribute('aria-label', 'Row ' + (r + 1) + ' step ' + (s + 1));
@@ -236,7 +236,8 @@ function buildGrid() {
     row.appendChild(cells);
     root.appendChild(row);
     GRID.rows.push(rb); GRID.cells.push(rc); GRID.leds.push(rb.querySelector('.led')); GRID.names.push(rb.querySelector('.nm'));
-    GRID.state.push(new Array(16).fill(''));
+    GRID.state.push(new Array(DRUM_MAX).fill(''));
+    GRID.boxes.push(cells);
   }
   window.addEventListener('pointerup', () => { paint = null; });
   document.querySelectorAll('.pat').forEach(b => b.addEventListener('click', () => {
@@ -245,12 +246,23 @@ function buildGrid() {
 }
 function renderGrid() {
   const part = PRJ.parts[0], pat = part.patterns[part.cur], ph = UI.ph[0];
-  const phStep = SEQ.playing && ph && ph.pat === part.cur ? ph.step : -1;
+  const phStep = SEQ.playing && ph && ph.pat === part.cur ? ph.step : -1, len = pat.len;
+  // as many cells as the pattern has steps, shaded by the beats of the time signature
+  const layout = len + '|' + (PRJ.sig || 0);
+  if (GRID.layout !== layout) {
+    GRID.layout = layout;
+    GRID.boxes.forEach((box, r) => {
+      box.style.gridTemplateColumns = 'repeat(' + len + ', minmax(0, 1fr))';
+      box.style.gap = len > 24 ? '3px' : len > 16 ? '4px' : '';
+      GRID.cells[r].forEach((c, s) => { c.hidden = s >= len; });
+    });
+    GRID.state.forEach(st => st.fill(''));
+  }
   for (let r = 0; r < 5; r++) {
-    for (let s = 0; s < 16; s++) {
+    for (let s = 0; s < len; s++) {
       const on = pat.steps[r][s], v = stepVel(pat, r, s), pr = stepProb(pat, r, s), n = stepRat(pat, r, s);
       const edit = OS.screen === 'step' && OS.stepEdit && OS.stepEdit.r === r && OS.stepEdit.s === s;
-      const cls = 'cell' + (Math.floor(s / 4) % 2 ? ' alt' : '') + (on ? ' on' : '') + (s === phStep ? ' ph' : '') +
+      const cls = 'cell' + (beatIndex(s) % 2 ? ' alt' : '') + (on ? ' on' : '') + (s === phStep ? ' ph' : '') +
         (on && pr < 1 ? ' pr' : '') + (edit ? ' edit' : '');
       const key = cls + '|' + v + '|' + n;
       if (GRID.state[r][s] !== key) {
@@ -265,7 +277,7 @@ function renderGrid() {
     if (GRID.names[r].textContent !== nm) { GRID.names[r].textContent = nm; GRID.rows[r].setAttribute('aria-label', 'Track ' + (r + 1) + ': ' + nm); }
     GRID.rows[r].classList.toggle('sel', part.rowSel === r);
   }
-  const info = 'PATTERN ' + PAT_NAMES[part.cur] + ' · 16 STEP' + (PRJ.songMode ? ' · SONG ROW ' + (UI.row + 1) : '') + (SEQ.rec ? ' · REC' : '');
+  const info = 'PATTERN ' + PAT_NAMES[part.cur] + ' · ' + len + ' STEPS · ' + sig().name + (PRJ.songMode ? ' · SONG ROW ' + (UI.row + 1) : '') + (SEQ.rec ? ' · REC' : '');
   if ($('seqInfo').textContent !== info) $('seqInfo').textContent = info;
   document.querySelectorAll('.pat').forEach(b => {
     b.classList.toggle('on', +b.dataset.p === part.cur);
