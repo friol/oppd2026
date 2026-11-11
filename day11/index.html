@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OPPD-1</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="wrap">
+  <main id="panel" aria-label="OPPD-1 virtual synthesizer">
+
+    <div class="top">
+      <div class="display"><canvas id="screen" width="600" height="240" aria-label="Display"></canvas></div>
+
+      <div class="knobs">
+        <div class="knob-col">
+          <div class="knob-well"><button class="knob" data-k="0" aria-label="Knob 1 (blue)" style="--kc:#4e6a80"><span class="knob-rot"><span class="knob-mark"></span></span></button></div>
+          <div class="knob-lab" aria-live="off"><span class="kn"></span><span class="kv"></span></div>
+        </div>
+        <div class="knob-col">
+          <div class="knob-well"><button class="knob" data-k="1" aria-label="Knob 2 (yellow)" style="--kc:#c9a24c"><span class="knob-rot"><span class="knob-mark"></span></span></button></div>
+          <div class="knob-lab" aria-live="off"><span class="kn"></span><span class="kv"></span></div>
+        </div>
+        <div class="knob-col">
+          <div class="knob-well"><button class="knob" data-k="2" aria-label="Knob 3 (green)" style="--kc:#6f8a72"><span class="knob-rot"><span class="knob-mark"></span></span></button></div>
+          <div class="knob-lab" aria-live="off"><span class="kn"></span><span class="kv"></span></div>
+        </div>
+        <div class="knob-col">
+          <div class="knob-well"><button class="knob" data-k="3" aria-label="Knob 4 (orange)" style="--kc:#c4664a"><span class="knob-rot"><span class="knob-mark"></span></span></button></div>
+          <div class="knob-lab" aria-live="off"><span class="kn"></span><span class="kv"></span></div>
+        </div>
+      </div>
+
+      <div class="side">
+        <nav class="nav" aria-label="Menu navigation">
+          <button id="navUp" class="btn nav-btn" aria-label="Up">
+            <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 15 V5 M5 10 L10 5 L15 10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <button id="navSel" class="btn nav-btn" aria-label="Select (hold for home)">
+            <span class="sel-ring"></span>
+          </button>
+          <button id="navDown" class="btn nav-btn" aria-label="Down">
+            <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 5 V15 M5 10 L10 15 L15 10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </nav>
+        <div class="brand">
+          <div>
+            <div class="logo">OPPD-1</div>
+            <div class="sub">VIRTUAL SYNTHESIZER</div>
+          </div>
+          <div class="speaker" id="speaker" aria-hidden="true"></div>
+          <div class="skin">
+            <span class="skin-lab">SKIN<b id="skinName">ORIGINAL</b></span>
+            <button id="skinSw" class="skin-sw" aria-label="Panel skin"><span class="skin-knob"></span></button>
+          </div>
+          <div class="maker">the Oil inc.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mid">
+      <div class="transport">
+        <button id="btnRec" class="btn" aria-label="Record"><span class="rec-dot"></span></button>
+        <button id="btnPlay" class="btn" aria-label="Play">
+          <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M5 3 L15 9 L5 15 Z" fill="currentColor"/></svg>
+        </button>
+        <button id="btnStop" class="btn" aria-label="Stop"><span class="stop-sq"></span></button>
+        <button id="btnLoop" class="btn" aria-label="Loop mode (off = song mode)">
+          <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 8 a5 5 0 0 1 5 -4 h4 M13 1 l3 3 l-3 3 M16 12 a5 5 0 0 1 -5 4 h-4 M7 19 l-3 -3 l3 -3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button id="btnOctDown" class="btn txt">OCT &minus;</button>
+        <button id="btnOctUp" class="btn txt">OCT +</button>
+      </div>
+      <div class="keyboard" id="keyboard" aria-label="Keyboard">
+        <div class="whites" id="whites"></div>
+      </div>
+    </div>
+
+    <section class="seq" aria-label="Drum machine">
+      <div class="seq-head">
+        <div class="seq-left">
+          <div class="parts" id="partBtns">
+            <button class="part" data-pi="0" style="--pc:#7f9bb2"><i></i>DRUM</button><button class="part" data-pi="1" style="--pc:#c9a24c"><i></i>SYN A</button><button class="part" data-pi="2" style="--pc:#6f8a72"><i></i>SYN B</button><button class="part" data-pi="3" style="--pc:#c4664a"><i></i>SYN C</button>
+          </div>
+          <span class="seq-info" id="seqInfo">PATTERN A · 16 STEP</span>
+        </div>
+        <div class="pat-btns" id="patBtns">
+          <button class="pat" data-p="0">A</button><button class="pat" data-p="1">B</button><button class="pat" data-p="2">C</button><button class="pat" data-p="3">D</button>
+        </div>
+      </div>
+      <div id="seqRows" class="seq-rows"></div>
+      <i class="screw" style="left: 6px; top: 6px"></i><i class="screw" style="right: 6px; top: 6px"></i><i class="screw" style="left: 6px; bottom: 6px"></i><i class="screw" style="right: 6px; bottom: 6px"></i>
+    </section>
+
+    <!-- skin details: wooden cheeks (1983), screws and silk-screened titles (MODULAR) -->
+    <i class="cheek l" aria-hidden="true"></i><i class="cheek r" aria-hidden="true"></i>
+    <i class="screw" style="left: 8px; top: 8px"></i><i class="screw" style="right: 8px; top: 8px"></i><i class="screw" style="left: 8px; bottom: 8px"></i><i class="screw" style="right: 8px; bottom: 8px"></i>
+    <span class="silk" aria-hidden="true" style="left: 30px; top: 7px">SCREEN</span>
+    <span class="silk" aria-hidden="true" style="left: 654px; top: 7px">PARAMETERS</span>
+    <span class="silk" aria-hidden="true" style="left: 30px; top: 271px">TRANSPORT</span>
+    <span class="silk" aria-hidden="true" style="left: 250px; top: 271px">KEYS</span>
+    <span class="silk" aria-hidden="true" style="left: 30px; top: 481px">SEQUENCER</span>
+  </main>
+  <p class="help">Drag or scroll the knobs, click a knob to press it · hold <b>SELECT</b> for home ·
+    keys <b>A–'</b> play, <b>Z/X</b> or numpad <b>/ *</b> octave, <b>Space</b> play/stop, <b>R</b> rec, hold <b>STOP</b> or <b>Del</b> clear pattern (<b>Ctrl+Z</b> undo), <b>Q</b> loop/song, <b>↑ ↓ Enter Esc</b> navigate, <b>1–4</b> pick a knob, <b>← →</b> turn it, <b>5</b> press it</p>
+</div>
+<input type="file" id="importFile" accept=".oppd1,.json,application/json" hidden>
+
+<script src="js/audio.js"></script>
+<script src="js/engines.js"></script>
+<script src="js/grain.js"></script>
+<script src="js/fold.js"></script>
+<script src="js/pulsar.js"></script>
+<script src="js/vector.js"></script>
+<script src="js/scanned.js"></script>
+<script src="js/noise.js"></script>
+<script src="js/vocal.js"></script>
+<script src="js/fof.js"></script>
+<script src="js/macro.js"></script>
+<script src="js/presets.js"></script>
+<script src="js/core.js"></script>
+<script src="js/bot.js"></script>
+<script src="js/os.js"></script>
+<script src="js/skin.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
