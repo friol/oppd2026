@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <title>Mandelbrötchen</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="view"></canvas>
+  <audio id="bgm" src="muzic/Weightless%20Pads.mp3" loop preload="auto"></audio>
+
+  <button id="toggle" type="button" aria-label="Toggle controls" title="Toggle controls (H)">&#9776;</button>
+
+  <aside id="panel">
+    <div class="head">
+      <h1>Mandelbrötchen</h1>
+      <button id="autopilot" type="button" class="autopilot" title="Autopilot (A)">&#9654; Auto</button>
+    </div>
+
+    <label class="row">
+      <span>Fractal</span>
+      <select id="formula"></select>
+    </label>
+
+    <label class="row" id="powerRow" hidden>
+      <span>Power</span>
+      <select id="power"></select>
+    </label>
+
+    <div class="row">
+      <span>Plane</span>
+      <div class="segmented">
+        <button id="modeM" type="button">Mandelbrot</button>
+        <button id="modeJ" type="button">Julia</button>
+      </div>
+    </div>
+
+    <fieldset id="juliaBox">
+      <legend>Julia seed c</legend>
+      <label class="row" id="presetRow">
+        <span>Preset</span>
+        <select id="juliaPreset"></select>
+      </label>
+      <div class="seed">
+        <input id="jre" type="text" spellcheck="false" autocomplete="off" aria-label="Seed real part" title="Real part">
+        <span>+ i</span>
+        <input id="jim" type="text" spellcheck="false" autocomplete="off" aria-label="Seed imaginary part" title="Imaginary part">
+      </div>
+      <button id="pick" type="button" class="wide">Pick seed on the parameter map</button>
+    </fieldset>
+
+    <div class="row">
+      <span>Iterations</span>
+      <div class="inline">
+        <input id="iter" type="number" min="10" max="2000000" step="100">
+        <label class="check"><input id="autoIter" type="checkbox" checked> auto</label>
+      </div>
+    </div>
+
+    <label class="row">
+      <span>Palette</span>
+      <select id="palette"></select>
+    </label>
+
+    <label class="row">
+      <span>Color density</span>
+      <input id="density" type="range" min="-3" max="3" step="0.05" value="0">
+    </label>
+
+    <div class="row">
+      <span>Color cycling</span>
+      <label class="check"><input id="cycle" type="checkbox"> animate</label>
+    </div>
+
+    <div class="row">
+      <span>3D relief</span>
+      <div class="inline">
+        <label class="check"><input id="relief" type="checkbox"> on</label>
+        <input id="light" type="range" min="0" max="360" step="1" value="45" aria-label="Light direction" title="Light direction">
+      </div>
+    </div>
+
+    <div class="row">
+      <span>Music</span>
+      <div class="inline">
+        <label class="check"><input id="music" type="checkbox" checked> on</label>
+        <input id="volume" type="range" min="0" max="1" step="0.01" value="0.5" aria-label="Music volume">
+      </div>
+    </div>
+    <label class="row">
+      <span>Quality</span>
+      <select id="quality"></select>
+    </label>
+
+    <div class="buttons">
+      <button id="reset" type="button">Reset view</button>
+      <button id="copy" type="button">Copy link</button>
+      <button id="save" type="button">Save PNG</button>
+    </div>
+
+    <p class="help">
+      <b>Wheel</b> zoom &middot; <b>Drag</b> pan &middot; <b>Dbl-click</b> zoom in<br>
+      <b>Shift+click</b> Julia &middot; <b>Arrows</b> pan &middot; <b>+/&minus;</b> zoom<br>
+      <b>R</b> reset &middot; <b>A</b> auto &middot; <b>L</b> relief &middot; <b>M</b> music &middot; <b>H</b> hide
+    </p>
+  </aside>
+
+  <footer id="hud">
+    <div id="progress"><div id="bar"></div></div>
+    <div class="stats">
+      <span id="status">Starting&hellip;</span>
+      <span>Zoom <b id="zoom">1</b></span>
+      <span>Iterations <b id="iterOut">0</b></span>
+      <span>Precision <b id="bits">0</b> bits</span>
+    </div>
+    <div class="coord"><span>Re</span> <code id="cre"></code></div>
+    <div class="coord"><span>Im</span> <code id="cim"></code></div>
+  </footer>
+
+  <script src="js/worker.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
