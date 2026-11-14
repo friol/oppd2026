@@ -6,7 +6,7 @@
   const RES = [{ name: 'Retro', h: 200 }, { name: 'Classic', h: 270 }, { name: 'Sharp', h: 400 }, { name: 'HD', h: 720 }];
 
   const FX = ['Off', 'Light', 'Full'];
-  const settings = { diff: 1, res: 1, sens: 5, sound: true, fx: 2 };
+  const settings = { diff: 1, res: 3, sens: 5, sound: true, fx: 2 }; // res 3 = HD
   try { Object.assign(settings, JSON.parse(localStorage.getItem('wolfenstain') || '{}')); } catch (e) { /* storage unavailable */ }
   Sound.setEnabled(settings.sound);
   // Browsers only allow audio after a user gesture.
