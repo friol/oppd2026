@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
   <title>WolfenstAIn</title>
-  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="icon" type="image/png" href="favicon.png">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -14,6 +14,10 @@
 
     <div id="bossbar" hidden><span>THE RED WYRM</span><div class="track"><i></i></div></div>
     <div id="msg"></div>
+    <div id="console" hidden>
+      <div class="log" aria-live="polite"></div>
+      <label class="line"><span>&gt;</span><input type="text" spellcheck="false" autocomplete="off" aria-label="Console command"></label>
+    </div>
     <div id="levelcard"><small></small><strong></strong></div>
 
     <footer id="hud">
@@ -21,6 +25,7 @@
       <div class="cell mana"><label>Mana</label><b id="mpv">60</b><div class="bar"><i id="mpb"></i></div></div>
       <div class="cell weapon"><label id="wname">Frost Staff</label>
         <div class="slots" id="slots"><span>1</span><span>2</span><span>3</span><span>4</span></div></div>
+      <div class="cell face" aria-hidden="true"><div class="portrait" id="face"></div></div>
       <div class="cell bolts"><label>Bolts</label><b id="bov">0</b></div>
       <div class="cell key"><label>Key</label><b id="keyv" class="nokey">&#9911;</b></div>
       <div class="cell info"><label id="lvlname">Level 1</label><b id="kills">0 / 0</b></div>
@@ -93,7 +98,8 @@
     </div>
   </section>
 
-  <section id="win" class="screen panel" hidden>
+  <section id="win" class="screen panel victory" hidden>
+    <div class="art" aria-hidden="true"></div>
     <div class="box">
       <h2>Victory</h2>
       <p class="sub">The Red Wyrm is dead and the castle is free.</p>

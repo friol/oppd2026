@@ -6,7 +6,7 @@
 //   Walls:  # stone  M mossy stone  B red brick  D dark brick  L big blocks  C purple cobble
 //           K dark brick  S skulls  O bones  R rock  U wood  J metal  A gold  V vines  I ivy
 //           T torch  X/Y crystals  W stained glass  N rose window  F waterfall  Z skull relief
-//           Q gargoyle statue  G gargoyle trap (spits fire)  1-4 banners  E exit lever
+//           Q gargoyle statue  G gargoyle trap (spits fire)  1-4 banners  E level exit door
 //   Floors: . floor  , carpet  : tall hall  * open sky  ~ lava pit  _ water  c crate  ^ dais  p trap plate
 //   Doors:  + wooden door  = locked door (key)  H locked portcullis (key)  % secret push wall
 //   Things: @ player  s skeleton  o orc  m wizard  d demon  z zombie  a spider  e eye  g slime
@@ -17,17 +17,17 @@ const World = (() => {
     '#': 'stone', M: 'stone_moss', B: 'brick_red', D: 'brick_dark', L: 'block_big', C: 'cobble_purple',
     K: 'dark_brick', S: 'skull_wall', O: 'bones', R: 'rock', U: 'wood_dark', J: 'metal_panel', A: 'gold',
     V: 'vines', I: 'ivy', T: 'torch', X: 'crystal_purple', Y: 'crystal_blue', W: 'stained', N: 'rose',
-    F: 'waterfall', Z: 'skull_relief', Q: 'gargoyle_statue', G: 'gargoyle', E: 'lever',
+    F: 'waterfall', Z: 'skull_relief', Q: 'gargoyle_statue', G: 'gargoyle', E: 'exit_door',
     1: 'banner_red', 2: 'banner_blue', 3: 'banner_purple', 4: 'banner_green',
   };
   // [color, intensity, radius] of lights emitted by wall tiles.
   const WALL_LIGHTS = {
     T: [[1.0, 0.6, 0.26], 1.5, 5.5], X: [[0.75, 0.35, 1.0], 1.1, 4.5], Y: [[0.35, 0.65, 1.0], 1.1, 4.5],
-    W: [[0.7, 0.55, 1.0], 0.7, 4], N: [[0.9, 0.5, 0.7], 0.8, 4.5], F: [[0.4, 0.6, 0.9], 0.6, 3.5], E: [[0.5, 1.0, 0.5], 0.7, 2.5],
+    W: [[0.7, 0.55, 1.0], 0.7, 4], N: [[0.9, 0.5, 0.7], 0.8, 4.5], F: [[0.4, 0.6, 0.9], 0.6, 3.5], E: [[1.0, 0.62, 0.3], 0.55, 2.5],
   };
   // 6 = free-standing prop: lightmap sampled further out along the normal so round shapes get shaded.
   // 7 = metal (shiny highlights), 8 = wet floor (set per level, see create()).
-  const FLAG = { lava: 1, water: 2, waterfall: 3, crystal_purple: 4, crystal_blue: 4, torch: 5, column: 6, column_stone: 6,
+  const FLAG = { lava: 1, water: 2, waterfall: 3, crystal_purple: 4, crystal_blue: 4, torch: 5, torch_out: 5, column: 6, column_stone: 6,
     iron_door: 7, bars: 7, cage: 7, metal_panel: 7, metal_floor: 7, gold: 7, lever: 7,
     // 9 = cloth (banners sway), 10 = foliage (ivy and vines tremble).
     banner_red: 9, banner_blue: 9, banner_purple: 9, banner_green: 9, ivy: 10, vines: 10 };
@@ -84,7 +84,7 @@ const World = (() => {
         c.c = b.c; c.sky = b.sky; c.floor = b.floor; c.ceil = b.ceil;
       }
       const ch = c.ch, cx = x + 0.5, cz = z + 0.5;
-      if (ch === '~') { c.f = -0.45; c.floor = T('lava'); c.kind = 'lava'; lights.push({ x: cx, z: cz, col: [1, 0.42, 0.1], i: 0.42, r: 2.4 }); }
+      if (ch === '~') { c.f = -0.45; c.floor = T('lava'); c.kind = 'lava'; lights.push({ x: cx, z: cz, y: -0.2, col: [1, 0.42, 0.1], i: 0.42, r: 2.4 }); }
       else if (ch === '_') { c.f = -0.25; c.floor = T('water'); c.kind = 'water'; waters.push({ x: cx, z: cz }); }
       else if (ch === 'c') { c.f = 0.6; c.floor = T('crate'); c.side = T('crate'); c.kind = 'crate'; }
       else if (ch === '^') { c.f = 0.3; c.floor = T('red_tile'); c.side = T('block_big'); }
@@ -117,7 +117,7 @@ const World = (() => {
         if (!n || n.solid) continue;
         const fx = x + 0.5 + dx * 0.5, fz = z + 0.5 + dz * 0.5;
         const L = WALL_LIGHTS[c.ch];
-        if (L) lights.push({ x: fx + dx * 0.3, z: fz + dz * 0.3, col: L[0], i: L[1], r: L[2], cell: z * W + x });
+        if (L) lights.push({ x: fx + dx * 0.3, z: fz + dz * 0.3, y: n.f + 1.25, col: L[0], i: L[1], r: L[2], cell: z * W + x });
         if (c.ch === 'F') waters.push({ x: fx + dx * 0.1, z: fz + dz * 0.1 });
         if (c.ch === 'T') torches.push({ x: fx + dx * 0.1, z: fz + dz * 0.1, cell: z * W + x, dx, dz, f: n.f, c: n.sky ? n.f + 3 : n.c });
         if (c.ch === 'X' || c.ch === 'Y') crystals.push({ x: fx + dx * 0.1, z: fz + dz * 0.1 });
@@ -166,13 +166,25 @@ const World = (() => {
       altars++;
     }
 
+    // Average colour of each texture layer (for bounced light).
+    const albedo = [];
+    const layerAvg = (layer) => {
+      const id = layer & 255;
+      if (albedo[id]) return albedo[id];
+      const n = tex.size * tex.size, base = id * n * 4, sum = [0, 0, 0];
+      let cnt = 0;
+      for (let i = 0; i < n; i += 7) { for (let k = 0; k < 3; k++) sum[k] += tex.data[base + i * 4 + k]; cnt++; }
+      return (albedo[id] = sum.map((v) => v / cnt / 255));
+    };
+
     const world = {
-      W, H, cells, at, start, spawns, items, decor, doors, pushwalls, turrets, lights, plates, level, windows, falls, cobwebs, moss,
+      W, H, cells, at, start, layerAvg, spawns, items, decor, doors, pushwalls, turrets, lights, plates, level, windows, falls, cobwebs, moss,
       mesh: null, lightmap: null, flow: new Int16Array(W * H), flowFly: new Int16Array(W * H),
       plainWall: T(level.side), waters, torches, crystals, torchOut: T('torch_out'), beam: T('wood_dark'),
     };
     world.mesh = buildMesh(world);
     world.lightmap = bakeLightmap(world);
+    world.occ = buildOccupancy(world);
     return world;
   }
 
@@ -251,7 +263,16 @@ const World = (() => {
           const decorated = n && DECORATED.test(n.ch);
           // Under open sky the wall stops at RUIN_CUT; its broken crown is added by ruinTops().
           const top = c.sky && n ? RUIN_CUT : c.c;
-          if (decorated && top - c.f > 1.6) {
+          if (n && /[1234T]/.test(n.ch)) {
+            // Banners and torches: the ordinary wall continues behind them; the
+            // cut-out cloth / the torch tile (edges dithered away in the shader)
+            // sits on a second face just in front.
+            wallFace(out, x, z, dx, dz, c.f, top, frameTex(w, x + dx, z + dz, dx, dz), false);
+            const start = out.length;
+            if (top - c.f > 1.6) wallFace(out, x, z, dx, dz, c.f + 0.2, c.f + 1.4, layer, true);
+            else wallFace(out, x, z, dx, dz, c.f, top, layer, true);
+            for (let i = start; i < out.length; i += 10) { out[i] -= dx * 0.006; out[i + 2] -= dz * 0.006; }
+          } else if (decorated && top - c.f > 1.6) {
             // Tall faces: ornament once at eye level, plain wall tiles above and below.
             const plain = frameTex(w, x + dx, z + dz, dx, dz);
             wallFace(out, x, z, dx, dz, c.f, c.f + 0.2, plain, false);
@@ -519,8 +540,68 @@ const World = (() => {
       acc[i] = Math.max(0, acc[i] + L.col[0] * a); acc[i + 1] = Math.max(0, acc[i + 1] + L.col[1] * a); acc[i + 2] = Math.max(0, acc[i + 2] + L.col[2] * a);
     }
   }
+  // One bounce of indirect light, computed per cell: every lit floor and wall
+  // reflects its light (tinted by its texture's colour) to the open cells that
+  // can see it, then the result is spread smoothly over the lightmap texels.
+  function addBounce(w, acc) {
+    const { W, H } = w, LW = W * LM_RES;
+    const D = new Float32Array(W * H * 3), open = (x, z) => { const c = w.at(x, z); return c && !c.solid; };
+    for (let z = 0; z < H; z++) for (let x = 0; x < W; x++) {
+      if (!open(x, z)) continue;
+      const o = (z * W + x) * 3;
+      for (let tz = 0; tz < LM_RES; tz++) for (let tx = 0; tx < LM_RES; tx++) {
+        const i = ((z * LM_RES + tz) * LW + x * LM_RES + tx) * 3;
+        D[o] += acc[i]; D[o + 1] += acc[i + 1]; D[o + 2] += acc[i + 2];
+      }
+      for (let k = 0; k < 3; k++) D[o + k] /= LM_RES * LM_RES;
+    }
+    // Walls receive roughly the light of the open cells in front of them.
+    const Dw = new Float32Array(W * H * 3);
+    for (let z = 0; z < H; z++) for (let x = 0; x < W; x++) {
+      if (open(x, z)) continue;
+      let n = 0;
+      for (const [dx, dz] of DIRS) if (open(x + dx, z + dz)) { n++; for (let k = 0; k < 3; k++) Dw[(z * W + x) * 3 + k] += D[((z + dz) * W + x + dx) * 3 + k]; }
+      if (n) for (let k = 0; k < 3; k++) Dw[(z * W + x) * 3 + k] /= n;
+    }
+    const see = (ax, az, bx, bz) => {
+      const dx = bx - ax, dz = bz - az, n = Math.ceil(Math.max(Math.abs(dx), Math.abs(dz)) * 2);
+      for (let k = 1; k < n; k++) if (!open(Math.floor(ax + 0.5 + dx * k / n), Math.floor(az + 0.5 + dz * k / n))) return false;
+      return true;
+    };
+    const R = 4, K = 0.085, ind = new Float32Array(W * H * 3);
+    for (let z = 0; z < H; z++) for (let x = 0; x < W; x++) {
+      if (!open(x, z)) continue;
+      const o = (z * W + x) * 3;
+      for (let nz = z - R; nz <= z + R; nz++) for (let nx = x - R; nx <= x + R; nx++) {
+        if ((nx === x && nz === z) || nx < 0 || nz < 0 || nx >= W || nz >= H) continue;
+        const c = w.at(nx, nz), j = (nz * W + nx) * 3, src = c.solid ? Dw : D;
+        if (src[j] + src[j + 1] + src[j + 2] < 0.01 || !see(x, z, nx, nz)) continue;
+        const a = w.layerAvg(c.solid ? c.wall : c.floor), wt = K / (1 + (nx - x) ** 2 + (nz - z) ** 2);
+        for (let k = 0; k < 3; k++) ind[o + k] += src[j + k] * a[k] * wt;
+      }
+    }
+    // Bilinear spread over the texels of open cells (only from open cells, so nothing leaks through walls).
+    for (let tz = 0; tz < H * LM_RES; tz++) for (let tx = 0; tx < LW; tx++) {
+      const x = Math.floor(tx / LM_RES), z = Math.floor(tz / LM_RES);
+      if (!open(x, z)) continue;
+      const fx = (tx + 0.5) / LM_RES - 0.5, fz = (tz + 0.5) / LM_RES - 0.5, x0 = Math.floor(fx), z0 = Math.floor(fz);
+      let sw = 0;
+      const v = [0, 0, 0];
+      for (const [cx, cz] of [[x0, z0], [x0 + 1, z0], [x0, z0 + 1], [x0 + 1, z0 + 1]]) {
+        if (!open(cx, cz)) continue;
+        const wt = (1 - Math.abs(fx - cx)) * (1 - Math.abs(fz - cz));
+        sw += wt;
+        for (let k = 0; k < 3; k++) v[k] += ind[(cz * W + cx) * 3 + k] * wt;
+      }
+      if (sw <= 0) continue;
+      const i = (tz * LW + tx) * 3;
+      for (let k = 0; k < 3; k++) acc[i + k] += v[k] / sw;
+    }
+  }
+
   function finishLightmap(w, lit) {
     const LW = w.W * LM_RES, LH = w.H * LM_RES, acc = lit.slice();
+    addBounce(w, acc);
     const solid = (x, z) => { const c = w.at(Math.floor(x), Math.floor(z)); return !c || c.solid || w.pushwalls.some((p) => p.x === Math.floor(x) && p.z === Math.floor(z)); };
     // Spread values into wall texels so bilinear filtering never darkens wall bases.
     const filled = new Uint8Array(LW * LH), q = [];
@@ -619,6 +700,65 @@ const World = (() => {
         }
       }
     }
+  }
+
+  // ---------------- Shadow occupancy ----------------
+  // A height map at lightmap resolution: R = static blockers (walls, floor
+  // steps, columns, furniture), G = dynamic blockers stamped every frame
+  // (enemies, doors, push-walls). Heights are encoded as (h + 1) / 6 * 255.
+  const OCC_LO = -1, OCC_SPAN = 6;
+  const occEnc = (h) => Math.max(0, Math.min(255, Math.round((h - OCC_LO) / OCC_SPAN * 255)));
+  function buildOccupancy(w) {
+    const OW = w.W * LM_RES, OH = w.H * LM_RES, data = new Uint8Array(OW * OH * 2);
+    for (let tz = 0; tz < OH; tz++) for (let tx = 0; tx < OW; tx++) {
+      const c = w.at(Math.floor(tx / LM_RES), Math.floor(tz / LM_RES));
+      data[(tz * OW + tx) * 2] = !c || c.solid ? 255 : occEnc(c.f);
+    }
+    for (const p of w.pushwalls) {
+      const c = w.at(p.x, p.z);
+      for (let tz = 0; tz < LM_RES; tz++) for (let tx = 0; tx < LM_RES; tx++) data[((p.z * LM_RES + tz) * OW + p.x * LM_RES + tx) * 2] = occEnc(c.f);
+    }
+    const stamp = (x0, x1, z0, z1, top, inside) => {
+      for (let tz = Math.max(0, Math.floor(z0 * LM_RES)); tz < Math.min(OH, Math.ceil(z1 * LM_RES)); tz++) {
+        for (let tx = Math.max(0, Math.floor(x0 * LM_RES)); tx < Math.min(OW, Math.ceil(x1 * LM_RES)); tx++) {
+          if (inside && !inside((tx + 0.5) / LM_RES, (tz + 0.5) / LM_RES)) continue;
+          const i = (tz * OW + tx) * 2;
+          data[i] = Math.max(data[i], occEnc(top));
+        }
+      }
+    };
+    for (const d of w.decor) {
+      const c = w.at(Math.floor(d.x), Math.floor(d.z));
+      if (d.type === 'pillar') stamp(d.x - 0.3, d.x + 0.3, d.z - 0.3, d.z + 0.3, c.sky ? c.f + 2.2 : c.c, (x, z) => Math.hypot(x - d.x, z - d.z) < 0.26);
+      else stamp(d.x - d.r, d.x + d.r, d.z - d.r, d.z + d.r, c.f + d.h);
+    }
+    // Rewrites the G channel: dynamic blockers. actors: [{x, z, r, top}].
+    const update = (actors) => {
+      for (let i = 1; i < data.length; i += 2) data[i] = 0;
+      const put = (x0, x1, z0, z1, top, inside) => {
+        for (let tz = Math.max(0, Math.floor(z0 * LM_RES)); tz < Math.min(OH, Math.ceil(z1 * LM_RES)); tz++) {
+          for (let tx = Math.max(0, Math.floor(x0 * LM_RES)); tx < Math.min(OW, Math.ceil(x1 * LM_RES)); tx++) {
+            if (inside && !inside((tx + 0.5) / LM_RES, (tz + 0.5) / LM_RES)) continue;
+            const i = (tz * OW + tx) * 2 + 1;
+            data[i] = Math.max(data[i], occEnc(top));
+          }
+        }
+      };
+      for (const d of w.doors) {
+        if (d.open >= 0.999 && !d.gate) continue;
+        const c = w.at(d.x, d.z), t = 0.07;
+        const top = d.gate ? (d.open > 0.7 ? -1 : c.c) : c.c;
+        if (d.orient === 'x') put(d.x + d.open, d.x + 1 + d.open, d.z + 0.5 - t, d.z + 0.5 + t, d.gate ? top : c.c);
+        else put(d.x + 0.5 - t, d.x + 0.5 + t, d.z + d.open, d.z + 1 + d.open, d.gate ? top : c.c);
+      }
+      for (const p of w.pushwalls) {
+        put(p.x, p.x + 1, p.z, p.z + 1, 9);
+      }
+      for (const a of actors) put(a.x - a.r, a.x + a.r, a.z - a.r, a.z + a.r, a.top, (x, z) => Math.hypot(x - a.x, z - a.z) < a.r);
+      return data;
+    };
+    update([]);
+    return { w: OW, h: OH, data, update, lo: OCC_LO, span: OCC_SPAN, res: LM_RES };
   }
 
   // Puts out the torch in wall cell `idx`: unlit texture, its lights removed

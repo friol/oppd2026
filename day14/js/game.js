@@ -44,6 +44,8 @@ const Game = (() => {
   const events = { message() {}, levelComplete() {}, death() {}, victory() {} };
 
   function init(assets) { A = assets; }
+  // Console cheats; they stay on across levels.
+  const cheats = { god: false, noclip: false };
   const rand = (a, b) => a + Math.random() * (b - a);
   const frame = (name) => A.atlas.frames[name];
 
@@ -78,14 +80,12 @@ const Game = (() => {
       flash: { hurt: 0, pickup: 0, lava: 0 }, shake: 0,
       stats: { kills: 0, totalKills: world.spawns.length, items: 0, totalItems: world.items.length, secrets: 0, totalSecrets: world.pushwalls.length },
       flowCell: -1, flowT: 0, seenT: 0, ended: false, victoryT: -1, boss: null, lastFireSnd: -1, lastFireHit: -1,
-      decals: [], motes: [], frost: 0, torchHits: {}, smokers: [], ripples: [], bubbles: [], drips: [],
+      decals: [], motes: [], frost: 0, torchHits: {}, smokers: [], ripples: [], bubbles: [], drips: [], hazes: [],
     });
     G.boss = G.enemies.find((e) => e.def.boss) || null;
     G.lavaCells = [];
     world.cells.forEach((c, i) => { if (c.kind === 'lava') G.lavaCells.push({ x: i % world.W + 0.5, z: Math.floor(i / world.W) + 0.5 }); });
     G.liquid = G.lavaCells.length > 0 || world.waters.length > 0;
-    // Wall lights strong enough to cast long moving shadows (torches, crystals, windows).
-    G.castLights = world.lights.filter((L) => L.r >= 3.5 && L.i >= 0.6);
     G.sootTorches = world.torches.slice();
     // Water under a roof drips from the ceiling.
     G.dripCells = [];
@@ -148,15 +148,19 @@ const Game = (() => {
 
     const feet = p.y;
     const nx = p.x + p.vx * dt;
-    if (!World.blocked(w, nx, p.z, p.r, feet, PLAYER_H, false)) p.x = nx; else p.vx = 0;
+    if (cheats.noclip || !World.blocked(w, nx, p.z, p.r, feet, PLAYER_H, false)) p.x = nx; else p.vx = 0;
     const nz = p.z + p.vz * dt;
-    if (!World.blocked(w, p.x, nz, p.r, feet, PLAYER_H, false)) p.z = nz; else p.vz = 0;
+    if (cheats.noclip || !World.blocked(w, p.x, nz, p.r, feet, PLAYER_H, false)) p.z = nz; else p.vz = 0;
+    p.x = Math.max(0.3, Math.min(w.W - 0.3, p.x)); p.z = Math.max(0.3, Math.min(w.H - 0.3, p.z));
     // Push out of pillars and monsters.
-    for (const d of G.decor) pushOut(p, d.x, d.z, p.r + d.r);
-    for (const e of G.enemies) if (!e.dead && Math.abs(e.y - p.y) < 1.2) pushOut(p, e.x, e.z, p.r + e.def.radius * 0.8);
+    if (!cheats.noclip) {
+      for (const d of G.decor) pushOut(p, d.x, d.z, p.r + d.r);
+      for (const e of G.enemies) if (!e.dead && Math.abs(e.y - p.y) < 1.2) pushOut(p, e.x, e.z, p.r + e.def.radius * 0.8);
+    }
 
-    // Vertical motion.
-    const floor = World.floorAt(w, p.x, p.z, p.r * 0.7);
+    // Vertical motion (inside walls with noclip there is no floor: keep the height).
+    let floor = World.floorAt(w, p.x, p.z, p.r * 0.7);
+    if (cheats.noclip && floor < -5) floor = p.y;
     if (input.jump && p.onGround) { p.vy = 4.6; p.onGround = false; Sound.play('jump', { rate: rand(0.95, 1.05) }); }
     if (p.y > floor + 0.001 || p.vy > 0) {
       p.vy -= GRAVITY * dt;
@@ -364,6 +368,8 @@ const Game = (() => {
     const next = G.world.at(pw.x + pw.dx, pw.z + pw.dz);
     if (!next || next.solid || next.door) { pw.dx = pw.dz = 0; return; }
     pw.moving = true;
+    // Stone grinding while it slides (two cells at 1.1 units/s, plus a short tail).
+    Sound.play('wallMove', { x: pw.x + 0.5, z: pw.z + 0.5, rate: 0.95 });
     G.stats.secrets++;
     events.message('You found a SECRET!');
   }
@@ -389,7 +395,7 @@ const Game = (() => {
 
   function damagePlayer(amount, silent) {
     const inv = G.inv;
-    if (inv.hp <= 0 || G.ended) return;
+    if (inv.hp <= 0 || G.ended || cheats.god) return;
     inv.hp -= amount * (silent ? 1 : G.diff.dmg);
     G.flash.hurt = Math.min(0.8, G.flash.hurt + (silent ? 0.02 : 0.35));
     if (!silent) G.shake = Math.max(G.shake, 0.18);
@@ -443,10 +449,8 @@ const Game = (() => {
     e.y = e.def.fly ? World.floorAt(G.world, e.x, e.z, 0.1) : e.y;
     if (e.type !== 'ghost' && !e.deathKind) floorDecal('splat', e.x, e.z, e.def.boss ? 1.6 : rand(0.55, 0.75), col);
     if (e.type === 'zombie') Sound.play('zombieDeath', { x: e.x, z: e.z, rate: rand(0.92, 1.05) });
-    if (e.type === 'slime') {
-      Sound.play('slime', { x: e.x, z: e.z, rate: rand(0.92, 1.08) });
-      for (let i = 0; i < 25; i++) particle(e.x, e.y + 0.25, e.z, rand(-3, 3), rand(1, 4), rand(-3, 3), col, 0.09, 1.1, false);
-    }
+    // Slimes splat right away, unless frozen or burning: then the splat comes when they burst.
+    if (e.type === 'slime' && !e.deathKind) slimeSplat(e);
     const drop = e.def.drop;
     if (drop && Math.random() < drop[1]) G.items.push({ type: drop[0], x: e.x, z: e.z, taken: false, counted: false });
     if (e.def.boss) {
@@ -593,20 +597,28 @@ const Game = (() => {
     G.growlT = best.awake ? rand(1.8, 3.2) : rand(3, 5.5);
   }
 
-  // Groans from the nearest zombie in earshot; more often once it has noticed the player.
+  // Voices from the nearest monster of a kind in earshot (zombie groans, the
+  // purple wizard's eerie wail); more often once it has noticed the player.
+  const VOICES = [
+    { type: 'zombie', sound: 'zombie', range: 11, awake: [2.8, 4.5], idle: [5, 8] },
+    { type: 'wizard', sound: 'wizard', range: 12, awake: [5, 8], idle: [8, 13] },
+  ];
   function zombieGroans(dt) {
-    G.groanT = (G.groanT ?? rand(1, 3)) - dt;
-    if (G.groanT > 0) return;
     const P = G.p;
-    let best = null, bestD = 11;
-    for (const e of G.enemies) {
-      if (e.dead || e.type !== 'zombie') continue;
-      const d = Math.hypot(e.x - P.x, e.z - P.z);
-      if (d < bestD) { best = e; bestD = d; }
+    G.voiceT = G.voiceT || {};
+    for (const v of VOICES) {
+      G.voiceT[v.type] = (G.voiceT[v.type] ?? rand(1, 3)) - dt;
+      if (G.voiceT[v.type] > 0) continue;
+      let best = null, bestD = v.range;
+      for (const e of G.enemies) {
+        if (e.dead || e.type !== v.type) continue;
+        const d = Math.hypot(e.x - P.x, e.z - P.z);
+        if (d < bestD) { best = e; bestD = d; }
+      }
+      if (!best) { G.voiceT[v.type] = 0.5; continue; }
+      Sound.play(v.sound, { x: best.x, z: best.z, rate: rand(0.9, 1.1) });
+      G.voiceT[v.type] = best.awake ? rand(...v.awake) : rand(...v.idle);
     }
-    if (!best) { G.groanT = 0.5; return; }
-    Sound.play('zombie', { x: best.x, z: best.z, rate: rand(0.85, 1.1) });
-    G.groanT = best.awake ? rand(2.8, 4.5) : rand(5, 8);
   }
 
   // Wet scuttling while an awake slime is closing in on the player.
@@ -660,16 +672,62 @@ const Game = (() => {
   }
 
   // ---------------- Projectiles & effects ----------------
+  // Projectiles with the fireball launch/burst sounds, and their pitch
+  // (orb_red: flying eye, orb_blue: the wizard's purple orb).
+  const FIERY = { fire: 1, orb_red: 1.2, orb_blue: 0.88 };
   function spawnProj(owner, kind, x, y, z, dir, speed, dmg, splash) {
     G.projs.push({ owner, kind, x, y, z, vx: dir[0] * speed, vy: dir[1] * speed, vz: dir[2] * speed, dmg, splash, life: 4, t: 0 });
     // One whoosh per volley (the dragon spits several fireballs at once).
-    if (kind === 'fire' && G.time - (G.lastFireSnd ?? -1) > 0.06) {
+    // Enemy fireballs (demons, dragon, gargoyles) are always heard: wide range and a volume floor.
+    // The flying eye's red orbs use the same sounds, pitched up a little.
+    if (FIERY[kind] && G.time - (G.lastFireSnd ?? -1) > 0.06) {
       G.lastFireSnd = G.time;
-      Sound.play('fireball', { x, z, rate: rand(0.92, 1.08) });
+      const rate = rand(0.92, 1.08) * FIERY[kind];
+      Sound.play('fireball', owner === 'e' ? { x, z, rate, range: 32, min: 0.35 } : { x, z, rate });
+    }
+  }
+  // The frost bolt freezes the air it crosses: tiny ice crystals hang in its
+  // wake, drift down slowly and twinkle before melting away, inside a thin
+  // cold haze that spreads out and fades.
+  function iceTrail(pr, dt) {
+    const sp = Math.hypot(pr.vx, pr.vy, pr.vz) || 1, dist = sp * dt;
+    pr.trail = (pr.trail || 0) + dist;
+    pr.haze = (pr.haze || 0) + dist;
+    while (pr.trail > 0.09) {
+      pr.trail -= 0.09;
+      const back = pr.trail / sp;
+      const x = pr.x - pr.vx * back + rand(-0.05, 0.05), y = pr.y - pr.vy * back + rand(-0.05, 0.05), z = pr.z - pr.vz * back + rand(-0.05, 0.05);
+      particle(x, y, z, pr.vx * 0.03 + rand(-0.12, 0.12), rand(-0.05, 0.1), pr.vz * 0.03 + rand(-0.12, 0.12),
+        [rand(0.75, 0.9), rand(0.9, 1), 1], rand(0.012, 0.026), rand(0.5, 1.1), false);
+      const q = G.parts[G.parts.length - 1];
+      q.frost = true; q.ph = Math.random() * 20;
+    }
+    if (pr.haze > 0.3) {
+      pr.haze = 0;
+      if (G.hazes.length > 80) G.hazes.shift();
+      G.hazes.push({ x: pr.x, y: pr.y, z: pr.z, t: 0, life: rand(0.7, 1.1) });
+    }
+  }
+  // Frost bolt hitting something: a spray of fine ice splinters bouncing back
+  // off the surface (fine points, falling and twinkling) and a puff of cold haze.
+  function iceBurst(pr, x, y, z, surf) {
+    const sp = Math.hypot(pr.vx, pr.vy, pr.vz) || 1;
+    // Bounce direction: the surface normal when known, otherwise back along the path.
+    const n = surf ? surf.n : [-pr.vx / sp, -pr.vy / sp, -pr.vz / sp];
+    for (let i = 0; i < 26; i++) {
+      let dx = n[0] + rand(-0.9, 0.9), dy = n[1] + rand(-0.6, 0.9), dz = n[2] + rand(-0.9, 0.9);
+      const l = Math.hypot(dx, dy, dz) || 1, v = rand(0.8, 3.2);
+      particle(x, y, z, dx / l * v, dy / l * v + 0.6, dz / l * v, [rand(0.75, 0.9), rand(0.9, 1), 1], rand(0.012, 0.03), rand(0.35, 0.8), false);
+      const q = G.parts[G.parts.length - 1];
+      q.frost = true; q.shard = true; q.ph = Math.random() * 20;
+    }
+    for (let i = 0; i < 3; i++) {
+      if (G.hazes.length > 80) G.hazes.shift();
+      G.hazes.push({ x: x + n[0] * 0.08 + rand(-0.06, 0.06), y: y + rand(-0.06, 0.06), z: z + n[2] * 0.08 + rand(-0.06, 0.06), t: 0, life: rand(0.6, 1), s: rand(1.3, 1.8) });
     }
   }
   function particle(x, y, z, vx, vy, vz, col, size, life, emissive) {
-    if (G.parts.length > 600) G.parts.shift();
+    if (G.parts.length > 900) G.parts.shift();
     G.parts.push({ x, y, z, vx, vy, vz, col, size, life, max: life, emissive });
   }
   function spark(x, y, z, col) { particle(x, y, z, rand(-0.6, 0.6), rand(0.5, 2), rand(-0.6, 0.6), col, 0.05, 0.5, true); }
@@ -727,6 +785,7 @@ const Game = (() => {
         }
       }
       if (hit || pr.life <= 0) pr.dead = true;
+      else if (pr.kind === 'ice' && pr.owner === 'p') iceTrail(pr, dt);
       else if (pr.kind !== 'arrow' && Math.random() < dt * 30) {
         const L = PROJ[pr.kind].light;
         if (L) particle(pr.x, pr.y, pr.z, rand(-0.3, 0.3), rand(-0.2, 0.4), rand(-0.3, 0.3), L, 0.04, 0.35, true);
@@ -754,9 +813,11 @@ const Game = (() => {
       douseTorch(x, y, z);
     }
     // Fireball bursting on a wall/floor or on the player (once per volley of the dragon).
-    if (pr.kind === 'fire' && (!target || target === 'player') && G.time - G.lastFireHit > 0.08) {
+    if (FIERY[pr.kind] && (!target || target === 'player') && G.time - G.lastFireHit > 0.08) {
       G.lastFireHit = G.time;
-      Sound.play('fireHit', target === 'player' ? { rate: rand(0.95, 1.05) } : { x, z, rate: rand(0.92, 1.08) });
+      const k = FIERY[pr.kind];
+      Sound.play('fireHit', target === 'player' ? { rate: rand(0.95, 1.05) * k }
+        : pr.owner === 'e' ? { x, z, rate: rand(0.92, 1.08) * k, range: 32, min: 0.35 } : { x, z, rate: rand(0.92, 1.08) * k });
     }
     if (pr.kind === 'fire') {
       if (surf) addDecal('scorch', surf, pr.splash > 1.5 ? 1.2 : 0.85, null);
@@ -764,8 +825,10 @@ const Game = (() => {
     }
     if (pr.kind === 'ice' && surf) addDecal('frost', surf, rand(0.42, 0.6), null);
     if (pr.splash) explosion(x, y, z, pr.splash, pr.dmg * 0.6, pr.owner);
+    else if (pr.kind === 'ice') iceBurst(pr, x, y, z, surf);
     else for (let i = 0; i < 8; i++) spark(x, y, z, col);
-    if (!pr.splash && pr.kind !== 'arrow') G.effects.push({ x, y, z, t: 0, dur: 0.15, frames: [PROJ[pr.kind].frame], size: 0.4, light: col, li: 1 });
+    // The ice burst has no sprite flash, only its cold light.
+    if (!pr.splash && pr.kind !== 'arrow') G.effects.push({ x, y, z, t: 0, dur: 0.15, frames: [PROJ[pr.kind].frame], size: pr.kind === 'ice' ? 0.001 : 0.4, light: col, li: 1 });
   }
 
   // Frozen enemies stand still for a moment then burst into ice shards;
@@ -787,6 +850,7 @@ const Game = (() => {
             [rand(0.6, 0.85), rand(0.85, 0.95), 1], rand(0.03, 0.08), rand(0.6, 1.2), false);
         }
         Sound.play('iceShatter', { x: e.x, z: e.z, rate: rand(0.85, 0.95), vol: 1.2 });
+        if (e.type === 'slime') slimeSplat(e);
         floorDecal('frost', e.x, e.z, rand(0.6, 0.8), null);
         e.deathDone = true;
       } else {
@@ -801,11 +865,23 @@ const Game = (() => {
           continue;
         }
         if (k < ASH_T) continue;
+        if (e.type === 'slime') slimeSplat(e, [0.16, 0.24, 0.08]);
         for (let i = 0; i < 18; i++) particle(e.x + rand(-0.3, 0.3), e.y + 0.1, e.z + rand(-0.3, 0.3), rand(-0.6, 0.6), rand(0.3, 1.2), rand(-0.6, 0.6), [0.3, 0.28, 0.26], 0.04, 0.8, false);
         floorDecal('scorch', e.x, e.z, 0.8, null);
         floorDecal('splat', e.x, e.z, 0.45, [0.2, 0.19, 0.18]);
         e.deathDone = true;
       }
+    }
+  }
+
+  function slimeSplat(e, col = BLOOD.slime) {
+    Sound.play('slime', { x: e.x, z: e.z, rate: rand(0.92, 1.08) });
+    // Gobs of goo of many sizes: big slow ones and fast small droplets.
+    for (let i = 0; i < 46; i++) {
+      const big = Math.random() < 0.25, v = big ? rand(0.5, 1.5) : rand(0.9, 2.6), a = Math.random() * Math.PI * 2;
+      particle(e.x + rand(-0.15, 0.15), e.y + rand(0.1, 0.35), e.z + rand(-0.15, 0.15), Math.cos(a) * v, rand(0.8, big ? 2.2 : 3.2), Math.sin(a) * v,
+        col.map((c) => c * rand(0.85, 1.15)), big ? rand(0.035, 0.055) : rand(0.012, 0.028), rand(0.7, 1.3), false);
+      G.parts[G.parts.length - 1].goo = true;
     }
   }
 
@@ -879,8 +955,8 @@ const Game = (() => {
     G.torchHits[t.cell] = (G.torchHits[t.cell] || 0) + 1;
     for (let i = 0; i < 8; i++) smoke(t.x, ty, t.z, 0.8, 0.9);
     if (G.torchHits[t.cell] < TORCH_HITS) return;
+    Sound.play('flameOut', { x: t.x, z: t.z, rate: rand(0.95, 1.05) });
     const gone = World.extinguish(w, t.cell);
-    G.castLights = G.castLights.filter((L) => !gone.includes(L));
     Renderer.setLevel(w);
     for (let i = 0; i < 26; i++) smoke(t.x, ty, t.z, 1.4, 1.6);
     G.smokers.push({ x: t.x, y: ty, z: t.z, t: 6 });
@@ -922,7 +998,7 @@ const Game = (() => {
   const rippleData = new Float32Array(16);
   function rippleUniform() {
     rippleData.fill(0);
-    G.ripples.forEach((r, i) => rippleData.set([r.x, r.z, r.t, r.s], i * 4));
+    G.ripples.slice(-4).forEach((r, i) => rippleData.set([r.x, r.z, r.t, r.s], i * 4));
     return rippleData;
   }
   function updateLiquids(dt) {
@@ -965,13 +1041,21 @@ const Game = (() => {
       q.life -= dt;
       // Smoke rises and slows down; everything else falls.
       if (q.float) { q.vy += (0.5 - q.vy) * dt * 2; q.vx *= 1 - dt; q.vz *= 1 - dt; }
+      else if (q.shard) { const k = Math.exp(-dt * 1.5); q.vx *= k; q.vz *= k; q.vy = q.vy * k - 5 * dt; }
+      else if (q.frost) { const k = Math.exp(-dt * 4); q.vx *= k; q.vz *= k; q.vy = q.vy * k - 0.12 * dt; }
       else if (q.rise) { q.vy += (0.5 - q.vy) * dt * 1.5; q.vx += rand(-1, 1) * dt; q.vz += rand(-1, 1) * dt; }
       else q.vy -= 6 * dt;
       q.x += q.vx * dt; q.y += q.vy * dt; q.z += q.vz * dt;
       const f = World.floorAt(G.world, q.x, q.z, 0.01);
-      if (q.y < f + 0.01) { q.y = f + 0.01; q.vx *= 0.5; q.vz *= 0.5; q.vy = 0; }
+      if (q.y < f + 0.01) {
+        q.y = f + 0.01; q.vx *= 0.5; q.vz *= 0.5; q.vy = 0;
+        // Slime goo splats where it lands, then is gone.
+        if (q.goo && !q.landed) { q.landed = true; floorDecal('splat', q.x, q.z, q.size * rand(2.2, 3.2), q.col); q.life = Math.min(q.life, 0.05); }
+      }
     }
     G.parts = G.parts.filter((q) => q.life > 0);
+    for (const h of G.hazes) h.t += dt;
+    G.hazes = G.hazes.filter((h) => h.t < h.life);
     for (const d of G.decals) d.t += dt;
     G.decals = G.decals.filter((d) => d.t < DECAL_LIFE[d.kind]);
     updateMotes(dt);
@@ -1114,14 +1198,14 @@ const Game = (() => {
     if (G.muzzle > 0) {
       const wp = WEAPONS[G.inv.weapon];
       const col = wp.id === 'fire' ? [1, 0.55, 0.2] : [0.4, 0.7, 1];
-      L.push({ x: cam.x + Math.cos(cam.yaw) * 0.5, y: cam.y, z: cam.z + Math.sin(cam.yaw) * 0.5, r: 5, col, i: 1.6 * G.muzzle / 0.12 });
+      L.push({ x: cam.x + Math.cos(cam.yaw) * 0.5, y: cam.y, z: cam.z + Math.sin(cam.yaw) * 0.5, r: 5, col, i: 1.6 * G.muzzle / 0.12, shadow: true });
     }
     for (const pr of G.projs) {
       const P = PROJ[pr.kind];
-      if (P.light) L.push({ x: pr.x, y: pr.y, z: pr.z, r: 3.5, col: P.light, i: P.li });
+      if (P.light) L.push({ x: pr.x, y: pr.y, z: pr.z, r: 3.5, col: P.light, i: P.li, shadow: true });
     }
     for (const e of G.effects) {
-      if (e.light) L.push({ x: e.x, y: e.y, z: e.z, r: 4.5, col: e.light, i: e.li * (1 - e.t / e.dur) });
+      if (e.light) L.push({ x: e.x, y: e.y, z: e.z, r: 4.5, col: e.light, i: e.li * (1 - e.t / e.dur), shadow: true });
     }
     // Green slimes glow, pulsing slowly.
     for (const e of G.enemies) {
@@ -1137,7 +1221,11 @@ const Game = (() => {
       L.push({ x: q.x, y: q.y, z: q.z, r: 1.5, col: q.col, i: 0.7 * q.life / q.max });
     }
     L.sort((a, b) => Math.hypot(a.x - cam.x, a.z - cam.z) - Math.hypot(b.x - cam.x, b.z - cam.z));
-    return L.slice(0, 16);
+    const out = L.slice(0, 16);
+    // Only the 4 nearest shadow casters really trace shadows (cost).
+    let k = 0;
+    for (const l of out) if (l.shadow && ++k > 4) l.shadow = false;
+    return out;
   }
 
   function slimePulse(e) { return 0.8 + 0.2 * Math.sin(G.time * 2.6 + e.x * 1.7 + e.z * 2.3); }
@@ -1155,7 +1243,7 @@ const Game = (() => {
     return [Math.min(r, 1.8), Math.min(g, 1.8), Math.min(b, 1.8)];
   }
 
-  let spriteData = new Float32Array(Renderer.MAX_SPRITES * 36);
+  let spriteData = new Float32Array(Renderer.MAX_SPRITES * 40);
   function buildSprites(cam, lights) {
     const list = [];
     const add = (name, x, y, z, ppu, tint, alpha, flip, sizeOverride) => {
@@ -1207,7 +1295,11 @@ const Game = (() => {
         continue;
       }
       e.sprite = `${e.type}_${idx}`;
-      const spr = add(e.sprite, e.x, e.dead ? World.floorAt(G.world, e.x, e.z, 0.1) : e.y, e.z, d.ppu, tint, e.dead ? 1 : (d.alpha || 1), flip);
+      // Lit per pixel on the GPU (light side / shadow side): the tint is then just a multiplier.
+      const sideLit = e.type !== 'ghost' && !(e.hit > 0);
+      const mult = keepAfter && e.deathKind === 'fire' ? [0.45, 0.45, 0.45] : [1, 1, 1];
+      const spr = add(e.sprite, e.x, e.dead ? World.floorAt(G.world, e.x, e.z, 0.1) : e.y, e.z, d.ppu, sideLit ? mult : tint, e.dead ? 1 : (d.alpha || 1), flip);
+      if (spr) spr.lit = sideLit;
       if (spr && e.dead) spr.bias = 0.01 + (G.enemies.indexOf(e) % 7) * 0.012;
     }
     for (const it of G.items) {
@@ -1229,15 +1321,26 @@ const Game = (() => {
       add(ef.frames[k], ef.x, ef.y - ef.size / 2, ef.z, 1, [1.3, 1.3, 1.3], 1, false, ef.size);
     }
     for (const q of G.parts) {
+      if (q.frost) continue; // frozen-air crystals are drawn as fine points (dustPoints)
       const a = q.life / q.max;
-      const t = q.emissive ? q.col.map((v) => v * 1.5) : q.col.map((v, i) => v * lightLevel(q.x, q.y, q.z, lights)[i]);
+      const t = q.emissive ? q.col.map((v) => v * 1.5)
+        : q.goo ? q.col.map((v, i) => v * (0.75 + lightLevel(q.x, q.y, q.z, lights)[i] * 0.6)) // slime goo glows a little
+        : q.col.map((v, i) => v * lightLevel(q.x, q.y, q.z, lights)[i]);
       if (q.float) {
         // Smoke puffs: soft, growing and fading as they rise.
         const sz = q.size * (2 + (1 - a) * 5), L = lightLevel(q.x, q.y, q.z, lights);
         add('glow', q.x, q.y - sz / 2, q.z, 1, q.col.map((v, i) => v * (0.55 + L[i] * 0.6)), -0.45 * a, false, sz);
         continue;
       }
-      add('white', q.x, q.y, q.z, 1, t, Math.min(1, a * 2), false, q.size);
+      // Round droplets (blood, goo, sparks), shrinking a little as they fade.
+      add('drop', q.x, q.y, q.z, 1, t, Math.min(1, a * 2), false, q.size * (0.75 + 0.25 * a));
+    }
+    // Cold haze along the frost bolt's path: spreads out and fades.
+    for (const h of G.hazes) {
+      const k = h.t / h.life, sz = (0.16 + k * 0.32) * (h.s || 1), al = 0.2 * Math.sin(Math.PI * Math.min(1, k * 1.4 + 0.15)) * (1 - k);
+      if (al < 0.01) continue;
+      list.push({ f: frame('glow'), x: h.x, y: h.y - sz / 2 - k * 0.05, z: h.z, w: sz, h: sz, tint: [0.78, 0.9, 1.1], alpha: -al, flip: false,
+        d: (h.x - cam.x) ** 2 + (h.z - cam.z) ** 2 + (h.y - cam.y) ** 2 });
     }
     // Dust motes: brightness from the light falling on them (drawn as points by dustPoints).
     const amb = G.level.ambient;
@@ -1370,46 +1473,6 @@ const Game = (() => {
     }
     for (const it of G.items) if (!it.taken) shadow(it.x, it.z, 0.2, 0.45);
     for (const d of G.decor) if (d.type === 'pillar') shadow(d.x, d.z, 0.5, 0.45);
-    // Long shadows from wall lights, swaying with the flame (two strongest lights per caster).
-    const castShadows = (x, z, w, h, f, strength) => {
-      const w0 = G.world, c0 = w0.at(Math.floor(x), Math.floor(z));
-      if (!f || !c0 || c0.solid) return;
-      const cand = [];
-      for (const L of G.castLights) {
-        const dx = x - L.x, dz = z - L.z, d = Math.hypot(dx, dz);
-        if (d >= L.r * 0.95 || d < 0.3) continue;
-        const k = (1 - d / L.r) ** 1.5 * Math.min(1, L.i) * strength;
-        if (k > 0.04) cand.push({ L, dx: dx / d, dz: dz / d, d, k });
-      }
-      cand.sort((a, b) => b.k - a.k);
-      let used = 0;
-      for (const s of cand) {
-        if (used >= 2) break;
-        if (!World.los(w0, s.L.x, s.L.z, x, z)) continue;
-        used++;
-        const ph = s.L.x * 3.1 + s.L.z * 1.7;
-        const a = Math.sin(G.time * 7.3 + ph) * 0.03 + Math.sin(G.time * 13.1 + ph) * 0.015;
-        const dx = s.dx * Math.cos(a) - s.dz * Math.sin(a), dz = s.dx * Math.sin(a) + s.dz * Math.cos(a);
-        let len = Math.min(3, h * (0.5 + s.d * 0.45)) * (1 + 0.06 * Math.sin(G.time * 9.1 + ph));
-        // Stop at walls, doors and floor steps.
-        for (let t = 0.1; t < len; t += 0.1) {
-          const c = w0.at(Math.floor(x + dx * t), Math.floor(z + dz * t));
-          if (!c || c.solid || c.door || Math.abs(c.f - c0.f) > 0.05) { len = t; break; }
-        }
-        if (len < 0.2) continue;
-        const k = s.k * (0.88 + 0.12 * Math.sin(G.time * 11 + ph));
-        const cx = x + dx * len / 2, cz = z + dz * len / 2, fy = c0.f + 0.011;
-        list.push({ f, x: cx, y: fy, z: cz, axes: [-dz * w / 2, 0, dx * w / 2, dx * len / 2, 0, dz * len / 2],
-          tint: [0, 0, 0], alpha: -Math.min(0.7, k), flip: false,
-          d: (cx - cam.x) ** 2 + (cz - cam.z) ** 2 + (fy - cam.y) ** 2 + 0.04 });
-      }
-    };
-    for (const e of G.enemies) {
-      if (e.dead || e.def.fly || Math.hypot(e.x - cam.x, e.z - cam.z) > 14) continue;
-      const f = e.sprite && frame(e.sprite);
-      if (f) castShadows(e.x, e.z, f.w / e.def.ppu, f.h / e.def.ppu, f, 0.95);
-    }
-    for (const d of G.decor) if (d.type === 'pillar' && Math.hypot(d.x - cam.x, d.z - cam.z) < 14) castShadows(d.x, d.z, 0.5, 2.4, frame('colshadow'), 0.35);
     list.sort((a, b) => b.d - a.d);
     const rx = -Math.sin(cam.yaw), rz = Math.cos(cam.yaw);
     const n = Math.min(list.length, Renderer.MAX_SPRITES);
@@ -1436,13 +1499,33 @@ const Game = (() => {
         [s.x + rx * hw - rz * (s.bias || 0), s.y + s.h, s.z + rz * hw + rx * (s.bias || 0), u1, s.f.v0],
         [s.x - rx * hw - rz * (s.bias || 0), s.y + s.h, s.z - rz * hw + rx * (s.bias || 0), u0, s.f.v0],
       ];
-      for (const v of verts) {
+      verts.forEach((v, k) => {
         spriteData[o++] = v[0]; spriteData[o++] = v[1]; spriteData[o++] = v[2];
         spriteData[o++] = v[3]; spriteData[o++] = v[4];
         spriteData[o++] = r; spriteData[o++] = g; spriteData[o++] = b; spriteData[o++] = s.alpha;
-      }
+        // Side code for per-pixel lighting: 2 = left edge, 4 = right edge, 0 = not lit.
+        spriteData[o++] = s.lit ? (k === 0 || k === 3 ? 2 : 4) : 0;
+      });
     }
     return { data: spriteData, count: n };
+  }
+
+  // Moving blockers for real-time shadows: walking enemies (not flyers or ghosts).
+  function shadowActors() {
+    const out = [];
+    for (const e of G.enemies) {
+      if (e.dead || e.def.fly) continue;
+      out.push({ x: e.x, z: e.z, r: e.def.radius * 0.5, top: e.y + e.height * 0.85 });
+    }
+    return out;
+  }
+  // The 4 baked wall lights nearest to the camera also get shadows from moving things.
+  function bakedShadowLights(cam) {
+    return G.world.lights
+      .filter((L) => L.r >= 2.5 && Math.hypot(L.x - cam.x, L.z - cam.z) < L.r + 9)
+      .sort((a, b) => Math.hypot(a.x - cam.x, a.z - cam.z) - Math.hypot(b.x - cam.x, b.z - cam.z))
+      .slice(0, 4)
+      .map((L) => ({ x: L.x, y: L.y ?? 1, z: L.z, r: L.r, col: L.col, i: L.i }));
   }
 
   // opts: { overlay: canvas, fx: 0 off | 1 light | 2 full (CRT) }
@@ -1454,6 +1537,7 @@ const Game = (() => {
     Renderer.draw(cam, {
       ambient: G.level.ambient, fog: G.level.fog, fogDensity: G.level.fogDensity, flicker, time,
       sky: true, reflectY: G.liquid ? -0.3 : undefined, lowFog: G.level.lowFog || 0, ripples: rippleUniform(),
+      occ: G.world.occ.update(shadowActors()), bakedShadow: bakedShadowLights(cam),
     }, lights, World.dynamicMesh(G.world), sprites.data, sprites.count, {
       overlay: opts.overlay, time, crt: opts.fx >= 2, grade: G.level.grade,
       aberration: opts.fx >= 1 ? Math.min(1.2, G.flash.hurt * 1.8) : 0,
@@ -1464,7 +1548,7 @@ const Game = (() => {
   }
 
   // Dust motes as tiny translucent points at display resolution, skipped when a wall hides them.
-  const dustData = new Float32Array(128 * 8);
+  const dustData = new Float32Array(768 * 8);
   function dustPoints(cam) {
     const px = Math.max(1, window.innerHeight * Math.min(window.devicePixelRatio || 1, 2) / 720);
     let n = 0;
@@ -1473,6 +1557,19 @@ const Game = (() => {
       if (!World.los(G.world, cam.x, cam.z, m.x, m.z)) continue;
       const L = m.lit;
       dustData.set([m.x, m.y, m.z, Math.min(1, L[0] * 0.9 + 0.25), Math.min(1, L[1] * 0.85 + 0.22), Math.min(1, L[2] * 0.75 + 0.18), m.a, m.sz * px], n * 8);
+      n++;
+    }
+    // Frost-trail crystals: fine glinting points, sized by distance.
+    const lights = G.lastLights || [], H = window.innerHeight * Math.min(window.devicePixelRatio || 1, 2);
+    for (const q of G.parts) {
+      if (!q.frost || n >= 768) continue;
+      const dist = Math.hypot(q.x - cam.x, q.y - cam.y, q.z - cam.z);
+      if (dist < 0.15) continue;
+      const a = q.life / q.max, tw = 0.5 + 0.5 * Math.sin(G.time * 26 + q.ph);
+      const L = lightLevel(q.x, q.y, q.z, lights), k = 0.6 + tw * 0.7;
+      const size = Math.max(1, Math.min(6, q.size * (0.5 + 0.5 * a) * H * 0.75 / dist));
+      dustData.set([q.x, q.y, q.z, Math.min(1, q.col[0] * (0.5 + L[0] * 0.5) * k), Math.min(1, q.col[1] * (0.5 + L[1] * 0.5) * k),
+        Math.min(1, q.col[2] * (0.55 + L[2] * 0.5) * k), Math.min(1, a * 1.5), size], n * 8);
       n++;
     }
     return { dust: dustData, dustCount: n };
@@ -1519,8 +1616,16 @@ const Game = (() => {
     };
     let glow = null, flash = null, bolt = null;
     if (wp.id === 'dagger') {
+      // Stab: the hand turns counter-clockwise about the wrist (which stays at
+      // the bottom edge, so the hand never looks detached) and leans in a little.
       const k = t < 0.3 ? Math.sin(t / 0.3 * Math.PI) : 0;
-      put(V.dagger, 0.66, 0.5, -k * W * 0.1, -k * H * 0.16, 1 + k * 0.12);
+      const img = V.dagger, hh = 0.5 * H * (1 + k * 0.05), ww = img.width * hh / img.height;
+      const px = 0.66 * W - ww / 2 + bx - k * W * 0.035 + ww * 0.43, py = H + by + lower + 4 * s + k * H * 0.02;
+      wl.save();
+      wl.translate(Math.round(px), Math.round(py));
+      wl.rotate(-k * 0.32);
+      wl.drawImage(img, Math.round(-ww * 0.43), Math.round(-hh), Math.round(ww), Math.round(hh));
+      wl.restore();
     } else if (wp.id === 'staff') {
       const k = t < 0.2 ? 1 - t / 0.2 : 0;
       const r = put(V.staff, 0.74, 0.62, k * 4 * s, k * 10 * s);
@@ -1742,8 +1847,30 @@ const Game = (() => {
     };
   }
 
+  // Console commands acting on the game; returns the line to print.
+  function cheat(cmd) {
+    const inv = G.inv;
+    switch (cmd) {
+      case 'god': cheats.god = !cheats.god; if (cheats.god) inv.hp = Math.max(inv.hp, 100); return `God mode ${cheats.god ? 'ON' : 'OFF'}`;
+      case 'noclip': cheats.noclip = !cheats.noclip; return `Noclip ${cheats.noclip ? 'ON' : 'OFF'}`;
+      case 'give':
+        for (const wp of WEAPONS) inv.owned[wp.id] = true;
+        inv.mana = 100; inv.bolts = 60;
+        return 'All weapons, full mana and bolts';
+      case 'heal': inv.hp = 100; return 'Health restored';
+      case 'key': G.p.key = true; return 'You have the iron key';
+      case 'killall': {
+        let n = 0;
+        for (const e of G.enemies) if (!e.dead) { killEnemy(e); n++; }
+        return `${n} monster${n === 1 ? '' : 's'} slain`;
+      }
+      case 'map': for (const c of G.world.cells) c.seen = true; return 'Map revealed';
+    }
+    return null;
+  }
+
   return {
-    init, newGame, restartLevel, nextLevel, update, render, drawOverlay, hud, events, DIFFICULTY, WEAPONS,
+    init, newGame, restartLevel, nextLevel, update, render, drawOverlay, hud, events, DIFFICULTY, WEAPONS, cheat, cheats,
     get state() { return G; },
   };
 })();

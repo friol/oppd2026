@@ -66,6 +66,14 @@ body.menu-blur #view { filter: blur(5px) brightness(0.8); transform: scale(1.02)
 #hud .mana .bar i { background: linear-gradient(#8fc0ff, #2253c9); }
 #hud .hp.low b { color: #ff4a3a; animation: pulse 0.6s infinite alternate; }
 #hud .weapon { min-width: 150px; }
+/* Hero portrait (img/faces.webp: four faces, healthiest on the left); position set in main.js. */
+#hud .face { min-width: 0; padding: 3px; display: flex; }
+#hud .face .portrait {
+  width: 52px; height: 54px; background: url(img/faces.webp) no-repeat; image-rendering: pixelated;
+  box-shadow: inset 0 0 0 1px #000, inset 0 0 8px rgba(0, 0, 0, 0.6);
+}
+#hud .face.hit .portrait { animation: faceHit 0.35s ease-out; }
+@keyframes faceHit { from { filter: brightness(1.8) sepia(1) hue-rotate(-40deg) saturate(4); transform: translateX(-2px); } }
 #hud .slots { display: flex; justify-content: center; gap: 4px; margin-top: 4px; }
 #hud .slots span {
   width: 22px; height: 22px; line-height: 20px; font-size: 13px; font-weight: bold;
@@ -111,6 +119,23 @@ body.menu-blur #view { filter: blur(5px) brightness(0.8); transform: scale(1.02)
 
 /* ---------- Screens ---------- */
 .screen { position: fixed; inset: 0; z-index: 10; }
+
+/* In-game console (backquote / F2): drops from the top, the game is frozen while open. */
+#console {
+  position: fixed; left: 0; right: 0; top: 0; height: min(42vh, 360px); z-index: 30;
+  display: flex; flex-direction: column;
+  background: linear-gradient(rgba(10, 13, 18, 0.94), rgba(18, 22, 30, 0.9));
+  border-bottom: 2px solid var(--bevel-mid, #66727f); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
+  font-family: var(--mono); font-size: 14px; color: #c8d2dc;
+  animation: consoleDrop 0.18s ease-out;
+}
+@keyframes consoleDrop { from { transform: translateY(-100%); } }
+#console .log { flex: 1; overflow-y: auto; padding: 10px 14px 4px; white-space: pre-wrap; line-height: 1.4; }
+#console .log .cmd { color: var(--gold); }
+#console .log .err { color: #ff7a6a; }
+#console .line { display: flex; gap: 8px; align-items: center; padding: 6px 14px 10px; border-top: 1px solid rgba(255, 255, 255, 0.08); }
+#console .line span { color: var(--gold); }
+#console input { flex: 1; background: none; border: 0; outline: none; color: #fff; font: inherit; caret-color: var(--gold); }
 [hidden] { display: none !important; }
 
 #title {
@@ -134,7 +159,12 @@ body.menu-blur #view { filter: blur(5px) brightness(0.8); transform: scale(1.02)
   width: min(940px, 90vw); max-height: 52vh; object-fit: contain;
   margin-bottom: 3.5vh;
   filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.8));
-  animation: float 6s ease-in-out infinite alternate;
+  /* The green halo follows the logo's own outline (drop-shadow uses its alpha) and pulses slowly. */
+  animation: float 6s ease-in-out infinite alternate, halo 3.2s ease-in-out infinite alternate;
+}
+@keyframes halo {
+  from { filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.8)) drop-shadow(0 0 4px rgba(120, 255, 60, 0.25)) drop-shadow(0 0 14px rgba(70, 200, 30, 0.15)); }
+  to { filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.8)) drop-shadow(0 0 8px rgba(140, 255, 70, 0.7)) drop-shadow(0 0 30px rgba(80, 220, 40, 0.45)); }
 }
 /* Slow drifting fog: a seamless noise texture (made in main.js) on two layers
    moving in opposite directions; translating by exactly one tile loops cleanly. */
@@ -185,6 +215,20 @@ body.menu-blur #view { filter: blur(5px) brightness(0.8); transform: scale(1.02)
 #mainmenu button[data-act="start"] { font-size: 18px; padding: 8px 14px; }
 
 .panel { display: grid; place-items: center; background: rgba(5, 8, 12, 0.7); backdrop-filter: blur(2px); }
+/* While a menu assembles/scatters its pieces cross the slab's edges. */
+.screen.flying, .screen.flying .box { overflow: visible; }
+/* Victory: the triumph picture fills the screen, the stats slab sits low over it. */
+.panel.victory { background: #05070b; place-items: end center; padding-bottom: 4vh; }
+.panel.victory .art {
+  position: absolute; inset: 0; background: url(img/viktory.jpg) center / cover no-repeat; image-rendering: pixelated;
+  animation: victoryIn 2.4s ease-out both;
+}
+.panel.victory .art::after { content: ''; position: absolute; inset: 0; background: linear-gradient(transparent 55%, rgba(0, 0, 0, 0.75)); }
+@keyframes victoryIn { from { opacity: 0; transform: scale(1.08); } }
+.panel.victory .box { position: relative; width: min(440px, calc(100vw - 32px)); padding: 16px 22px 14px; gap: 4px; }
+.panel.victory h2 { font-size: 32px; }
+.panel.victory .stats { font-size: 15px; margin-bottom: 8px; }
+.panel.victory .stats td { padding: 3px 4px; }
 .panel.blood { background: radial-gradient(ellipse at center, rgba(70, 0, 0, 0.7), rgba(15, 0, 0, 0.92)); }
 .panel .box {
   width: min(520px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto;

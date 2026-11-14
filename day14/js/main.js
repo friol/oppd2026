@@ -20,8 +20,63 @@
 
   // ---------- Screens ----------
   const screens = ['title', 'help', 'pause', 'inter', 'dead', 'win'];
+  // Menus assemble from the screen edges: the stone slab and every button fly
+  // in from a random side (staggered), and scatter back out when dismissed.
+  const pieces = (el) => [...el.querySelectorAll('.box'), ...el.querySelectorAll('button')];
+  function offscreen(piece, i) {
+    const r = piece.getBoundingClientRect(), W = window.innerWidth, H = window.innerHeight;
+    const side = (i * 7 + Math.floor(Math.random() * 4)) % 4, m = 40;
+    const dx = side === 0 ? -(r.right + m) : side === 1 ? W - r.left + m : (Math.random() - 0.5) * W * 0.3;
+    const dy = side === 2 ? -(r.bottom + m) : side === 3 ? H - r.top + m : (Math.random() - 0.5) * H * 0.3;
+    return `translate(${dx.toFixed(0)}px, ${dy.toFixed(0)}px) rotate(${((Math.random() - 0.5) * 30).toFixed(1)}deg)`;
+  }
+  function assemble(el) {
+    el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 250, easing: 'ease-out' });
+    // Pieces fly across the slab's edges: no clipping (or scrollbars) while they do.
+    el.classList.add('flying');
+    const list = pieces(el);
+    setTimeout(() => { if (!el.dataset.leaving) el.classList.remove('flying'); }, 600 + list.length * 45);
+    list.forEach((p, i) => {
+      const from = offscreen(p, i);
+      p.animate([{ transform: from, opacity: 0.4 }, { transform: 'none', opacity: 1 }],
+        { duration: 560, delay: i * 45, easing: 'cubic-bezier(0.2, 0.9, 0.25, 1.08)', fill: 'backwards' });
+    });
+  }
+  function scatter(el) {
+    if (el.dataset.leaving) { el.hidden = true; return; }
+    el.dataset.leaving = '1';
+    el.style.pointerEvents = 'none';
+    el.classList.add('flying');
+    const list = pieces(el), dur = 340, stagger = 25;
+    list.forEach((p, i) => {
+      p.animate([{ transform: 'none', opacity: 1 }, { transform: offscreen(p, i + 2), opacity: 0.3 }],
+        { duration: dur, delay: i * stagger, easing: 'cubic-bezier(0.55, 0, 0.8, 0.4)', fill: 'forwards' });
+    });
+    const total = dur + list.length * stagger;
+    el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: total, easing: 'ease-in', fill: 'forwards' }).finished.then(() => {
+      if (!el.dataset.leaving) return;
+      el.hidden = true;
+      finishLeave(el);
+    });
+  }
+  function finishLeave(el) {
+    delete el.dataset.leaving;
+    el.style.pointerEvents = '';
+    el.classList.remove('flying');
+    for (const a of el.getAnimations({ subtree: true })) a.cancel();
+  }
+  let shown = null;
   function show(name) {
-    for (const s of screens) $(s).hidden = s !== name;
+    const changed = name !== shown;
+    shown = name;
+    for (const s of screens) {
+      const el = $(s);
+      if (s === name) {
+        const wasLeaving = !!el.dataset.leaving;
+        if (wasLeaving) finishLeave(el);
+        if (el.hidden || wasLeaving || changed) { el.hidden = false; assemble(el); }
+      } else if (!el.hidden && !el.dataset.leaving) scatter(el);
+    }
     const first = name && $(name).querySelector('button');
     if (first) first.focus({ preventScroll: true });
   }
@@ -121,6 +176,7 @@
       <tr><td>Secrets</td><td>${pct(s.secrets, s.totalSecrets)}</td></tr>
       <tr><td>Time</td><td>${fmtTime(s.time)}</td></tr>`;
     setState('inter');
+    Sound.play('levelDone');
   };
   Game.events.death = () => { setTimeout(() => setState('dead'), 1100); };
   Game.events.victory = (s) => {
@@ -129,11 +185,103 @@
       <tr><td>Monsters slain</td><td>${s.kills}</td></tr>
       <tr><td>Total time</td><td>${fmtTime(s.time)}</td></tr>`;
     setState('win');
+    Sound.play('victory');
   };
+
+  // ---------- Console ----------
+  // Toggled with the key under Esc (backquote; backslash on Italian keyboards) or F2.
+  // The game is frozen while it is open.
+  const con = $('console'), conLog = con.querySelector('.log'), conIn = con.querySelector('input');
+  let consoleOpen = false;
+  const history = [];
+  let histPos = 0;
+  const HELP = [
+    'god          invulnerability on/off',
+    'noclip       walk through walls on/off',
+    'give         all weapons, full mana and bolts',
+    'heal         full health',
+    'key          get the iron key',
+    'killall      slay every monster in the level',
+    'map          reveal the whole map',
+    'next         go to the next level',
+    'level <1-3>  jump to a level',
+    'restart      restart the current level',
+    'clear        clear the console',
+    'close        close the console (also Esc or the toggle key)',
+  ];
+  function conPrint(text, cls) {
+    const line = document.createElement('div');
+    if (cls) line.className = cls;
+    line.textContent = text;
+    conLog.append(line);
+    conLog.scrollTop = conLog.scrollHeight;
+  }
+  function openConsole() {
+    consoleOpen = true;
+    con.hidden = false;
+    keys.clear(); firing = false;
+    if (document.pointerLockElement) document.exitPointerLock();
+    if (!conLog.childElementCount) conPrint('WolfenstAIn console. Type "help" for the list of commands.');
+    conIn.value = '';
+    setTimeout(() => conIn.focus(), 0);
+  }
+  function closeConsole() {
+    consoleOpen = false;
+    con.hidden = true;
+    conIn.blur();
+    keys.clear();
+    if (state === 'play') lock();
+  }
+  function gotoLevel(index) {
+    const g = Game.state;
+    if (index < 0 || index >= LEVELS.length) return false;
+    g.levelIndex = index - 1;
+    Game.nextLevel();
+    levelCard();
+    return true;
+  }
+  function runCommand(raw) {
+    const text = raw.trim();
+    if (!text) return;
+    conPrint('> ' + text, 'cmd');
+    history.push(text); histPos = history.length;
+    const [cmd, arg] = text.toLowerCase().split(/\s+/);
+    const g = Game.state;
+    if (cmd === 'help' || cmd === '?') { HELP.forEach((l) => conPrint(l)); return; }
+    if (cmd === 'clear' || cmd === 'cls') { conLog.textContent = ''; return; }
+    if (cmd === 'close' || cmd === 'exit' || cmd === 'quit') { closeConsole(); return; }
+    if (cmd === 'next') {
+      if (g.levelIndex + 1 >= LEVELS.length) { conPrint('This is the last level', 'err'); return; }
+      gotoLevel(g.levelIndex + 1);
+      conPrint(`Level ${g.levelIndex + 1}: ${Game.state.level.name}`);
+      return;
+    }
+    if (cmd === 'level') {
+      const n = parseInt(arg, 10);
+      if (!gotoLevel(n - 1)) { conPrint(`Usage: level <1-${LEVELS.length}>`, 'err'); return; }
+      conPrint(`Level ${n}: ${Game.state.level.name}`);
+      return;
+    }
+    if (cmd === 'restart') { Game.restartLevel(); levelCard(); conPrint('Level restarted'); return; }
+    const out = Game.cheat(cmd);
+    if (out) conPrint(out);
+    else conPrint(`Unknown command "${cmd}". Type "help".`, 'err');
+  }
+  conIn.addEventListener('keydown', (e) => {
+    if (e.code === 'Enter') { runCommand(conIn.value); conIn.value = ''; }
+    else if (e.code === 'ArrowUp' && history.length) { histPos = Math.max(0, histPos - 1); conIn.value = history[histPos]; e.preventDefault(); }
+    else if (e.code === 'ArrowDown' && history.length) { histPos = Math.min(history.length, histPos + 1); conIn.value = history[histPos] || ''; e.preventDefault(); }
+  });
+  const isConsoleKey = (e) => e.code === 'Backquote' || e.code === 'F2';
 
   // ---------- Input ----------
   const GAME_KEYS = new Set(['Space', 'Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ControlLeft', 'ControlRight']);
   window.addEventListener('keydown', (e) => {
+    if (consoleOpen) {
+      if (isConsoleKey(e) || e.code === 'Escape') { e.preventDefault(); closeConsole(); }
+      return;
+    }
+    if (state === 'play' && isConsoleKey(e) && !e.repeat) { e.preventDefault(); openConsole(); return; }
     if (state === 'play') {
       if (GAME_KEYS.has(e.code)) e.preventDefault();
       if (e.repeat) return;
@@ -160,10 +308,10 @@
     }
   });
   window.addEventListener('keyup', (e) => keys.delete(e.code));
-  window.addEventListener('blur', () => { keys.clear(); firing = false; if (state === 'play') setState('pause'); });
+  window.addEventListener('blur', () => { keys.clear(); firing = false; if (state === 'play' && !consoleOpen) setState('pause'); });
 
   view.addEventListener('mousedown', (e) => {
-    if (state !== 'play') return;
+    if (state !== 'play' || consoleOpen) return;
     if (!document.pointerLockElement) { lock(); return; }
     if (e.button === 0) firing = true;
   });
@@ -177,7 +325,7 @@
   let lockedOnce = false;
   document.addEventListener('pointerlockchange', () => {
     if (document.pointerLockElement === view) lockedOnce = true;
-    else if (state === 'play' && lockedOnce) setState('pause');
+    else if (state === 'play' && lockedOnce && !consoleOpen) setState('pause');
   });
   view.addEventListener('contextmenu', (e) => e.preventDefault());
 
@@ -200,6 +348,8 @@
   // ---------- HUD ----------
   const last = {};
   function setText(id, v) { if (last[id] !== v) { last[id] = v; $(id).textContent = v; } }
+  // Inner portrait rectangles in img/faces.webp (1024 px wide).
+  const FACE = { sheet: 1024, x: [47, 295, 542, 792], y: 46, w: 184 };
   function updateHud() {
     const h = Game.hud();
     if (!h) return;
@@ -208,6 +358,19 @@
     setText('lvlname', `Level ${h.level}`);
     setText('kills', `${h.kills} / ${h.totalKills}`);
     $('hpb').style.width = `${Math.max(0, h.hp)}%`;
+    // Portrait: the face gets more battered as health drops; it flinches when hit.
+    const face = h.hp > 75 ? 0 : h.hp > 50 ? 1 : h.hp > 25 ? 2 : 3;
+    if (last.face !== face) {
+      last.face = face;
+      const el = $('face'), k = el.clientWidth / FACE.w;
+      el.style.backgroundSize = `${FACE.sheet * k}px auto`;
+      el.style.backgroundPosition = `${-FACE.x[face] * k}px ${-FACE.y * k}px`;
+    }
+    if (last.hp !== undefined && h.hp < last.hp) {
+      const cell = $('face').parentElement;
+      cell.classList.remove('hit'); void cell.offsetWidth; cell.classList.add('hit');
+    }
+    last.hp = h.hp;
     $('mpb').style.width = `${h.mana}%`;
     $('hpv').parentElement.classList.toggle('low', h.hp <= 25);
     $('keyv').className = h.key ? '' : 'nokey';
@@ -225,6 +388,7 @@
   // The scene renders at a low retro resolution; the canvas itself matches the
   // display so the final pass (upscale + screen effects) is sharp.
   function resize() {
+    delete last.face; // portrait scale follows the HUD size
     const H = Math.min(RES[settings.res].h, window.innerHeight);
     const W = Math.round(H * window.innerWidth / window.innerHeight);
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -238,10 +402,14 @@
   function frame(now) {
     const dt = Math.min(0.05, (now - prev) / 1000);
     prev = now;
-    if (state === 'play') {
+    if (state === 'play' && !consoleOpen) {
       Game.update(dt, readInput());
+      Sound.ambient('titleGhosts', 0);
     } else {
-      Sound.silenceAmbient();
+      // Low ghostly drone under the title screen only.
+      const onTitle = !$('title').hidden;
+      Sound.silenceAmbient(onTitle ? 'titleGhosts' : null);
+      if (onTitle) Sound.ambient('titleGhosts', 1);
     }
     if (!$('title').hidden) titleGhosts(now / 1000);
     if (Game.state && ['play', 'dead', 'inter', 'win', 'pause'].includes(state)) {

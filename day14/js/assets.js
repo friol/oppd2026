@@ -111,7 +111,9 @@ const Assets = (() => {
   }
 
   // ---------------- Textures ----------------
-  function buildTextures(img) {
+  // EXIT_RECT: the arched door in img/level.exit.webp (its grey margin is left out).
+  const EXIT_RECT = [362, 94, 300, 352];
+  function buildTextures(img, exitImg) {
     const src = sourceCtx(img);
     const tmp = makeCanvas(TS, TS), g = ctx2d(tmp);
     g.imageSmoothingEnabled = true;
@@ -134,10 +136,23 @@ const Assets = (() => {
       const ban = trimmed(floodKey(src.getImageData(x0, y0, x1 - x0, y1 - y0), isBlack(40)));
       g.clearRect(0, 0, TS, TS);
       g.drawImage(img, ...cellRect(0, 1), 0, 0, TS, TS);
+      const wall = g.getImageData(0, 0, TS, TS).data;
       const h = TS * 0.94, w = ban.width * h / ban.height;
       g.drawImage(ban, (TS - w) / 2, 0, w, h);
+      // Only the cloth is kept (the stone behind is made transparent): the
+      // banner is drawn over the level's own wall.
+      const id = g.getImageData(0, 0, TS, TS), d = id.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const diff = Math.abs(d[i] - wall[i]) + Math.abs(d[i + 1] - wall[i + 1]) + Math.abs(d[i + 2] - wall[i + 2]);
+        d[i + 3] = diff > 12 ? 255 : 0;
+      }
+      g.putImageData(id, 0, 0);
       push(name);
     }
+    // Level exit: the arched door picture, stretched over the whole tile.
+    g.clearRect(0, 0, TS, TS);
+    g.drawImage(exitImg, ...EXIT_RECT, 0, 0, TS, TS);
+    push('exit_door');
     // Burnt-out torch: the flame pixels are filled in from the surrounding
     // wall (diffusion) and a charred stub is left on the sconce.
     {
@@ -263,7 +278,45 @@ const Assets = (() => {
       out.data[di + 2] = sheet.data[si * 4 + 2];
       out.data[di + 3] = 255;
     }
+    fillHoles(out, sheet, x0, y0);
     return trimmed(out);
+  }
+  // Dark details inside a monster (eyes, mouths, nostrils) are as dark as the
+  // sheet's background, so they come out transparent. Transparent regions not
+  // connected to the frame border and small compared to the sprite are filled
+  // back with their original (dark) colours; large ones (gaps between an arm
+  // and the body) stay see-through.
+  function fillHoles(out, sheet, x0, y0) {
+    const w = out.width, h = out.height, d = out.data;
+    const reg = new Int32Array(w * h).fill(-1), sizes = [], touches = [];
+    let opaque = 0;
+    for (let i = 0; i < w * h; i++) if (d[i * 4 + 3]) opaque++;
+    const stack = [];
+    for (let s = 0; s < w * h; s++) {
+      if (d[s * 4 + 3] || reg[s] !== -1) continue;
+      const id = sizes.length;
+      let n = 0, edge = false;
+      reg[s] = id; stack.push(s);
+      while (stack.length) {
+        const i = stack.pop(), x = i % w, y = (i / w) | 0;
+        n++;
+        if (x === 0 || y === 0 || x === w - 1 || y === h - 1) edge = true;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nx = x + dx, ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+          const j = ny * w + nx;
+          if (!d[j * 4 + 3] && reg[j] === -1) { reg[j] = id; stack.push(j); }
+        }
+      }
+      sizes.push(n); touches.push(edge);
+    }
+    const limit = Math.max(60, opaque * 0.1);
+    for (let i = 0; i < w * h; i++) {
+      const r = reg[i];
+      if (r < 0 || touches[r] || sizes[r] > limit) continue;
+      const si = ((((i / w) | 0) + y0) * (sheet.width) + (i % w) + x0) * 4;
+      d[i * 4] = sheet.data[si]; d[i * 4 + 1] = sheet.data[si + 1]; d[i * 4 + 2] = sheet.data[si + 2]; d[i * 4 + 3] = 255;
+    }
   }
 
   // ---------------- Procedural sprites ----------------
@@ -445,6 +498,22 @@ const Assets = (() => {
     }
     return c;
   }
+  // Round droplet for blood, goo and debris: hard edge (alpha tested), lit from
+  // the top left with a small specular glint. White, tinted at draw time.
+  function dropSprite() {
+    const S = 16, c = makeCanvas(S, S), g = c.getContext('2d'), id = g.createImageData(S, S);
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const u = (x + 0.5) / S * 2 - 1, v = (y + 0.5) / S * 2 - 1, r = Math.hypot(u, v);
+      if (r > 0.95) continue;
+      const nz = Math.sqrt(Math.max(0, 1 - r * r)), lit = Math.max(0, -u * 0.45 - v * 0.55 + nz * 0.7);
+      let k = 0.45 + lit * 0.6;
+      if (Math.hypot(u + 0.32, v + 0.38) < 0.2) k = 1.25;
+      const i = (y * S + x) * 4;
+      id.data[i] = id.data[i + 1] = id.data[i + 2] = Math.min(255, k * 205); id.data[i + 3] = 255;
+    }
+    g.putImageData(id, 0, 0);
+    return c;
+  }
   // Soft white radial glow (tinted at draw time).
   function glowSprite() {
     const S = 64, c = makeCanvas(S, S), g = c.getContext('2d');
@@ -525,16 +594,6 @@ const Assets = (() => {
     }
     return c;
   }
-  // Long shadow of a column on the floor: soft sides, fading towards the far end (top).
-  function columnShadowSprite() {
-    const W = 32, H = 64, c = makeCanvas(W, H), g = c.getContext('2d'), id = g.createImageData(W, H);
-    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-      const u = (x + 0.5) / W * 2 - 1, v = (y + 0.5) / H;
-      id.data[(y * W + x) * 4 + 3] = 255 * Math.max(0, 1 - u ** 4) * (0.25 + 0.75 * v);
-    }
-    g.putImageData(id, 0, 0);
-    return c;
-  }
   function solid(color, s = 4) {
     const c = makeCanvas(s, s), g = c.getContext('2d');
     g.fillStyle = color; g.fillRect(0, 0, s, s);
@@ -562,13 +621,14 @@ const Assets = (() => {
 
   async function load(onProgress = () => {}) {
     // The crossbow images were cut out of their backgrounds offline (img/crossbow_*.png).
-    const [texImg, enemyImg, weaponImg, xbowPickup, xbowHand, xbowEmpty] = await Promise.all([
+    const [texImg, enemyImg, weaponImg, xbowPickup, xbowHand, xbowEmpty, exitImg] = await Promise.all([
       loadImage('img/medieval.textures.png'), loadImage('img/enemies.png'), loadImage('img/weapons.webp'),
       loadImage('img/crossbow_pickup.png'), loadImage('img/crossbow_hand.png'), loadImage('img/crossbow_hand_empty.png'),
+      loadImage('img/level.exit.webp'),
     ]);
     onProgress('Carving textures');
     await new Promise(requestAnimationFrame);
-    const textures = buildTextures(texImg);
+    const textures = buildTextures(texImg, exitImg);
 
     onProgress('Summoning monsters');
     await new Promise(requestAnimationFrame);
@@ -606,8 +666,8 @@ const Assets = (() => {
     entries.push({ name: 'tome', c: tomeSprite() });
     entries.push({ name: 'white', c: solid('#fff') });
     entries.push({ name: 'shadow', c: shadowSprite() });
-    entries.push({ name: 'colshadow', c: columnShadowSprite() });
     entries.push({ name: 'glow', c: glowSprite() });
+    entries.push({ name: 'drop', c: dropSprite() });
     entries.push({ name: 'beam', c: beamSprite() });
     entries.push({ name: 'soot', c: sootSprite() });
     entries.push({ name: 'ring', c: ringSprite() });

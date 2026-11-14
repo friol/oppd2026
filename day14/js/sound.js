@@ -13,6 +13,11 @@ const Sound = (() => {
     spiderSteps: { src: 'soundfx/408572__miguelab1998__43spider_steps.mp3', offset: 0.23, dur: 0.65, vol: 1.0 },
     spiderBite: { src: 'soundfx/837907__frostnox__spider-eat-1.ogg', offset: 0.01, dur: 0.66, vol: 1.3 },
     iceShatter: { src: 'soundfx/486166__ruben_uitenweerde__glass-breaking.mp3', offset: 0.74, dur: 0.65, vol: 1.2, reverb: 0.8 },
+    wallMove: { src: 'soundfx/wall.moving.mp3', offset: 0.45, dur: 2.2, vol: 2.6 },
+    flameOut: { src: 'soundfx/flame.vanishing.out.mp3', offset: 0, dur: 0.8, vol: 0.9 },
+    wizard: { src: 'soundfx/purple.ghost.mp3', offset: 0.45, dur: 3.9, vol: 0.55 },
+    victory: { src: 'soundfx/810330__mokasza__triumphant-success.mp3', offset: 0, vol: 1.0 },
+    levelDone: { src: 'soundfx/580310__colorscrimsontears__fanfare-2-rpg.mp3', offset: 0, vol: 1.0 },
     growl: { src: 'soundfx/706487__elpatino__creature-growl-6.mp3', offset: 0.03, dur: 1.05, vol: 2.6 },
     ice: { src: 'soundfx/519414__iridiuss__energymagic-shot.mp3', offset: 0, dur: 0.85, vol: 0.45 },
     fireball: { src: 'soundfx/442827__qubodup__fireball.mp3', offset: 0, dur: 0.95, vol: 0.7 },
@@ -23,6 +28,7 @@ const Sound = (() => {
     thud: { src: 'soundfx/494932__yummy9987__thud2.mp3', offset: 0.54, dur: 0.6, vol: 0.5 },
     fire: { src: 'soundfx/363092__thewoodlandnomad__fire-crackle-and-flames-002.mp3', loop: [1.0, 20.0], vol: 2.2 },
     glow: { src: 'soundfx/752274__ienba__magic-glow.mp3', loop: [4.5, 38.5], vol: 0.35 },
+    titleGhosts: { src: 'soundfx/380511__haralddeluca__horror-ghost-low-pitched-sound.mp3', loop: [3.0, 10.8], vol: 0.35 },
     water: { src: 'soundfx/56777__arnaud-coutancier__fountain-fontaine-8.mp3', loop: [0.6, 12.6], vol: 0.8 },
     uiMove: { src: 'soundfx/707042__vilkas_sound__vs-button-click-05.mp3', offset: 0.025, dur: 0.18, vol: 0.6 },
     uiClick: { src: 'soundfx/241809__suntemple__magic-sfx-for-games.mp3', offset: 0, dur: 1.4, vol: 1.3 },
@@ -86,9 +92,10 @@ const Sound = (() => {
     if (L.panner) L.panner.pan.setTargetAtTime(Math.max(-1, Math.min(1, pan)), t, 0.12);
     L.filter.frequency.setTargetAtTime(muffled ? 700 : 18000, t, 0.15);
   }
-  function silenceAmbient() {
+  // Fades out every looping ambience except `keep`.
+  function silenceAmbient(keep) {
     if (!ctx) return;
-    for (const L of Object.values(loops)) L.gain.gain.setTargetAtTime(0, ctx.currentTime, 0.08);
+    for (const [name, L] of Object.entries(loops)) if (name !== keep) L.gain.gain.setTargetAtTime(0, ctx.currentTime, 0.08);
   }
 
   // Distance falloff and stereo pan for a world position.
@@ -106,7 +113,7 @@ const Sound = (() => {
 
   function setListener(x, z, yaw) { listener.x = x; listener.z = z; listener.yaw = yaw; }
 
-  // opts: { x, z } for positional sounds, { vol, rate, pan, offset } overrides.
+  // opts: { x, z, range, min } for positional sounds, { vol, rate, pan, offset } overrides.
   // FILES entries may set `reverb` (send level to the shared reverb).
   // Shared reverb: a convolver with a synthetic hall impulse (decaying stereo noise).
   let reverb = null;
@@ -130,8 +137,9 @@ const Sound = (() => {
     if (!ctx || !buf || !enabled || ctx.state !== 'running') return;
     let vol = f.vol * (opts.vol ?? 1), pan = opts.pan ?? 0;
     if (opts.x !== undefined) {
-      const sp = spatial(opts.x, opts.z, 18);
-      vol *= sp.level;
+      // opts.range: hearing distance (default 18); opts.min: never quieter than this fraction.
+      const sp = spatial(opts.x, opts.z, opts.range ?? 18);
+      vol *= Math.max(opts.min ?? 0, sp.level);
       if (vol < 0.01) return;
       pan = sp.pan;
     }

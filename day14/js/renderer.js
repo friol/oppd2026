@@ -14,7 +14,8 @@ const Renderer = (() => {
   let gl, canvas, progWorld, progSprite, progSky, progPost, progDust, progAO, progBright, progBlur, dustBuf, vaoDust;
   let aoT = null, bloomA = null, bloomB = null;
   const NEAR = 0.04, FAR = 80;
-  let texArray, texAtlas, texLight, texSky, texOver, texDummy;
+  let texArray, texAtlas, texLight, texSky, texOver, texDummy, texOcc;
+  let occW = 1, occH = 1;
   let scene = null, refl = null, sw = 1, sh = 1;
   let staticBuf, staticCount = 0, dynBuf, spriteBuf, spriteIdx, vaoWorld, vaoDyn, vaoSprite, vaoSky;
   let mapW = 1, mapH = 1;
@@ -89,6 +90,28 @@ const Renderer = (() => {
       vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
       return mix(mix(hash2(i), hash2(i + vec2(1, 0)), f.x), mix(hash2(i + vec2(0, 1)), hash2(i + vec2(1, 1)), f.x), f.y);
     }
+
+    // Real-time shadows: march from the surface towards the light through the
+    // occupancy height map (R = static blockers, G = dynamic ones).
+    // Returns (blocked by static, blocked by dynamic).
+    uniform sampler2D uOcc; uniform vec3 uOccInfo; // texels per unit, height lo, height span
+    vec2 shadowRay(vec3 p, vec3 lp, bool stopStatic){
+      vec3 d = lp - p; float len = length(d);
+      int n = int(clamp(len / 0.11, 2.0, 56.0));
+      vec2 hit = vec2(0.0);
+      for (int i = 1; i < 56; i++) {
+        if (i >= n) break;
+        vec3 q = p + d * (float(i) / float(n));
+        vec2 top = texelFetch(uOcc, ivec2(floor(q.xz * uOccInfo.x)), 0).rg * uOccInfo.z + uOccInfo.y;
+        if (q.y < top.r - 0.02) { hit.x = 1.0; if (stopStatic) break; }
+        if (q.y < top.g - 0.02) hit.y = 1.0;
+        if (hit.x > 0.0 && hit.y > 0.0) break;
+      }
+      return hit;
+    }
+    // Baked wall lights whose light is taken away where a moving thing (enemy, door) blocks it.
+    uniform int uNBL; uniform vec4 uBLP[4]; uniform vec3 uBLC[4];
+    uniform float uShadowOn;
     float lum(vec2 uv, float layer){ return dot(texture(uTex, vec3(uv, layer)).rgb, vec3(0.3, 0.59, 0.11)); }
     float lmLum(vec2 p){ return dot(texture(uLM, p / uMapSize).rgb, vec3(0.333)); }
     void main(){
@@ -102,19 +125,26 @@ const Renderer = (() => {
       else if (flag == 3.0) uv.y -= uTime * 0.9;
       // Banners sway more towards their hem, with moving folds; ivy and vines tremble in a draught.
       float cloth = 1.0;
+      vec2 clothUv = uv;
       if (flag == 9.0) {
         vec2 f = fract(uv);
         float ph = f.y * 5.0 - uTime * 2.2 + (vPos.x + vPos.z) * 1.3, sway = f.y * f.y;
-        uv.x += sin(ph) * 0.022 * sway;
+        clothUv.x += sin(ph) * 0.022 * sway;
         cloth = 1.0 + 0.16 * cos(ph) * sway;
       } else if (flag == 10.0) {
         uv.x += sin(uv.y * 18.0 + uTime * 3.1 + vPos.x * 2.0) * 0.004 + sin(uTime * 0.9 + vPos.z + vPos.x) * 0.003;
       }
       vec4 t = texture(uTex, vec3(uv, layer));
+      // Banners: cut-out cloth over the wall, swaying and folding.
+      if (flag == 9.0) t = texture(uTex, vec3(clothUv, layer));
       // Torch: the flame (upper middle of the tile) ripples upwards and flickers.
       float flame = 0.0;
       if (flag == 5.0) {
         vec2 f = fract(uv);
+        // The torch tile's own dark bricks fade into the wall behind with an
+        // ordered dither: kept around the sconce and flame, gone towards the edges.
+        float edge = length((f - vec2(0.5, 0.47)) / vec2(0.3, 0.54));
+        if (1.0 - smoothstep(0.45, 0.95, edge) < bayer(gl_FragCoord.xy) * 0.94 + 0.03) discard;
         if (f.x > 0.27 && f.x < 0.75 && f.y < 0.53) {
           float ph = (vPos.x + vPos.z) * 3.7;
           float k = 1.0 - f.y / 0.53;
@@ -149,6 +179,18 @@ const Renderer = (() => {
       }
       vec2 lp = vPos.xz + vNrm.xz * (flag == 6.0 ? 0.3 : 0.04);
       vec3 lm = texture(uLM, lp / uMapSize).rgb * 2.0;
+      vec3 sp = vPos + N * 0.05;
+      if (uShadowOn > 0.5 && flag != 1.0 && flame == 0.0) {
+        vec3 cut = vec3(0.0);
+        for (int i = 0; i < 4; i++) {
+          if (i >= uNBL) break;
+          float dxz = length(vPos.xz - uBLP[i].xz);
+          if (dxz >= uBLP[i].w) continue;
+          vec2 h = shadowRay(sp, uBLP[i].xyz, true);
+          if (h.x < 0.5 && h.y > 0.5) { float a = 1.0 - dxz / uBLP[i].w; cut += uBLC[i] * a * a * 0.8; }
+        }
+        lm = max(lm - cut, vec3(0.0));
+      }
       // Baked light has no direction: take it from the lightmap gradient.
       float gx = lmLum(lp + vec2(0.2, 0.0)) - lmLum(lp - vec2(0.2, 0.0));
       float gz = lmLum(lp + vec2(0.0, 0.2)) - lmLum(lp - vec2(0.0, 0.2));
@@ -159,8 +201,10 @@ const Renderer = (() => {
       float shin = flag == 7.0 ? 28.0 : 70.0, specOn = (flag == 7.0 || flag == 8.0) ? 1.0 : 0.0;
       for (int i = 0; i < ${MAXL}; i++) {
         if (i >= uNL) break;
-        vec3 d = uLP[i].xyz - vPos; float dist = length(d);
-        float a = clamp(1.0 - dist / uLP[i].w, 0.0, 1.0); a *= a;
+        vec3 d = uLP[i].xyz - vPos; float dist = length(d), rad = abs(uLP[i].w);
+        float a = clamp(1.0 - dist / rad, 0.0, 1.0); a *= a;
+        // Negative radius = this light casts real-time shadows.
+        if (a > 0.0 && uLP[i].w < 0.0 && uShadowOn > 0.5) { vec2 h = shadowRay(sp, uLP[i].xyz, false); a *= 1.0 - max(h.x, h.y * 0.85); }
         vec3 l = d / max(dist, 1e-3);
         float ndl = max(dot(nb, l), 0.0) * 0.85 + 0.15;
         dyn += uLC[i] * a * ndl;
@@ -205,18 +249,41 @@ const Renderer = (() => {
       oCol = vec4(retro(fog(c, vPos)), 1.0);
     }`;
 
-  // Sprite vertex: x y z  u v  r g b a  (9 floats). Tint > 1 brightens.
+  // Sprite vertex: x y z  u v  r g b a  s (10 floats). Tint > 1 brightens.
+  // s = 0: tint is the final colour; s in [2, 4] (2 left edge, 4 right edge):
+  // the sprite is lit per pixel as a vertical cylinder (lit side / dark side).
   const SPRITE_VS = `#version 300 es
-    layout(location=0) in vec3 aPos; layout(location=1) in vec2 aUv; layout(location=2) in vec4 aCol;
+    layout(location=0) in vec3 aPos; layout(location=1) in vec2 aUv; layout(location=2) in vec4 aCol; layout(location=3) in float aSide;
     uniform mat4 uVP;
-    out vec3 vPos; out vec2 vUv; out vec4 vCol;
-    void main(){ vPos=aPos; vUv=aUv; vCol=aCol; gl_Position=uVP*vec4(aPos,1.0); }`;
+    out vec3 vPos; out vec2 vUv; out vec4 vCol; out float vSide;
+    void main(){ vPos=aPos; vUv=aUv; vCol=aCol; vSide=aSide; gl_Position=uVP*vec4(aPos,1.0); }`;
   const SPRITE_FS = `#version 300 es
     precision highp float;
-    in vec3 vPos; in vec2 vUv; in vec4 vCol;
+    in vec3 vPos; in vec2 vUv; in vec4 vCol; in float vSide;
     uniform sampler2D uAtlas; uniform float uClip, uSoft;
+    uniform sampler2D uLM; uniform vec2 uMapSize; uniform float uAmbient, uFlicker; uniform vec3 uRight;
+    uniform int uNL; uniform vec4 uLP[${MAXL}]; uniform vec3 uLC[${MAXL}];
     out vec4 oCol;
     ${COMMON}
+    float lmLum(vec2 p){ return dot(texture(uLM, p / uMapSize).rgb, vec3(0.333)); }
+    vec3 sideLight(){
+      float side = clamp(vSide - 3.0, -1.0, 1.0);
+      vec3 toCam = uCam - vPos; toCam.y = 0.0; toCam = normalize(toCam);
+      vec3 N = normalize(uRight * side + toCam * sqrt(max(1.0 - side * side, 0.04)));
+      vec3 lm = texture(uLM, vPos.xz / uMapSize).rgb * 2.0;
+      vec2 g = vec2(lmLum(vPos.xz + vec2(0.25, 0.0)) - lmLum(vPos.xz - vec2(0.25, 0.0)), lmLum(vPos.xz + vec2(0.0, 0.25)) - lmLum(vPos.xz - vec2(0.0, 0.25)));
+      // Baked light comes from where the lightmap gets brighter.
+      float k = clamp(length(g) * 7.0, 0.0, 1.0);
+      float bake = 1.0 + 0.7 * k * dot(N.xz, length(g) > 1e-5 ? normalize(g) : vec2(0.0));
+      vec3 light = vec3(uAmbient) + lm * uFlicker * bake;
+      for (int i = 0; i < ${MAXL}; i++) {
+        if (i >= uNL) break;
+        vec3 d = uLP[i].xyz - vPos; float dist = length(d);
+        float a = clamp(1.0 - dist / abs(uLP[i].w), 0.0, 1.0); a *= a;
+        light += uLC[i] * a * (0.3 + 0.95 * max(dot(N, d / max(dist, 1e-3)), 0.0));
+      }
+      return min(light, vec3(1.8));
+    }
     void main(){
       if (vPos.y < uClip) discard;
       // Two passes: alpha-tested sprites first, soft blended ones (no depth write) after.
@@ -230,7 +297,8 @@ const Renderer = (() => {
         return;
       }
       if (t.a < 0.5) discard;
-      oCol = vec4(retro(fog(t.rgb * vCol.rgb, vPos)), vCol.a);
+      vec3 tint = vSide > 1.0 ? vCol.rgb * sideLight() : vCol.rgb;
+      oCol = vec4(retro(fog(t.rgb * tint, vPos)), vCol.a);
     }`;
 
   const SKY_VS = `#version 300 es
@@ -487,6 +555,7 @@ const Renderer = (() => {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
     texLight = gl.createTexture();
+    texOcc = gl.createTexture();
     texOver = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, texOver);
     for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.NEAREST], [gl.TEXTURE_MAG_FILTER, gl.NEAREST], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
@@ -499,10 +568,11 @@ const Renderer = (() => {
     vaoSprite = gl.createVertexArray();
     gl.bindVertexArray(vaoSprite);
     gl.bindBuffer(gl.ARRAY_BUFFER, spriteBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, MAX_SPRITES * 4 * 36, gl.DYNAMIC_DRAW);
-    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 36, 0);
-    gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 36, 12);
-    gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 4, gl.FLOAT, false, 36, 20);
+    gl.bufferData(gl.ARRAY_BUFFER, MAX_SPRITES * 4 * 40, gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 40, 0);
+    gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 40, 12);
+    gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 4, gl.FLOAT, false, 40, 20);
+    gl.enableVertexAttribArray(3); gl.vertexAttribPointer(3, 1, gl.FLOAT, false, 40, 36);
     const idx = new Uint16Array(MAX_SPRITES * 6);
     for (let i = 0; i < MAX_SPRITES; i++) idx.set([i * 4, i * 4 + 1, i * 4 + 2, i * 4, i * 4 + 2, i * 4 + 3], i * 6);
     spriteIdx = gl.createBuffer();
@@ -532,7 +602,15 @@ const Renderer = (() => {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    const o = world.occ;
+    occW = o.w; occH = o.h;
+    occInfo = [o.res, o.lo, o.span];
+    gl.bindTexture(gl.TEXTURE_2D, texOcc);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG8, o.w, o.h, 0, gl.RG, gl.UNSIGNED_BYTE, o.data);
+    for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.NEAREST], [gl.TEXTURE_MAG_FILTER, gl.NEAREST], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
   }
+  let occInfo = [8, -1, 6];
 
   // Colour texture (+ optional depth texture). Nearest sampling unless `linear`.
   function makeTarget(w, h, depth, linear) {
@@ -641,12 +719,22 @@ const Renderer = (() => {
     const lp = new Float32Array(MAXL * 4), lc = new Float32Array(MAXL * 3);
     for (let i = 0; i < n; i++) {
       const L = lights[i];
-      lp.set([L.x, L.y, L.z, L.r], i * 4);
+      lp.set([L.x, L.y, L.z, L.shadow ? -L.r : L.r], i * 4);
       lc.set([L.col[0] * L.i, L.col[1] * L.i, L.col[2] * L.i], i * 3);
     }
     gl.uniform1i(P.u.uNL, n);
     gl.uniform4fv(P.u.uLP, lp);
     gl.uniform3fv(P.u.uLC, lc);
+    const bl = env.bakedShadow || [], blp = new Float32Array(16), blc = new Float32Array(12);
+    bl.slice(0, 4).forEach((L, i) => { blp.set([L.x, L.y, L.z, L.r], i * 4); blc.set(L.col.map((v) => v * L.i), i * 3); });
+    gl.uniform1i(P.u.uNBL, Math.min(4, bl.length));
+    gl.uniform4fv(P.u.uBLP, blp);
+    gl.uniform3fv(P.u.uBLC, blc);
+    // Shadows are skipped in the (low-detail) reflection pass.
+    gl.uniform1f(P.u.uShadowOn, clipY < -1e8 ? 1 : 0);
+    gl.uniform3f(P.u.uOccInfo, occInfo[0], occInfo[1], occInfo[2]);
+    gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, texOcc);
+    gl.uniform1i(P.u.uOcc, 3);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D_ARRAY, texArray);
     gl.uniform1i(P.u.uTex, 0);
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, texLight);
@@ -670,6 +758,15 @@ const Renderer = (() => {
       gl.uniform1f(S.u.uFogDen, env.fogDensity);
       gl.uniform1f(S.u.uLowFog, env.lowFog || 0);
       gl.uniform1f(S.u.uClip, clipY);
+      gl.uniform1f(S.u.uAmbient, env.ambient);
+      gl.uniform1f(S.u.uFlicker, env.flicker);
+      gl.uniform2f(S.u.uMapSize, mapW, mapH);
+      gl.uniform3fv(S.u.uRight, B.r);
+      gl.uniform1i(S.u.uNL, n);
+      gl.uniform4fv(S.u.uLP, lp);
+      gl.uniform3fv(S.u.uLC, lc);
+      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, texLight);
+      gl.uniform1i(S.u.uLM, 1);
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, texAtlas);
       gl.uniform1i(S.u.uAtlas, 0);
       gl.enable(gl.BLEND);
@@ -687,7 +784,9 @@ const Renderer = (() => {
   }
 
   // cam: {x,y,z,yaw,pitch,fov}
-  // env: {ambient, fog, fogDensity, lowFog, flicker, time, sky, reflectY (optional), ripples (Float32Array(16))}
+  // env: {ambient, fog, fogDensity, lowFog, flicker, time, sky, reflectY (optional), ripples (Float32Array(16)),
+  //       occ (shadow occupancy, RG bytes), bakedShadow ([{x,y,z,r,col,i}] baked lights shadowed by moving things)}
+  // lights[i].shadow: that dynamic light casts real-time shadows.
   // post: {overlay (canvas), crt, aberration, heat, time, grade ([r,g,b]), dust (Float32Array), dustCount}
   function draw(cam, env, lights, dynMesh, sprites, spriteCount, post) {
     if (!scene) return;
@@ -695,10 +794,15 @@ const Renderer = (() => {
       gl.bindBuffer(gl.ARRAY_BUFFER, dynBuf);
       gl.bufferData(gl.ARRAY_BUFFER, dynMesh, gl.DYNAMIC_DRAW);
     }
+    if (env.occ) {
+      gl.bindTexture(gl.TEXTURE_2D, texOcc);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, occW, occH, gl.RG, gl.UNSIGNED_BYTE, env.occ);
+    }
     const count = Math.min(spriteCount, MAX_SPRITES);
     if (count > 0) {
       gl.bindBuffer(gl.ARRAY_BUFFER, spriteBuf);
-      gl.bufferSubData(gl.ARRAY_BUFFER, 0, sprites, 0, count * 36);
+      gl.bufferSubData(gl.ARRAY_BUFFER, 0, sprites, 0, count * 40);
     }
     // Reflection: the scene seen from the mirrored eye, clipped above the water plane.
     const reflect = env.reflectY !== undefined;
