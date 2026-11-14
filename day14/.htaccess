@@ -1,0 +1,6 @@
+# Always revalidate game files so edits are picked up without a hard refresh.
+<IfModule mod_headers.c>
+  <FilesMatch "\.(html|js|css)$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>

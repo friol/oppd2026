@@ -1,0 +1,230 @@
+:root {
+  --gold: #ffc23a;
+  --gold-dark: #b8660f;
+  --ember: #ff5a12;
+  --blood: #b3160f;
+  --ink: #0b0710;
+  --stone: #3a434e;
+  --stone-light: #6c7987;
+  /* Carved grey-blue stone (texture made in main.js) with bevelled edges. */
+  --slab: linear-gradient(rgba(255, 255, 255, 0.07), rgba(0, 0, 0, 0.28)), var(--stone-tex, none) #4a5462;
+  --slab-dark: linear-gradient(rgba(255, 255, 255, 0.04), rgba(0, 0, 0, 0.42)), var(--stone-tex, none) #3a434e;
+  --bevel-hi: #9aa6b4; --bevel-mid: #66727f; --bevel-lo: #161b22;
+  --carved: #dfe5ec;
+  --parchment: #f1e2bd;
+  --mana: #3d8bff;
+  --serif: "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+  --mono: "Consolas", "Courier New", monospace;
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; height: 100%; overflow: hidden;
+  background: var(--ink); color: var(--parchment);
+  font-family: var(--serif);
+  user-select: none;
+}
+
+#game { position: fixed; inset: 0; }
+#view, #overlay {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  image-rendering: pixelated;
+  display: block;
+}
+#view { transition: filter 0.35s ease-out, transform 0.35s ease-out; }
+body.menu-blur #view { filter: blur(5px) brightness(0.8); transform: scale(1.02); }
+/* Drawn by the game but composited by the WebGL final pass, so it is not shown directly. */
+#overlay { display: none; }
+
+/* ---------- HUD ---------- */
+#hud {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  display: flex; justify-content: center; gap: 6px;
+  padding: 8px 10px 10px;
+  background: none;
+  pointer-events: none;
+  font-family: var(--mono);
+}
+#hud .cell {
+  min-width: 86px; padding: 5px 10px 6px;
+  background: var(--slab);
+  border: 2px solid var(--bevel-mid); border-top-color: var(--bevel-hi); border-left-color: #828e9c; border-bottom-color: var(--bevel-lo); border-right-color: #262d36;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.55), inset 0 2px 6px rgba(0, 0, 0, 0.35), 0 2px 0 #000;
+  text-align: center;
+}
+#hud label {
+  display: block; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+  color: #b7c2cf; text-shadow: 0 1px 0 #000;
+}
+#hud b {
+  display: block; font-size: 24px; line-height: 1.05; color: var(--gold);
+  text-shadow: 2px 2px 0 #3a1800; font-variant-numeric: tabular-nums;
+}
+#hud .bar { height: 5px; margin-top: 3px; background: #10151b; border: 1px solid #000; box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12); }
+#hud .bar i { display: block; height: 100%; width: 100%; background: linear-gradient(#ff6b4a, var(--blood)); transition: width 0.15s; }
+#hud .mana b { color: #8fc0ff; text-shadow: 2px 2px 0 #0a1b40; }
+#hud .mana .bar i { background: linear-gradient(#8fc0ff, #2253c9); }
+#hud .hp.low b { color: #ff4a3a; animation: pulse 0.6s infinite alternate; }
+#hud .weapon { min-width: 150px; }
+#hud .slots { display: flex; justify-content: center; gap: 4px; margin-top: 4px; }
+#hud .slots span {
+  width: 22px; height: 22px; line-height: 20px; font-size: 13px; font-weight: bold;
+  border: 1px solid #000; background: #1e252d; color: #4b5663;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+#hud .slots span.own { color: #d6dde5; background: #36404b; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15); }
+#hud .slots span.on { color: #1b0f00; background: var(--gold); box-shadow: 0 0 8px rgba(255, 194, 58, 0.7); }
+#hud .key b.nokey { color: #2e3640; text-shadow: 0 1px 0 rgba(255, 255, 255, 0.12); }
+#hud .info { min-width: 150px; }
+#hud .info b { font-size: 18px; padding-top: 4px; }
+
+@keyframes pulse { from { opacity: 1; } to { opacity: 0.45; } }
+
+#msg {
+  position: absolute; top: 9%; left: 50%; transform: translateX(-50%);
+  font-family: var(--mono); font-size: 18px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--gold); text-shadow: 2px 2px 0 #000, 0 0 12px rgba(255, 120, 20, 0.5);
+  opacity: 0; transition: opacity 0.4s; pointer-events: none; white-space: nowrap;
+}
+#msg.show { opacity: 1; transition: none; }
+
+#levelcard {
+  position: absolute; top: 32%; left: 0; right: 0; text-align: center;
+  opacity: 0; pointer-events: none; transition: opacity 1s;
+}
+#levelcard.show { opacity: 1; transition: opacity 0.3s; }
+#levelcard small { display: block; font-family: var(--mono); letter-spacing: 0.5em; color: #b7c2cf; font-size: 14px; }
+#levelcard strong {
+  display: block; font-size: clamp(28px, 6vw, 64px); font-weight: bold; letter-spacing: 0.04em;
+  background: linear-gradient(#fff1a0, var(--gold) 45%, var(--ember));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(3px 3px 0 #000);
+}
+
+#bossbar {
+  position: absolute; top: 18px; left: 50%; transform: translateX(-50%);
+  width: min(520px, 80vw); text-align: center; pointer-events: none;
+  font-family: var(--mono); font-size: 12px; letter-spacing: 0.3em; color: #ffb08a; text-shadow: 1px 1px 0 #000;
+}
+#bossbar .track { height: 10px; margin-top: 4px; background: #1a0606; border: 2px solid #000; box-shadow: 0 0 0 1px #6b1a10; }
+#bossbar i { display: block; height: 100%; width: 100%; background: linear-gradient(#ff7a3a, #8c0f08); }
+
+/* ---------- Screens ---------- */
+.screen { position: fixed; inset: 0; z-index: 10; }
+[hidden] { display: none !important; }
+
+#title {
+  background: #000; overflow: hidden;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 2vh 16px 7vh;
+}
+/* Pulsing slime-green glow behind the logo. */
+#title .glow {
+  position: absolute; left: 50%; top: 34%; width: min(1100px, 110vw); height: 60vh;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(ellipse at center, rgba(90, 200, 40, 0.16), rgba(40, 90, 20, 0.06) 45%, transparent 70%);
+  animation: glow 4s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+/* Ray-marched 3D ghosts drifting behind the logo (main.js), deliberately blurred. */
+#title #ghosts { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; filter: blur(5px); opacity: 0.85; mix-blend-mode: screen; }
+@keyframes glow { from { opacity: 0.55; } to { opacity: 1; } }
+#title .logo {
+  position: relative;
+  width: min(940px, 90vw); max-height: 52vh; object-fit: contain;
+  margin-bottom: 3.5vh;
+  filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.8));
+  animation: float 6s ease-in-out infinite alternate;
+}
+/* Slow drifting fog: a seamless noise texture (made in main.js) on two layers
+   moving in opposite directions; translating by exactly one tile loops cleanly. */
+#title .fog {
+  position: absolute; top: 0; bottom: 0; left: 0;
+  background-image: var(--fog);
+  background-repeat: repeat;
+  pointer-events: none;
+  will-change: transform;
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,0.35), #000 45%, #000 80%, rgba(0,0,0,0.5));
+  mask-image: linear-gradient(to bottom, rgba(0,0,0,0.35), #000 45%, #000 80%, rgba(0,0,0,0.5));
+}
+#title .fog.f1 { width: calc(100% + 1100px); background-size: 1100px 1100px; opacity: 0.55; animation: fogL 150s linear infinite; }
+#title .fog.f2 { width: calc(100% + 1700px); left: -1700px; background-size: 1700px 1700px; background-position: 0 380px; opacity: 0.35; animation: fogR 230s linear infinite; }
+@keyframes fogL { to { transform: translateX(-1100px); } }
+@keyframes fogR { to { transform: translateX(1700px); } }
+@keyframes float { from { transform: translateY(0); } to { transform: translateY(-0.8vh); } }
+.menu {
+  position: relative;
+  display: flex; flex-direction: column; align-items: stretch; gap: 6px; width: min(340px, 86vw);
+}
+.screen button {
+  font: inherit; font-size: 20px; font-weight: bold; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--carved); cursor: pointer;
+  padding: 9px 18px;
+  display: flex; justify-content: space-between; align-items: baseline; gap: 16px;
+  background: var(--slab);
+  border: 2px solid var(--bevel-mid); border-top-color: var(--bevel-hi); border-left-color: #828e9c; border-bottom-color: var(--bevel-lo); border-right-color: #262d36;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.45), 0 3px 0 #000;
+  /* Letters cut into the stone: dark above, light lip below. */
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+.screen button:only-child, .menu button[data-act="start"], .screen button[data-act="resume"], .screen button[data-act="continue"] { justify-content: center; }
+.screen button b { color: var(--gold); font-size: 15px; }
+.screen button:hover, .screen button:focus-visible {
+  outline: none; color: #fff3c8;
+  background: linear-gradient(rgba(255, 255, 255, 0.16), rgba(0, 0, 0, 0.15)), var(--stone-tex, none) #66727f;
+  border-color: #c9d3de #8e9aa8 #1c232b #a4afbc;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.4), inset 0 0 14px rgba(255, 210, 120, 0.25), 0 0 10px rgba(255, 194, 58, 0.35), 0 3px 0 #000;
+  text-shadow: 0 -1px 0 #000, 0 0 8px rgba(255, 200, 90, 0.7);
+}
+.screen button:hover b, .screen button:focus-visible b { color: var(--gold); }
+.menu button[data-act="start"] { font-size: 24px; padding: 12px 18px; }
+/* Title menu: smaller and tucked up under the logo's drips. */
+#mainmenu { width: min(270px, 80vw); gap: 5px; margin-top: -4vh; }
+#mainmenu button { font-size: 15px; padding: 6px 14px; box-shadow: 0 2px 0 #000; }
+#mainmenu button b { font-size: 12px; }
+#mainmenu button[data-act="start"] { font-size: 18px; padding: 8px 14px; }
+
+.panel { display: grid; place-items: center; background: rgba(5, 8, 12, 0.7); backdrop-filter: blur(2px); }
+.panel.blood { background: radial-gradient(ellipse at center, rgba(70, 0, 0, 0.7), rgba(15, 0, 0, 0.92)); }
+.panel .box {
+  width: min(520px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto;
+  padding: 26px 26px 22px;
+  display: flex; flex-direction: column; gap: 8px;
+  background: var(--slab-dark);
+  border: 4px solid var(--bevel-mid); border-top-color: var(--bevel-hi); border-left-color: #828e9c; border-bottom-color: var(--bevel-lo); border-right-color: #262d36;
+  box-shadow: 0 0 0 2px #000, inset 0 0 0 2px rgba(0, 0, 0, 0.5), inset 0 0 30px rgba(0, 0, 0, 0.45), 0 20px 60px rgba(0, 0, 0, 0.7);
+}
+.panel h2 {
+  margin: 0 0 6px; text-align: center; font-size: 40px; letter-spacing: 0.08em; text-transform: uppercase;
+  background: linear-gradient(#fff1a0, var(--gold) 45%, var(--ember));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(3px 3px 0 #000);
+}
+.panel.blood h2 { background: linear-gradient(#ffb0a0, #ff3a2a 50%, #7a0000); -webkit-background-clip: text; background-clip: text; }
+.panel .sub { margin: -4px 0 10px; text-align: center; font-style: italic; color: #b7c2cf; }
+.keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0 0 8px; font-size: 15px; }
+.keys dt { font-family: var(--mono); color: var(--gold); white-space: nowrap; }
+.keys dd { margin: 0; color: var(--carved); }
+.tip { font-size: 14px; line-height: 1.45; color: #aab6c3; margin: 4px 0 12px; }
+.stats { width: 100%; border-collapse: collapse; margin: 0 0 14px; font-family: var(--mono); font-size: 18px; }
+.stats td { padding: 6px 4px; border-bottom: 1px dashed #66727f; color: var(--carved); }
+.stats td:last-child { text-align: right; color: var(--gold); }
+
+#loading { display: grid; place-items: center; background: #000; z-index: 20; text-align: center; }
+#loading strong {
+  display: block; font-size: 42px; letter-spacing: 0.06em;
+  background: linear-gradient(#fff1a0, var(--gold) 45%, var(--ember));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+#loading span { display: block; margin-top: 8px; font-family: var(--mono); letter-spacing: 0.2em; color: #8a7d90; text-transform: uppercase; font-size: 13px; }
+#loading.error span { color: #ff7a6a; text-transform: none; letter-spacing: 0; max-width: 90vw; }
+
+@media (max-width: 760px) {
+  #hud { gap: 3px; padding: 6px 4px; flex-wrap: wrap; }
+  #hud .cell { min-width: 0; padding: 3px 6px; }
+  #hud b { font-size: 17px; }
+  #hud .weapon, #hud .info { min-width: 0; }
+  #hud .slots span { width: 17px; height: 17px; line-height: 15px; font-size: 11px; }
+  .screen button { font-size: 16px; }
+  #msg { font-size: 13px; }
+}

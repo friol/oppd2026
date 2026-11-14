@@ -1,0 +1,54 @@
+# CLAUDE.md — day14
+
+Questa cartella contiene il programma day14 per OPPD 2026.
+
+## Contesto
+
+- Repository: `oppd2026` (cartella root `D:\xampp\htdocs\oppd2026`)
+- Ogni giorno/programma vive nella propria sottocartella (`day1`, `day2`, `day3`, `day4`, `day5`, `day6`, `day7`, `day8`, `day9`, `day10`, `day11`, `day12`, `day13`, `day14`, ...) e deve restare autonomo.
+
+## Obiettivo del programma
+
+**WolfenstAIn**: FPS 3D in stile retro (medievale/fantasy) con schermata titolo, 3 livelli
+(il terzo con il boss drago), 4 armi (pugnale, bastone del gelo, balestra, palla di fuoco),
+nemici sprite, porte, porte chiuse a chiave, muri segreti, trappole (gargoyle che sputano fuoco,
+piastre a pressione, lava), automappa. Effetti sonori (Web Audio, posizionali): apertura porte, passi, salto, morte dello slime, ringhi dei ragni vicini, zampettare e morso dei ragni, zampettio viscido degli slime che si avvicinano, lamenti dello zombie più vicino e il suo verso di morte, passi ossuti degli scheletri, sparo del bastone del gelo e impatto sui muri, vetro infranto con riverbero quando il ghiaccio colpisce un nemico (riverbero condiviso: convolver con risposta all'impulso sintetica), scatto della balestra al tiro, dardo della balestra che parte dall'arma e vola verso il mirino (immagine `crossbow_hand_empty.png` senza punta finché non si ricarica), lancio delle palle di fuoco (giocatore, demoni, drago, gargoyle), esplosione delle palle di fuoco su muri, pavimento e giocatore, pozioni del mana e della salute, menu (clic di pulsante al passaggio su una voce, suono magico al clic), raccolta della chiave, errore tentando di aprire una porta chiusa a chiave senza chiave, "missione fallita" alla morte del giocatore, scroscio d'acqua vicino a cascate e pozze e ronzio magico vicino ai cristalli viola e blu, crepitio delle torce a parete (loop, attutiti dietro i muri).
+
+## Stack e struttura
+
+HTML/CSS/JavaScript puro + WebGL2, nessuna dipendenza, script classici (no moduli).
+
+- `index.html`, `style.css`, `favicon.svg`
+- `img/` — fogli sorgente forniti dall'utente: `enemies.png`, `medieval.textures.png`, `weapons.webp`, `title.png` (logo della schermata iniziale, scontornato con alpha morbido da `title.jpg`, che resta come originale); `wolfenstAIn.png` (vecchio titolo, non più usato). `balestra.jpg` e `mano.balestra.jpg` (balestra a terra e impugnata, con lo sfondo a scacchi finto nel JPG) sono scontornate offline in `crossbow_pickup.png` e `crossbow_hand.png`, che sono quelle caricate dal gioco. Dietro il logo una nebbia lenta: texture di rumore frattale senza cuciture generata in `main.js`, su due strati CSS che scorrono in versi opposti; tra i due strati di nebbia un canvas WebGL2 (`#ghosts`, 400 px di larghezza, sfocato via CSS) con 6 fantasmi 3D procedurali in ray marching (SDF: testa, corpo a lenzuolo con orlo ondeggiante che si trascina indietro, braccia protese, occhi e bocca scuri; resi come nebbia luminosa con rumore), ognuno su un lento percorso di Lissajous dentro l'inquadratura
+- `soundfx/` — file forniti dall'utente (porta, passo, splat dello slime, ringhio dei ragni, sparo magico, palla di fuoco, tonfo, fontana, crepitio del fuoco, pozioni, passo dello scheletro, salto, chiave, clic magico della UI, clic di pulsante); i `.wav` originali sono stati convertiti in `.mp3` a 160 kbps con ffmpeg (`D:\software\ffmpeg\bin`) e poi eliminati (il gioco carica solo gli `.mp3` e i due `.ogg`); `js/sound.js` li suona con attenuazione per distanza e panning stereo, l'audio si sblocca al primo clic/tasto
+- `js/levels.js` — mappe ASCII dei livelli (legenda in testa a `world.js`)
+- `js/assets.js` — ritaglio dei fogli a runtime: texture array 128×128, atlante sprite (nemici separati per componenti connesse), viste delle armi (sfondo grigio rimosso con flood fill). Le coordinate dei ritagli sono misurate a mano sui fogli.
+- `js/world.js` — parsing mappa, mesh 3D statica (altezze di pavimento/soffitto per cella, cielo), lightmap 2D con ombre calcolata al caricamento (l'accumulo per luce resta in memoria, così `World.extinguish` può togliere la luce di una torcia, rifare la mesh con la texture `torch_out` e ricaricare la lightmap: 3 colpi di ghiaccio spengono una torcia, che poi fuma per qualche secondo), collisioni, linea di vista, campi di flusso BFS per i nemici; le colonne bloccano anche la luce precalcolata (ombra sul pavimento); i muri che confinano con il cielo si fermano a SKY-1 e hanno una sommità diroccata (`ruinTops`: 4×4 blocchi per cella, altezze a corsi di mattoni da rumore liscio + variazione per blocco, funzione solo della posizione così le celle vicine combaciano); colonne `i` in vero 3D (plinto, toro, fusto scanalato rastremato, echino, abaco) con due texture procedurali generate in `assets.js` (`column`, `column_stone`, flag 6 = lightmap campionata più lontano lungo la normale per ombreggiare le forme tonde)
+- `js/renderer.js` — WebGL2: la scena si disegna in un framebuffer a bassa risoluzione (luci dinamiche max 16, nebbia, dithering Bayer, cielo notturno procedurale, sprite billboard, fiamme delle torce animate nello shader con flag 5), più un passaggio specchiato per i riflessi di acqua e lava (piano a y=-0.3, clip sopra il piano). Rilievo sulle superfici (bump dalla luminanza della texture con frame tangente dalle derivate dello schermo; luci dinamiche con la normale perturbata, luce precalcolata con la direzione ricavata dal gradiente della lightmap). Sprite in due passaggi: prima quelli con alpha test, poi quelli morbidi (ombre, decal, nebbia) senza scrivere la profondità. Dalla profondità della scena (texture) si calcola l'SSAO (12 campioni a spirale, sfocato 3×3 nel passaggio finale); il bloom estrae i pixel luminosi a metà risoluzione e li sfoca due volte in modo separabile. Un passaggio finale a risoluzione dello schermo ingrandisce senza smussare, compone l'overlay 2D (arma, mappa, lampi) e applica gli effetti: CRT (scanline, maschera RGB, vignettatura; senza curvatura), aberrazione cromatica sul danno, distorsione da calore vicino alla lava. Opzione Effects nel menu: Full / Light (senza CRT) / Off
+- Ombre a macchia morbida sotto nemici, oggetti e colonne; ombre lunghe proiettate a terra da torce, cristalli e vetrate (sagoma del nemico o fascia della colonna, al massimo 2 luci per oggetto, oscillano col tremolio della fiamma e si fermano a muri e gradini); gli slime verdi emettono una luce dinamica verde pulsante, con alone dietro il corpo e pozza luminosa sul pavimento (sprite `glow`) (sprite piatti con alpha negativo = blending senza alpha test); oscillazione dell'arma con inerzia, respiro, rinculo della telecamera, abbassamento all'atterraggio e lampi alla bocca delle armi in `game.js`; decal (bruciature delle palle di fuoco, brina del ghiaccio su muri/pavimento/soffitto, sangue a terra) che svaniscono col tempo; pulviscolo visibile solo dove c'è luce (punti traslucidi disegnati a risoluzione dello schermo dopo il passaggio finale, nascosti dietro l'arma e dai muri); nebbia bassa su acqua e vapore sulla lava (billboard morbidi); brina sui bordi dello schermo che compare solo dopo una lunga raffica col bastone del gelo (~18 colpi)
+- Ambiente: fasci di luce obliqui dalle vetrate (due quad incrociati morbidi), nebbia bassa che si addensa vicino al pavimento (`lowFog` per livello, nella funzione `fog()` degli shader), correzione colore leggerissima per livello (`grade`), acqua con onde 3D nel vertex shader (pavimenti d'acqua suddivisi 6×6, cerchi dai passi e dai colpi via `uRip`) e schiuma/spruzzi alla base delle cascate, lava con croste scure che scorrono, pulsazione e bolle che scoppiano in scintille, riflessi speculari su metalli (flag 7) e pavimenti bagnati (flag 8, `wet` per livello), ragnatele negli angoli alti e muschio alla base dei muri (sprite morbidi), travi di legno a soffitto ogni tre colonne, sarcofagi negli anfratti ciechi e altari sotto le vetrate (in `decor`, con collisione), detriti ai piedi delle brecce dei muri diroccati, scintille e braci che illuminano (fino a 5 luci dinamiche), scena sfocata dietro i menu di gioco (classe `menu-blur`); stendardi che ondeggiano (flag 9) ed edera/rampicanti che tremolano (flag 10) nello shader; fuliggine sopra le torce (sul muro nelle stanze alte, sul soffitto in quelle basse) e braci che salgono; gocce che cadono dai soffitti sopra l'acqua con cerchi e schizzi; morti speciali: col ghiaccio il nemico resta congelato 0,6 s e poi va in frantumi (suono di vetro, brina a terra), col fuoco brucia, si annerisce e si sbriciola in cenere (bruciatura a terra); scheletri, orchi e ragni (`KEEP_CORPSE`) fanno l'effetto ma poi lasciano comunque il cadavere a terra (scurito se bruciati); i nemici feriti sotto il 60% lasciano gocce di sangue mentre camminano; l'arma in mano viene tinta dal colore della luce circostante (disegnata su un canvas separato, poi `source-atop`)
+- `js/game.js` — giocatore, armi, IA dei nemici, proiettili, esplosioni, oggetti, trappole, overlay arma/mappa
+- `js/main.js` — schermate, input (pointer lock), HUD DOM, loop; genera anche la texture di granito grigio-blu (`--stone-tex`) usata da pulsanti, pannelli e caselle dell'HUD (pietra smussata, scritte incise, bordo dorato luminoso al passaggio)
+
+Le immagini vengono lette con `getImageData`, quindi la pagina va aperta via HTTP (es. `http://localhost/oppd2026/day14/`), non da `file://`.
+
+Non usare mai la rete o motori LLM o AI remoti per le azioni del computer.
+Per tutti i file, usa sempre la sottocartella relativa al giorno corrente (`day14`).
+
+## Comandi
+
+Nessun build. Aprire `http://localhost/oppd2026/day14/` con Apache di XAMPP attivo.
+Comandi di gioco: WASD/frecce, mouse, clic/Ctrl spara, 1–4/rotella armi, E/F usa, Spazio salta, Shift corre, M/Tab mappa, Esc pausa.
+
+## Convenzioni
+
+- Tutti i testi ed i commenti nel codice in Inglese
+- Mantenere il codice semplice e coerente con lo stile dei file esistenti.
+- Non aggiungere dipendenze senza motivo.
+- Aggiornare questo file quando cambiano obiettivo, stack o comandi.
+
+## Testing
+
+- Per le webapp: verifica visiva con Chrome headless pilotato via DevTools Protocol (WebSocket di Node, script fuori dal repo). `--virtual-time-budget` non fa avanzare `requestAnimationFrame`, quindi usare il tempo reale; la larghezza minima della finestra headless è ~500 px, per il formato telefono usare `Emulation.setDeviceMetricsOverride`.
+- Usare un `--user-data-dir` nuovo a ogni prova, così i dati in localStorage non restano da una prova all'altra.
+- Per WebGL con la GPU vera: `--headless=new --enable-gpu --use-angle=d3d11 --ignore-gpu-blocklist`. Per misurare le prestazioni oltre i 60 fps aggiungere `--disable-gpu-vsync --disable-frame-rate-limit`. Gli eventi sintetici (tasti, clic) non contano come gesto dell'utente: per provare l'audio serve `--autoplay-policy=no-user-gesture-required`.

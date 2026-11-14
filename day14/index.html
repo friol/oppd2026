@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <title>WolfenstAIn</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="game">
+    <canvas id="view"></canvas>
+    <canvas id="overlay"></canvas>
+
+    <div id="bossbar" hidden><span>THE RED WYRM</span><div class="track"><i></i></div></div>
+    <div id="msg"></div>
+    <div id="levelcard"><small></small><strong></strong></div>
+
+    <footer id="hud">
+      <div class="cell hp"><label>Health</label><b id="hpv">100</b><div class="bar"><i id="hpb"></i></div></div>
+      <div class="cell mana"><label>Mana</label><b id="mpv">60</b><div class="bar"><i id="mpb"></i></div></div>
+      <div class="cell weapon"><label id="wname">Frost Staff</label>
+        <div class="slots" id="slots"><span>1</span><span>2</span><span>3</span><span>4</span></div></div>
+      <div class="cell bolts"><label>Bolts</label><b id="bov">0</b></div>
+      <div class="cell key"><label>Key</label><b id="keyv" class="nokey">&#9911;</b></div>
+      <div class="cell info"><label id="lvlname">Level 1</label><b id="kills">0 / 0</b></div>
+    </footer>
+  </main>
+
+  <section id="title" class="screen">
+    <div class="fog f1"></div>
+    <canvas id="ghosts"></canvas>
+    <div class="glow"></div>
+    <div class="fog f2"></div>
+    <img class="logo" src="img/title.png" alt="WolfenstAIn">
+    <nav class="menu" id="mainmenu">
+      <button type="button" data-act="start">New Game</button>
+      <button type="button" data-act="diff">Difficulty <b id="diffv">Knight</b></button>
+      <button type="button" data-act="res">Graphics <b id="resv">Classic</b></button>
+      <button type="button" data-act="fx">Effects <b class="fxv">Full</b></button>
+      <button type="button" data-act="sound">Sound <b class="sndv">On</b></button>
+      <button type="button" data-act="help">Controls</button>
+    </nav>
+  </section>
+
+  <section id="help" class="screen panel" hidden>
+    <div class="box">
+      <h2>Controls</h2>
+      <dl class="keys">
+        <dt>W A S D / Arrows</dt><dd>Move &amp; strafe (arrows turn)</dd>
+        <dt>Mouse</dt><dd>Look around</dd>
+        <dt>Left click / Ctrl</dt><dd>Attack</dd>
+        <dt>1 &ndash; 4 / Wheel</dt><dd>Dagger, Frost Staff, Crossbow, Fireball</dd>
+        <dt>E / F</dt><dd>Open doors, pull levers, push secret walls</dd>
+        <dt>Space</dt><dd>Jump (over crates, out of lava)</dd>
+        <dt>Shift</dt><dd>Run</dd>
+        <dt>M / Tab</dt><dd>Automap</dd>
+        <dt>Esc</dt><dd>Pause</dd>
+      </dl>
+      <p class="tip">Find the iron key to open locked doors, then pull the green-lit lever to leave each level. Beware of gargoyles and pressure plates. Some walls hide secrets.</p>
+      <button type="button" data-act="back">Back</button>
+    </div>
+  </section>
+
+  <section id="pause" class="screen panel" hidden>
+    <div class="box">
+      <h2>Paused</h2>
+      <button type="button" data-act="resume">Resume</button>
+      <button type="button" data-act="res">Graphics <b class="resv">Classic</b></button>
+      <button type="button" data-act="fx">Effects <b class="fxv">Full</b></button>
+      <button type="button" data-act="sens">Mouse speed <b id="sensv">5</b></button>
+      <button type="button" data-act="sound">Sound <b class="sndv">On</b></button>
+      <button type="button" data-act="restart">Restart level</button>
+      <button type="button" data-act="quit">Quit to title</button>
+    </div>
+  </section>
+
+  <section id="inter" class="screen panel" hidden>
+    <div class="box">
+      <h2>Level complete</h2>
+      <p class="sub" id="intername"></p>
+      <table class="stats" id="interstats"></table>
+      <button type="button" data-act="continue">Continue</button>
+    </div>
+  </section>
+
+  <section id="dead" class="screen panel blood" hidden>
+    <div class="box">
+      <h2>You died</h2>
+      <p class="sub">The darkness claims another hero.</p>
+      <button type="button" data-act="restart">Try again</button>
+      <button type="button" data-act="quit">Quit to title</button>
+    </div>
+  </section>
+
+  <section id="win" class="screen panel" hidden>
+    <div class="box">
+      <h2>Victory</h2>
+      <p class="sub">The Red Wyrm is dead and the castle is free.</p>
+      <table class="stats" id="winstats"></table>
+      <button type="button" data-act="quit">Back to title</button>
+    </div>
+  </section>
+
+  <div id="loading" class="screen"><div><strong>WolfenstAIn</strong><span id="loadmsg">Loading&hellip;</span></div></div>
+
+  <script src="js/levels.js"></script>
+  <script src="js/assets.js"></script>
+  <script src="js/world.js"></script>
+  <script src="js/renderer.js"></script>
+  <script src="js/sound.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
