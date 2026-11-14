@@ -79,7 +79,7 @@ const Game = (() => {
       projs: [], parts: [], effects: [], muzzle: 0,
       flash: { hurt: 0, pickup: 0, lava: 0 }, shake: 0,
       stats: { kills: 0, totalKills: world.spawns.length, items: 0, totalItems: world.items.length, secrets: 0, totalSecrets: world.pushwalls.length },
-      flowCell: -1, flowT: 0, seenT: 0, ended: false, victoryT: -1, boss: null, lastFireSnd: -1, lastFireHit: -1,
+      flowCell: -1, flowT: 0, seenT: 0, ended: false, victoryT: -1, boss: null, lastFireSnd: -1, lastFireHit: -1, lastHurtSnd: -1,
       decals: [], motes: [], frost: 0, torchHits: {}, smokers: [], ripples: [], bubbles: [], drips: [], hazes: [],
     });
     G.boss = G.enemies.find((e) => e.def.boss) || null;
@@ -213,8 +213,9 @@ const Game = (() => {
       }
     }
 
-    // Mana slowly regenerates.
-    if (inv.mana < 100) inv.mana = Math.min(100, inv.mana + dt * 1.2);
+    // Running drains a little mana (no regeneration meanwhile); otherwise it slowly regenerates.
+    if (input.run && p.moving > 0.3 && !cheats.god) inv.mana = Math.max(0, inv.mana - dt * 1.5);
+    else if (inv.mana < 100) inv.mana = Math.min(100, inv.mana + dt * 1.2);
 
     // Weapons.
     p.cooldown -= dt;
@@ -243,13 +244,13 @@ const Game = (() => {
     switch (type) {
       case 'health': if (inv.hp >= 100) return false; inv.hp = Math.min(100, inv.hp + 25); Sound.play('heal'); events.message('Healing potion +25'); return true;
       case 'mana': if (inv.mana >= 100) return false; inv.mana = Math.min(100, inv.mana + 30); Sound.play('potion'); events.message('Mana potion +30'); return true;
-      case 'bolts': if (inv.bolts >= 60) return false; inv.bolts = Math.min(60, inv.bolts + 8); events.message('Crossbow bolts +8'); return true;
+      case 'bolts': if (inv.bolts >= 60) return false; inv.bolts = Math.min(60, inv.bolts + 8); Sound.play('powerup', { rate: 0.8 }); events.message('Crossbow bolts +8'); return true;
       case 'key': G.p.key = true; Sound.play('key'); events.message('You found the IRON KEY'); return true;
       case 'crossbow':
         inv.owned.xbow = true; inv.bolts = Math.min(60, inv.bolts + 12);
         events.message('CROSSBOW! Press 3'); selectWeapon(2); return true;
       case 'tome':
-        inv.owned.fire = true; inv.mana = Math.min(100, inv.mana + 30);
+        inv.owned.fire = true; inv.mana = Math.min(100, inv.mana + 30); Sound.play('tome');
         events.message('Tome of FIREBALL! Press 4'); selectWeapon(3); return true;
     }
     return false;
@@ -396,9 +397,16 @@ const Game = (() => {
   function damagePlayer(amount, silent) {
     const inv = G.inv;
     if (inv.hp <= 0 || G.ended || cheats.god) return;
-    inv.hp -= amount * (silent ? 1 : G.diff.dmg);
+    const dealt = amount * (silent ? 1 : G.diff.dmg);
+    inv.hp -= dealt;
     G.flash.hurt = Math.min(0.8, G.flash.hurt + (silent ? 0.02 : 0.35));
     if (!silent) G.shake = Math.max(G.shake, 0.18);
+    // The hero cries out: a grunt for light hits, a shout for heavy ones (not for
+    // lava ticks, nor on the killing blow, which has the mission-failed jingle).
+    if (!silent && inv.hp > 0 && G.time - (G.lastHurtSnd ?? -1) > 0.3) {
+      G.lastHurtSnd = G.time;
+      Sound.play(dealt >= 14 ? 'hurtHeavy' : 'hurtLight', { rate: rand(0.94, 1.06) });
+    }
     if (inv.hp <= 0) {
       inv.hp = 0;
       G.ended = true;
@@ -448,7 +456,7 @@ const Game = (() => {
     if (!e.deathKind) for (let i = 0; i < 20; i++) particle(e.x, e.y + e.height * 0.5, e.z, rand(-2, 2), rand(0.5, 3.5), rand(-2, 2), col, 0.07, 0.9, false);
     e.y = e.def.fly ? World.floorAt(G.world, e.x, e.z, 0.1) : e.y;
     if (e.type !== 'ghost' && !e.deathKind) floorDecal('splat', e.x, e.z, e.def.boss ? 1.6 : rand(0.55, 0.75), col);
-    if (e.type === 'zombie') Sound.play('zombieDeath', { x: e.x, z: e.z, rate: rand(0.92, 1.05) });
+    if (e.type === 'zombie' || e.type === 'orc') Sound.play('zombieDeath', { x: e.x, z: e.z, rate: rand(0.92, 1.05) * (e.type === 'orc' ? 1.15 : 1) });
     // Slimes splat right away, unless frozen or burning: then the splat comes when they burst.
     if (e.type === 'slime' && !e.deathKind) slimeSplat(e);
     const drop = e.def.drop;
@@ -601,6 +609,8 @@ const Game = (() => {
   // purple wizard's eerie wail); more often once it has noticed the player.
   const VOICES = [
     { type: 'zombie', sound: 'zombie', range: 11, awake: [2.8, 4.5], idle: [5, 8] },
+    // Green goblins ('orc' sprites) use the zombie groan, a little higher.
+    { type: 'orc', sound: 'zombie', range: 11, awake: [3, 5], idle: [5.5, 9], rate: 1.15 },
     { type: 'wizard', sound: 'wizard', range: 12, awake: [5, 8], idle: [8, 13] },
   ];
   function zombieGroans(dt) {
@@ -616,7 +626,7 @@ const Game = (() => {
         if (d < bestD) { best = e; bestD = d; }
       }
       if (!best) { G.voiceT[v.type] = 0.5; continue; }
-      Sound.play(v.sound, { x: best.x, z: best.z, rate: rand(0.9, 1.1) });
+      Sound.play(v.sound, { x: best.x, z: best.z, rate: rand(0.9, 1.1) * (v.rate || 1) });
       G.voiceT[v.type] = best.awake ? rand(...v.awake) : rand(...v.idle);
     }
   }
@@ -1584,13 +1594,28 @@ const Game = (() => {
   }
 
   // ---------------- First-person overlay ----------------
-  let weaponLayer = null;
+  let weaponLayer = null, weaponMask = null;
+  // Which side the light falls from, relative to the view: -1 left .. 1 right
+  // (from the lightmap gradient and the nearby dynamic lights).
+  function weaponLightSide(P) {
+    const rx = -Math.sin(P.yaw), rz = Math.cos(P.yaw);
+    const lum = (x, z) => { const l = World.lightAt(G.world, x, z); return l[0] + l[1] + l[2]; };
+    let s = (lum(P.x + rx * 0.4, P.z + rz * 0.4) - lum(P.x - rx * 0.4, P.z - rz * 0.4)) * 1.5;
+    for (const L of G.lastLights || []) {
+      const dx = L.x - P.x, dz = L.z - P.z, d = Math.hypot(dx, dz);
+      if (d < 0.2 || d > L.r) continue;
+      s += (dx * rx + dz * rz) / d * L.i * (1 - d / L.r) * 0.8;
+    }
+    weaponSide += (Math.max(-1, Math.min(1, s)) - weaponSide) * 0.08;
+    return weaponSide;
+  }
+  let weaponSide = 0;
   function drawOverlay(g, W, H, showMap) {
     g.clearRect(0, 0, W, H);
     if (!G) return;
     const P = G.p, inv = G.inv, V = A.views;
     const light = lightLevel(P.x, P.eyeY, P.z, G.lastLights || []);
-    const bright = Math.max(0.35, Math.min(1.5, (light[0] + light[1] + light[2]) / 3 + 0.15));
+    const bright = Math.max(0.28, Math.min(1.45, Math.max(light[0], light[1], light[2]) * 0.95 + 0.1));
     const s = H / 300;
     const breathe = Math.sin(G.time * 1.8) * 2 * s * (1 - P.moving);
     const bx = Math.sin(P.bob) * 6 * s * P.moving + P.swayX * 22 * s;
@@ -1651,14 +1676,27 @@ const Game = (() => {
       }
     }
     wl.filter = 'none';
-    const lmax = Math.max(light[0], light[1], light[2], 1e-3), lmin = Math.min(light[0], light[1], light[2]);
-    const sat = (lmax - lmin) / lmax;
-    if (sat > 0.05) {
-      wl.globalCompositeOperation = 'source-atop';
-      wl.fillStyle = `rgba(${light.map((v) => Math.round(v / lmax * 255)).join(',')},${Math.min(0.4, sat * 0.55).toFixed(3)})`;
-      wl.fillRect(0, 0, W, H);
-      wl.globalCompositeOperation = 'source-over';
+    // Light the weapon like the world: multiply by the colour of the light
+    // around the player, brighter on the side the light comes from.
+    const lmax = Math.max(light[0], light[1], light[2], 1e-3);
+    const hue = light.map((v) => 0.25 + 0.75 * v / lmax);
+    const side = weaponLightSide(P), c = (k) => hue.map((v) => Math.round(Math.min(1, v * k) * 255)).join(',');
+    if (!weaponMask || weaponMask.width !== W || weaponMask.height !== H) {
+      weaponMask = document.createElement('canvas');
+      weaponMask.width = W; weaponMask.height = H;
     }
+    const mk = weaponMask.getContext('2d');
+    mk.clearRect(0, 0, W, H);
+    mk.drawImage(weaponLayer, 0, 0);
+    const gr = wl.createLinearGradient(W * 0.25, 0, W, 0);
+    gr.addColorStop(0, `rgb(${c(1 - 0.28 * side)})`);
+    gr.addColorStop(1, `rgb(${c(1 + 0.28 * side)})`);
+    wl.globalCompositeOperation = 'multiply';
+    wl.fillStyle = gr;
+    wl.fillRect(0, 0, W, H);
+    wl.globalCompositeOperation = 'destination-in';
+    wl.drawImage(weaponMask, 0, 0);
+    wl.globalCompositeOperation = 'source-over';
     g.drawImage(weaponLayer, 0, 0);
     if (glow) {
       const gr = g.createRadialGradient(glow.x, glow.y, 0, glow.x, glow.y, glow.r);
@@ -1734,7 +1772,7 @@ const Game = (() => {
   // crosshair, shrinking with distance (tip and tail projected separately).
   function drawBolt(g, r, k, W, H, s) {
     const vx = W / 2, vy = H / 2, d = k * 7;
-    const tip0 = [r.x + r.w * 0.464, r.y + r.h * 0.005], tail0 = [r.x + r.w * 0.62, r.y + r.h * 0.3];
+    const tip0 = [r.x + r.w * 0.464, r.y + r.h * 0.005], tail0 = [r.x + r.w * 0.665, r.y + r.h * 0.38];
     const st = 1.6 / (1.6 + d), sl = 1 / (1 + d);
     const tip = [vx + (tip0[0] - vx) * st, vy + (tip0[1] - vy) * st];
     const tail = [vx + (tail0[0] - vx) * sl, vy + (tail0[1] - vy) * sl];
