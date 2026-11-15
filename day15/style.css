@@ -143,8 +143,10 @@ main {
   cursor: pointer;
 }
 .cell.block { background: var(--block); cursor: default; }
-.portrait { background: var(--block); overflow: hidden; cursor: pointer; }
-.portrait img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.portrait { position: relative; background: var(--block); overflow: hidden; cursor: pointer; }
+/* absolutely positioned: the picture must not change the size of the grid rows it spans */
+.portrait img { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; }
+.portrait img.contain { object-fit: contain; }
 .pic-info h3 { font-size: 14px; margin: 0 0 4px; }
 .pic-info p { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
 .pic-info a { color: inherit; }

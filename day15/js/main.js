@@ -11,8 +11,8 @@
   }
   const LEVEL_NAMES = { e: 'Easy', h: 'Hard' };
   const LABELS = {
-    it: { across: 'Orizzontali', down: 'Verticali', name: 'Italiano', portrait: 'Il personaggio nella foto' },
-    en: { across: 'Across', down: 'Down', name: 'English', portrait: 'The person in the picture' }
+    it: { across: 'Orizzontali', down: 'Verticali', name: 'Italiano', portrait: 'Il personaggio nella foto', painting: "L'autore del dipinto" },
+    en: { across: 'Across', down: 'Down', name: 'English', portrait: 'The person in the picture', painting: 'The artist of the painting' }
   };
 
   // Large grids show a portrait in the top-left square; the seed picks it, so a link always
@@ -24,7 +24,7 @@
     if (opts.size !== 'l') return [];
     const n = PORTRAITS.length;
     return PORTRAITS.map((_, k) => PORTRAITS[(opts.seed + k) % n]).slice(0, 8)
-      .map(p => ({ id: p.id, word: p[opts.lang], clue: LABELS[opts.lang].portrait }));
+      .map(p => ({ id: p.id, word: p[opts.lang], clue: LABELS[opts.lang][p.kind === 'painting' ? 'painting' : 'portrait'] }));
   }
   function portraitData() {
     return P && P.portrait ? PORTRAITS.find(p => p.id === P.portrait.id) || null : null;
@@ -42,7 +42,7 @@
     h.textContent = 'Picture';
     const t = document.createElement('p');
     if (solved) {
-      t.append(p.name + ' — ' + p.artist + (p.date ? ', ' + p.date : '') + '. ' + p.license + ', ');
+      t.append((p.kind === 'painting' ? p.work + ' — ' + p.name : p.name + ' — ' + p.artist) + (p.date ? ', ' + p.date : '') + '. ' + p.license + ', ');
       const a = document.createElement('a');
       a.href = p.source;
       a.target = '_blank';
@@ -50,11 +50,11 @@
       a.textContent = 'Wikimedia Commons';
       t.append(a, '.');
     } else {
-      t.textContent = 'Public-domain portrait from Wikimedia Commons. The name and the credits appear here once the puzzle is solved.';
+      t.textContent = 'Public-domain ' + (p.kind === 'painting' ? 'painting' : 'portrait') + ' from Wikimedia Commons. The ' + (p.kind === 'painting' ? 'title and the artist' : 'name') + ' and the credits appear here once the puzzle is solved.';
     }
     box.append(h, t);
     const img = gridEl.querySelector('.portrait img');
-    if (img) img.title = solved ? p.name : '';
+    if (img) img.title = solved ? (p.kind === 'painting' ? p.work + ' — ' + p.name : p.name) : '';
   }
   const SIZE_NAMES = { s: 'Small', m: 'Medium', l: 'Large' };
 
@@ -289,8 +289,10 @@
       box.className = 'portrait';
       box.style.gridArea = '1 / 1 / span ' + pic.block + ' / span ' + pic.block;
       const img = document.createElement('img');
-      img.src = portraitData().file;
-      img.alt = LABELS[P.lang].portrait; // never the name: it is an answer
+      const pd = portraitData();
+      img.src = pd.file;
+      img.alt = LABELS[P.lang][pd.kind === 'painting' ? 'painting' : 'portrait']; // never the name: it is an answer
+      if (pd.kind === 'painting') img.className = 'contain'; // show the whole painting, not a square crop
       img.draggable = false;
       box.appendChild(img);
       gridEl.appendChild(box);
@@ -414,7 +416,7 @@
         status('Solved in ' + t + '!', 'good');
         const pd = portraitData();
         el('doneText').textContent = 'You completed puzzle #' + P.seed + ' in ' + t + (revealed.size ? ' (' + revealed.size + ' letters revealed).' : '.') +
-          (pd ? ' The person in the picture is ' + pd.name + '.' : '');
+          (pd ? (pd.kind === 'painting' ? ' The painting is "' + pd.work + '" by ' + pd.name + '.' : ' The person in the picture is ' + pd.name + '.') : '');
         renderPicInfo();
         const cat = category(P.lang, P.size, level);
         let rank, mine = 0;
