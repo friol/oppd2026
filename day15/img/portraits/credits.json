@@ -1,0 +1,992 @@
+[
+ {
+  "id": "garibaldi",
+  "file": "garibaldi.jpg",
+  "commonsFile": "Giuseppe_Garibaldi_1861.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Giuseppe_Garibaldi_1861.jpg",
+  "artist": "In album: Cartes-de-visite portraits of U.S. Army officers, children, and others, p. 15, right.",
+  "date": "1861",
+  "license": "Public domain"
+ },
+ {
+  "id": "dante",
+  "file": "dante.jpg",
+  "commonsFile": "Portrait_de_Dante.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Portrait_de_Dante.jpg",
+  "artist": "Sandro Botticelli",
+  "date": "1495",
+  "license": "Public domain"
+ },
+ {
+  "id": "galileo",
+  "file": "galileo.jpg",
+  "commonsFile": "Galileo_Galilei_(1564-1642)_RMG_BHC2700.tiff",
+  "source": "https://commons.wikimedia.org/wiki/File:Galileo_Galilei_(1564-1642)_RMG_BHC2700.tiff",
+  "artist": "Justus Sustermans",
+  "date": "circa 1640date QS:P571,+1640-00-00T00:00:00Z/9,P1480,Q5727902",
+  "license": "Public domain"
+ },
+ {
+  "id": "leonardo",
+  "file": "leonardo.jpg",
+  "commonsFile": "Francesco_Melzi_-_Portrait_of_Leonardo_(colour_correction).png",
+  "source": "https://commons.wikimedia.org/wiki/File:Francesco_Melzi_-_Portrait_of_Leonardo_(colour_correction).png",
+  "artist": "Attributed to Francesco Melzi",
+  "date": "circa 1515–1517",
+  "license": "Public domain"
+ },
+ {
+  "id": "verdi",
+  "file": "verdi.jpg",
+  "commonsFile": "Giuseppe_Verdi_by_Ferdinand_Mulnier_BW.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Giuseppe_Verdi_by_Ferdinand_Mulnier_BW.jpg",
+  "artist": "Ferdinand Mulnier",
+  "date": "circa 1872date QS:P,+1872-00-00T00:00:00Z/9,P1480,Q5727902",
+  "license": "Public domain"
+ },
+ {
+  "id": "napoleone",
+  "file": "napoleone.jpg",
+  "commonsFile": "Jacques-Louis_David_-_The_Emperor_Napoleon_in_His_Study_at_the_Tuileries_-_Google_Art_Project.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Jacques-Louis_David_-_The_Emperor_Napoleon_in_His_Study_at_the_Tuileries_-_Google_Art_Project.jpg",
+  "artist": "Jacques-Louis David",
+  "date": "1812date QS:P571,+1812-00-00T00:00:00Z/9",
+  "license": "Public domain"
+ },
+ {
+  "id": "manzoni",
+  "file": "manzoni.jpg",
+  "commonsFile": "Francesco_Hayez_-_Ritratto_di_Alessandro_Manzoni.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Francesco_Hayez_-_Ritratto_di_Alessandro_Manzoni.jpg",
+  "artist": "Francesco Hayez",
+  "date": "1841",
+  "license": "Public domain"
+ },
+ {
+  "id": "volta",
+  "file": "volta.jpg",
+  "commonsFile": "Alessandro_Volta.jpeg",
+  "source": "https://commons.wikimedia.org/wiki/File:Alessandro_Volta.jpeg",
+  "artist": "",
+  "date": "",
+  "license": "Public domain"
+ },
+ {
+  "id": "mozart",
+  "file": "mozart.jpg",
+  "commonsFile": "The_Mozart_Family_-_Wolfgang_Amadeus_Mozart_headshot.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:The_Mozart_Family_-_Wolfgang_Amadeus_Mozart_headshot.jpg",
+  "artist": "Johann Nepomuk della Croce",
+  "date": "circa 1780date QS:P571,+1780-00-00T00:00:00Z/9,P1480,Q5727902",
+  "license": "Public domain"
+ },
+ {
+  "id": "cavour",
+  "file": "cavour.jpg",
+  "commonsFile": "Camillo_Benso_Cavour_di_Ciseri.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Camillo_Benso_Cavour_di_Ciseri.jpg",
+  "artist": "Antonio Ciseri",
+  "date": "1861",
+  "license": "Public domain"
+ },
+ {
+  "id": "cesare",
+  "file": "cesare.jpg",
+  "commonsFile": "Retrato_de_Julio_César_(26724093101)_(cropped).jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Retrato_de_Julio_C%C3%A9sar_(26724093101)_(cropped).jpg",
+  "artist": "Ángel M. Felicísimo from Mérida, España",
+  "date": "",
+  "license": "Public domain"
+ },
+ {
+  "id": "nerone",
+  "file": "nerone.jpg",
+  "commonsFile": "Nero_Glyptothek_Munich_321.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Nero_Glyptothek_Munich_321.jpg",
+  "artist": "",
+  "date": "",
+  "license": "Public domain"
+ },
+ {
+  "id": "virgilio",
+  "file": "virgilio.jpg",
+  "commonsFile": "Virgil_mosaic_in_the_Bardo_National_Museum_(Tunis)_(12241228546).jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Virgil_mosaic_in_the_Bardo_National_Museum_(Tunis)_(12241228546).jpg",
+  "artist": "Boyd Dwyer",
+  "date": "2014-01-26 10:10",
+  "license": "Public domain"
+ },
+ {
+  "id": "platone",
+  "file": "platone.jpg",
+  "commonsFile": "Plato_Silanion_Musei_Capitolini_MC1377.png",
+  "source": "https://commons.wikimedia.org/wiki/File:Plato_Silanion_Musei_Capitolini_MC1377.png",
+  "artist": "Marie-Lan Nguyen",
+  "date": "2009",
+  "license": "Public domain"
+ },
+ {
+  "id": "socrate",
+  "file": "socrate.jpg",
+  "commonsFile": "Socrates_Louvre.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Socrates_Louvre.jpg",
+  "artist": "Copy of Lysippos (?)",
+  "date": "1st century ADdate QS:P,+050-00-00T00:00:00Z/7",
+  "license": "Public domain"
+ },
+ {
+  "id": "cleopatra",
+  "file": "cleopatra.jpg",
+  "commonsFile": "Kleopatra-VII.-Altes-Museum-Berlin1.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Kleopatra-VII.-Altes-Museum-Berlin1.jpg",
+  "artist": "Louis le Grand",
+  "date": "40-30 v. Chr. / 40-30 BC / spätptolemäisch / late Ptolemaic dynasty",
+  "license": "Public domain"
+ },
+ {
+  "id": "annibale",
+  "file": "annibale.jpg",
+  "commonsFile": "Hannibal_Barca_bust_from_Capua_photo.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Hannibal_Barca_bust_from_Capua_photo.jpg",
+  "artist": "Fratelli Alinari",
+  "date": "circa 1900date QS:P,+1900-00-00T00:00:00Z/9,P1480,Q5727902",
+  "license": "Public domain"
+ },
+ {
+  "id": "petrarca",
+  "file": "petrarca.jpg",
+  "commonsFile": "Portrait_of_Francesco_Petrarca_(called_Petrarch)_-_French_school,_17th_century.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Portrait_of_Francesco_Petrarca_(called_Petrarch)_-_French_school,_17th_century.jpg",
+  "artist": "",
+  "date": "",
+  "license": "Public domain"
+ },
+ {
+  "id": "boccaccio",
+  "file": "boccaccio.jpg",
+  "commonsFile": "Andrea_del_Castagno_Giovanni_Boccaccio_c_1450.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Andrea_del_Castagno_Giovanni_Boccaccio_c_1450.jpg",
+  "artist": "Andrea del Castagno",
+  "date": "circa 1450date QS:P571,+1450-00-00T00:00:00Z/9,P1480,Q5727902",
+  "license": "Public domain"
+ },
+ {
+  "id": "ariosto",
+  "file": "ariosto.jpg",
+  "commonsFile": "Ludovico_Ariosto_1532.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Ludovico_Ariosto_1532.jpg",
+  "artist": "Unknown authorUnknown author",
+  "date": "1532",
+  "license": "Public domain"
+ },
+ {
+  "id": "tasso",
+  "file": "tasso.jpg",
+  "commonsFile": "Torquato_Tasso,_aged_22,_by_Jacopo_da_Ponte,_called_Jacopo_Bassano_(cropped).jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Torquato_Tasso,_aged_22,_by_Jacopo_da_Ponte,_called_Jacopo_Bassano_(cropped).jpg",
+  "artist": "Jacopo Bassano",
+  "date": "1566date QS:P571,+1566-00-00T00:00:00Z/9",
+  "license": "Public domain"
+ },
+ {
+  "id": "raffaello",
+  "file": "raffaello.jpg",
+  "commonsFile": "Raffaello_Sanzio.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Raffaello_Sanzio.jpg",
+  "artist": "Raphael",
+  "date": "between 1504 and 1506date QS:P,+1504-00-00T00:00:00Z/8,P1319,+1504-00-00T00:00:00Z/9,P1326,+1506-00-00T00:00:00Z/9",
+  "license": "Public domain"
+ },
+ {
+  "id": "tiziano",
+  "file": "tiziano.jpg",
+  "commonsFile": "Titian_-_Self-portrait_(Museo_del_Prado).jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Titian_-_Self-portrait_(Museo_del_Prado).jpg",
+  "artist": "Titian",
+  "date": "circa 1562date QS:P571,+1562-00-00T00:00:00Z/9,P1480,Q5727902",
+  "license": "Public domain"
+ },
+ {
+  "id": "bernini",
+  "file": "bernini.jpg",
+  "commonsFile": "Gian_Lorenzo_Bernini,_self-portrait,_c1623.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Gian_Lorenzo_Bernini,_self-portrait,_c1623.jpg",
+  "artist": "Gian Lorenzo Bernini",
+  "date": "1623",
+  "license": "Public domain"
+ },
+ {
+  "id": "canova",
+  "file": "canova.jpg",
+  "commonsFile": "Antonio_Canova_Selfportrait_1792.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Antonio_Canova_Selfportrait_1792.jpg",
+  "artist": "Antonio Canova",
+  "date": "1790date QS:P571,+1790-00-00T00:00:00Z/9",
+  "license": "Public domain"
+ },
+ {
+  "id": "vivaldi",
+  "file": "vivaldi.jpg",
+  "commonsFile": "Vivaldi.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Vivaldi.jpg",
+  "artist": "Unidentified painter",
+  "date": "1723date QS:P571,+1723-00-00T00:00:00Z/9",
+  "license": "Public domain"
+ },
+ {
+  "id": "rossini",
+  "file": "rossini.jpg",
+  "commonsFile": "Rossini_young-circa-1815.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Rossini_young-circa-1815.jpg",
+  "artist": "uncredited",
+  "date": "circa 1815date QS:P,+1815-00-00T00:00:00Z/9,P1480,Q5727902",
+  "license": "Public domain"
+ },
+ {
+  "id": "puccini",
+  "file": "puccini.jpg",
+  "commonsFile": "Giacomo_Puccini_LCCN2005685154_(1)_cropped.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Giacomo_Puccini_LCCN2005685154_(1)_cropped.jpg",
+  "artist": "Miscellaneous Items in High Demand, PPOC, Library of Congress",
+  "date": "1908",
+  "license": "Public domain"
+ },
+ {
+  "id": "bellini",
+  "file": "bellini.jpg",
+  "commonsFile": "Unknown_artist_-_Portrait_of_Italian_composer_Vincenzo_Bellini_(engraving_19th_century).jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Unknown_artist_-_Portrait_of_Italian_composer_Vincenzo_Bellini_(engraving_19th_century).jpg",
+  "artist": "Unknown authorUnknown author",
+  "date": "1828-01-24",
+  "license": "Public domain"
+ },
+ {
+  "id": "donizetti",
+  "file": "donizetti.jpg",
+  "commonsFile": "Francesco_Coghetti,_Ritratto_di_Gaetano_Donizetti.JPG",
+  "source": "https://commons.wikimedia.org/wiki/File:Francesco_Coghetti,_Ritratto_di_Gaetano_Donizetti.JPG",
+  "artist": "Francesco Coghetti",
+  "date": "1837date QS:P571,+1837-00-00T00:00:00Z/9",
+  "license": "Public domain"
+ },
+ {
+  "id": "paganini",
+  "file": "paganini.jpg",
+  "commonsFile": "Paganini.jpeg",
+  "source": "https://commons.wikimedia.org/wiki/File:Paganini.jpeg",
+  "artist": "John Whittle (active in Preston, early 19th century)",
+  "date": "1836date QS:P571,+1836-00-00T00:00:00Z/9",
+  "license": "Public domain"
+ },
+ {
+  "id": "polo",
+  "file": "polo.jpg",
+  "commonsFile": "Frontispice_édition_de_Nuremberg_1477_(cropped).png",
+  "source": "https://commons.wikimedia.org/wiki/File:Frontispice_%C3%A9dition_de_Nuremberg_1477_(cropped).png",
+  "artist": "Unknown authorUnknown author",
+  "date": "1477",
+  "license": "Public domain"
+ },
+ {
+  "id": "vespucci",
+  "file": "vespucci.jpg",
+  "commonsFile": "Amerigo_Vespucci_(with_turban)_-_cropped.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Amerigo_Vespucci_(with_turban)_-_cropped.jpg",
+  "artist": "Crispijn van de Passe the Elder",
+  "date": "between circa 1590 and circa 1637date QS:P571,+1500-00-00T00:00:00Z/6,P1319,+1590-00-00T00:00:00Z/9,P1326,+1637-00-00T00:00:00Z/9,P1480,Q5727902",
+  "license": "Public domain"
+ },
+ {
+  "id": "magellano",
+  "file": "magellano.jpg",
+  "commonsFile": "Ferdinand_Magellan.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Ferdinand_Magellan.jpg",
+  "artist": "Unknown authorUnknown author",
+  "date": "circa 1550-1625",
+  "license": "Public domain"
+ },
+ {
+  "id": "keplero",
+  "file": "keplero.jpg",
+  "commonsFile": "JKepler.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:JKepler.jpg",
+  "artist": "August Köhler [1]",
+  "date": "1910, cf. Steven N. Shore, Václav Pavlík, arXiv:2108.02213",
+  "license": "Public domain"
+ },
+ {
+  "id": "newton",
+  "file": "newton.jpg",
+  "commonsFile": "Portrait_of_Sir_Isaac_Newton,_1689_(brightened).jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Portrait_of_Sir_Isaac_Newton,_1689_(brightened).jpg",
+  "artist": "Godfrey Kneller",
+  "date": "1689",
+  "license": "Public domain"
+ },
+ {
+  "id": "darwin",
+  "file": "darwin.jpg",
+  "commonsFile": "Charles_Darwin_seated_crop.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Charles_Darwin_seated_crop.jpg",
+  "artist": "Charles_Darwin_seated.jpg: Henry Maull (1829–1914) and John Fox (1832–1907) (Maull &amp; Fox) [3] derivative work: Beao",
+  "date": "Believed to be 1854",
+  "license": "Public domain"
+ },
+ {
+  "id": "pasteur",
+  "file": "pasteur.jpg",
+  "commonsFile": "Louis_Pasteur,_foto_av_Paul_Nadar,_Crisco_edit.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Louis_Pasteur,_foto_av_Paul_Nadar,_Crisco_edit.jpg",
+  "artist": "Paul Nadar",
+  "date": "before 1895date QS:P,+1895-00-00T00:00:00Z/7,P1326,+1895-00-00T00:00:00Z/9",
+  "license": "Public domain"
+ },
+ {
+  "id": "curie",
+  "file": "curie.jpg",
+  "commonsFile": "Marie_Curie_c._1920s.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Marie_Curie_c._1920s.jpg",
+  "artist": "Henri Manuel",
+  "date": "circa 1920date QS:P,+1920-00-00T00:00:00Z/9,P1480,Q5727902",
+  "license": "Public domain"
+ },
+ {
+  "id": "tesla",
+  "file": "tesla.jpg",
+  "commonsFile": "Tesla_circa_1890.jpeg",
+  "source": "https://commons.wikimedia.org/wiki/File:Tesla_circa_1890.jpeg",
+  "artist": "Napoleon Sarony",
+  "date": "circa 1890date QS:P,+1890-00-00T00:00:00Z/9,P1480,Q5727902",
+  "license": "Public domain"
+ },
+ {
+  "id": "marconi",
+  "file": "marconi.jpg",
+  "commonsFile": "Guglielmo_Marconi.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Guglielmo_Marconi.jpg",
+  "artist": "Pach Brothers",
+  "date": "1908",
+  "license": "Public domain"
+ },
+ {
+  "id": "fermi",
+  "file": "fermi.jpg",
+  "commonsFile": "Enrico_Fermi_1943-49.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Enrico_Fermi_1943-49.jpg",
+  "artist": "Department of Energy-Office of Public Affairs, restored by Yann",
+  "date": "between 1943 and 1949date QS:P,+1943-00-00T00:00:00Z/8,P1319,+1943-00-00T00:00:00Z/9,P1326,+1949-00-00T00:00:00Z/9",
+  "license": "Public domain"
+ },
+ {
+  "id": "meucci",
+  "file": "meucci.jpg",
+  "commonsFile": "Antonio_Meucci.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Antonio_Meucci.jpg",
+  "artist": "Unknown authorUnknown author",
+  "date": "1878",
+  "license": "Public domain"
+ },
+ {
+  "id": "galvani",
+  "file": "galvani.jpg",
+  "commonsFile": "Luigi_Galvani,_oil-painting.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Luigi_Galvani,_oil-painting.jpg",
+  "artist": "Unidentified painter",
+  "date": "between 18th centurydate QS:P571,+1750-00-00T00:00:00Z/7 and 19th centurydate QS:P571,+1850-00-00T00:00:00Z/7",
+  "license": "Public domain"
+ },
+ {
+  "id": "avogadro",
+  "file": "avogadro.jpg",
+  "commonsFile": "Amadeo_Avogadro.png",
+  "source": "https://commons.wikimedia.org/wiki/File:Amadeo_Avogadro.png",
+  "artist": "The original uploader was Anton at German Wikipedia.",
+  "date": "before 1856date QS:P,+1856-00-00T00:00:00Z/7,P1326,+1856-00-00T00:00:00Z/9",
+  "license": "Public domain"
+ },
+ {
+  "id": "mazzini",
+  "file": "mazzini.jpg",
+  "commonsFile": "Giuseppe_Mazzini.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Giuseppe_Mazzini.jpg",
+  "artist": "Unknown authorUnknown author",
+  "date": "1860-01-01",
+  "license": "Public domain"
+ },
+ {
+  "id": "crispi",
+  "file": "crispi.jpg",
+  "commonsFile": "Francesco_Crispi_crop.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Francesco_Crispi_crop.jpg",
+  "artist": "Unknown authorUnknown author",
+  "date": "2008-04-23 15:41:41",
+  "license": "Public domain"
+ },
+ {
+  "id": "giolitti",
+  "file": "giolitti.jpg",
+  "commonsFile": "Portrait_of_Giovanni_Giolitti,_1920.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Portrait_of_Giovanni_Giolitti,_1920.jpg",
+  "artist": "Unknown authorUnknown author",
+  "date": "1920",
+  "license": "Public domain"
+ },
+ {
+  "id": "lincoln",
+  "file": "lincoln.jpg",
+  "commonsFile": "Abraham_Lincoln_O-77_matte_collodion_print.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Abraham_Lincoln_O-77_matte_collodion_print.jpg",
+  "artist": "Alexander Gardner",
+  "date": "8 November 1863date QS:P571,+1863-11-08T00:00:00Z/11",
+  "license": "Public domain"
+ },
+ {
+  "id": "jefferson",
+  "file": "jefferson.jpg",
+  "commonsFile": "Official_Presidential_portrait_of_Thomas_Jefferson_(by_Rembrandt_Peale,_1800).jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Official_Presidential_portrait_of_Thomas_Jefferson_(by_Rembrandt_Peale,_1800).jpg",
+  "artist": "Rembrandt Peale",
+  "date": "1800",
+  "license": "Public domain"
+ },
+ {
+  "id": "franklin",
+  "file": "franklin.jpg",
+  "commonsFile": "Joseph_Siffrein_Duplessis_-_Benjamin_Franklin_-_Google_Art_Project.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Joseph_Siffrein_Duplessis_-_Benjamin_Franklin_-_Google_Art_Project.jpg",
+  "artist": "Joseph-Siffred Duplessis",
+  "date": "circa 1785date QS:P571,+1785-00-00T00:00:00Z/9,P1480,Q5727902",
+  "license": "Public domain"
+ },
+ {
+  "id": "nelson",
+  "file": "nelson.jpg",
+  "commonsFile": "HoratioNelson1.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:HoratioNelson1.jpg",
+  "artist": "Lemuel Francis Abbott",
+  "date": "1799date QS:P571,+1799-00-00T00:00:00Z/9",
+  "license": "Public domain"
+ },
+ {
+  "id": "bismarck",
+  "file": "bismarck.jpg",
+  "commonsFile": "Otto_von_Bismarck_1885_(cropped).jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Otto_von_Bismarck_1885_(cropped).jpg",
+  "artist": "Unknown authorUnknown author",
+  "date": "1885",
+  "license": "Public domain"
+ },
+ {
+  "id": "lenin",
+  "file": "lenin.jpg",
+  "commonsFile": "Lenin_in_1920_(cropped).jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Lenin_in_1920_(cropped).jpg",
+  "artist": "Unknown, presumably official",
+  "date": "1920-04",
+  "license": "Public domain"
+ },
+ {
+  "id": "marx",
+  "file": "marx.jpg",
+  "commonsFile": "Karl_Marx_by_John_Jabez_Edwin_Mayall_1875_-_Restored.png",
+  "source": "https://commons.wikimedia.org/wiki/File:Karl_Marx_by_John_Jabez_Edwin_Mayall_1875_-_Restored.png",
+  "artist": "John Jabez Edwin Mayall",
+  "date": "1875date QS:P571,+1875-00-00T00:00:00Z/9",
+  "license": "Public domain"
+ },
+ {
+  "id": "engels",
+  "file": "engels.jpg",
+  "commonsFile": "Friedrich_Engels_portrait_(cropped).jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Friedrich_Engels_portrait_(cropped).jpg",
+  "artist": "William Hall (1826–ca. 1898) (cropped and sepia tone removed)",
+  "date": "1877-05",
+  "license": "Public domain"
+ },
+ {
+  "id": "freud",
+  "file": "freud.jpg",
+  "commonsFile": "Sigmund_Freud,_by_Max_Halberstadt_(cropped).jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Sigmund_Freud,_by_Max_Halberstadt_(cropped).jpg",
+  "artist": "Max Halberstadt",
+  "date": "circa 1921date QS:P,+1921-00-00T00:00:00Z/9,P1480,Q5727902",
+  "license": "Public domain"
+ },
+ {
+  "id": "nietzsche",
+  "file": "nietzsche.jpg",
+  "commonsFile": "Nietzsche187a.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Nietzsche187a.jpg",
+  "artist": "Friedrich Hermann Hartmann",
+  "date": "circa 1875date QS:P571,+1875-00-00T00:00:00Z/9,P1480,Q5727902",
+  "license": "Public domain"
+ },
+ {
+  "id": "kant",
+  "file": "kant.jpg",
+  "commonsFile": "Immanuel_Kant_-_Gemaelde_1.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Immanuel_Kant_-_Gemaelde_1.jpg",
+  "artist": "Johann Gottlieb Becker (1720-1782)",
+  "date": "1768date QS:P571,+1768-00-00T00:00:00Z/9",
+  "license": "Public domain"
+ },
+ {
+  "id": "hegel",
+  "file": "hegel.jpg",
+  "commonsFile": "Jakob_Schlesinger_-_Hegel_1831.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Jakob_Schlesinger_-_Hegel_1831.jpg",
+  "artist": "Jakob Schlesinger",
+  "date": "1831date QS:P571,+1831-00-00T00:00:00Z/9",
+  "license": "Public domain"
+ },
+ {
+  "id": "cartesio",
+  "file": "cartesio.jpg",
+  "commonsFile": "Frans_Hals_-_Portret_van_René_Descartes.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Frans_Hals_-_Portret_van_Ren%C3%A9_Descartes.jpg",
+  "artist": "After Frans Hals",
+  "date": "1649",
+  "license": "Public domain"
+ },
+ {
+  "id": "voltaire",
+  "file": "voltaire.jpg",
+  "commonsFile": "Nicolas_de_Largillière_-_Portrait_de_Voltaire_(1694-1778)_en_1718_-_P208_-_musée_Carnavalet_-_5_(cropped).jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Nicolas_de_Largilli%C3%A8re_-_Portrait_de_Voltaire_(1694-1778)_en_1718_-_P208_-_mus%C3%A9e_Carnavalet_-_5_(cropped).jpg",
+  "artist": "Nicolas de Largillière",
+  "date": "from 1718 until 1724date QS:P,+1750-00-00T00:00:00Z/7,P580,+1718-00-00T00:00:00Z/9,P582,+1724-00-00T00:00:00Z/9",
+  "license": "CC0"
+ },
+ {
+  "id": "rousseau",
+  "file": "rousseau.jpg",
+  "commonsFile": "Maurice_Quentin_de_La_Tour_-_Portrait_of_Jean-Jacques_Rousseau_-_adjusted.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Maurice_Quentin_de_La_Tour_-_Portrait_of_Jean-Jacques_Rousseau_-_adjusted.jpg",
+  "artist": "Maurice Quentin de La Tour (Life time: 1788)",
+  "date": "1753",
+  "license": "Public domain"
+ },
+ {
+  "id": "beethoven",
+  "file": "beethoven.jpg",
+  "commonsFile": "Joseph_Karl_Stieler's_Beethoven_mit_dem_Manuskript_der_Missa_solemnis.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Joseph_Karl_Stieler%27s_Beethoven_mit_dem_Manuskript_der_Missa_solemnis.jpg",
+  "artist": "Joseph Karl Stieler",
+  "date": "1820date QS:P571,+1820-00-00T00:00:00Z/9",
+  "license": "Public domain"
+ },
+ {
+  "id": "bach",
+  "file": "bach.jpg",
+  "commonsFile": "Johann_Sebastian_Bach.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Johann_Sebastian_Bach.jpg",
+  "artist": "Elias Gottlob Haussmann",
+  "date": "1748date QS:P571,+1748-00-00T00:00:00Z/9",
+  "license": "Public domain"
+ },
+ {
+  "id": "haydn",
+  "file": "haydn.jpg",
+  "commonsFile": "Joseph_Haydn.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Joseph_Haydn.jpg",
+  "artist": "Thomas Hardy",
+  "date": "1791date QS:P571,+1791-00-00T00:00:00Z/9",
+  "license": "Public domain"
+ },
+ {
+  "id": "chopin",
+  "file": "chopin.jpg",
+  "commonsFile": "Frederic_Chopin_photo.jpeg",
+  "source": "https://commons.wikimedia.org/wiki/File:Frederic_Chopin_photo.jpeg",
+  "artist": "Louis-Auguste Bisson",
+  "date": "1849",
+  "license": "Public domain"
+ },
+ {
+  "id": "liszt",
+  "file": "liszt.jpg",
+  "commonsFile": "Franz_Liszt_by_Herman_Biow-_1843.png",
+  "source": "https://commons.wikimedia.org/wiki/File:Franz_Liszt_by_Herman_Biow-_1843.png",
+  "artist": "Herman Biow",
+  "date": "1843date QS:P571,+1843-00-00T00:00:00Z/9",
+  "license": "Public domain"
+ },
+ {
+  "id": "schubert",
+  "file": "schubert.jpg",
+  "commonsFile": "Franz_Schubert_by_Wilhelm_August_Rieder_1875.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Franz_Schubert_by_Wilhelm_August_Rieder_1875.jpg",
+  "artist": "Wilhelm August Rieder",
+  "date": "1875date QS:P571,+1875-00-00T00:00:00Z/9",
+  "license": "Public domain"
+ },
+ {
+  "id": "brahms",
+  "file": "brahms.jpg",
+  "commonsFile": "JohannesBrahms_(cropped).jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:JohannesBrahms_(cropped).jpg",
+  "artist": "C. Brasch, Berlin (biography)",
+  "date": "1889",
+  "license": "Public domain"
+ },
+ {
+  "id": "wagner",
+  "file": "wagner.jpg",
+  "commonsFile": "RichardWagner.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:RichardWagner.jpg",
+  "artist": "Franz Hanfstaengl",
+  "date": "1871date QS:P571,+1871-00-00T00:00:00Z/9",
+  "license": "Public domain"
+ },
+ {
+  "id": "handel",
+  "file": "handel.jpg",
+  "commonsFile": "George_Frideric_Handel_by_Balthasar_Denner.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:George_Frideric_Handel_by_Balthasar_Denner.jpg",
+  "artist": "Attributed to Balthasar Denner",
+  "date": "between circa 1726 and circa 1728date QS:P,+1726-00-00T00:00:00Z/8,P1319,+1726-00-00T00:00:00Z/9,P1326,+1728-00-00T00:00:00Z/9,P1480,Q5727902",
+  "license": "Public domain"
+ },
+ {
+  "id": "goethe",
+  "file": "goethe.jpg",
+  "commonsFile": "Goethe_(Stieler_1828).jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Goethe_(Stieler_1828).jpg",
+  "artist": "Joseph Karl Stieler",
+  "date": "1828",
+  "license": "Public domain"
+ },
+ {
+  "id": "schiller",
+  "file": "schiller.jpg",
+  "commonsFile": "Friedrich_Schiller_by_Ludovike_Simanowiz.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Friedrich_Schiller_by_Ludovike_Simanowiz.jpg",
+  "artist": "Ludovike Simanowiz",
+  "date": "between 1793 and 1794date QS:P571,+1793-00-00T00:00:00Z/8,P1319,+1793-00-00T00:00:00Z/9,P1326,+1794-00-00T00:00:00Z/9",
+  "license": "Public domain"
+ },
+ {
+  "id": "dickens",
+  "file": "dickens.jpg",
+  "commonsFile": "Dickens_Gurney_head.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Dickens_Gurney_head.jpg",
+  "artist": "Jeremiah Gurney",
+  "date": "between 1867 and 1868date QS:P,+1867-00-00T00:00:00Z/8,P1319,+1867-00-00T00:00:00Z/9,P1326,+1868-00-00T00:00:00Z/9",
+  "license": "Public domain"
+ },
+ {
+  "id": "tolstoj",
+  "file": "tolstoj.jpg",
+  "commonsFile": "Leo_Tolstoy_1908_Portrait_(3x4_cropped).jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Leo_Tolstoy_1908_Portrait_(3x4_cropped).jpg",
+  "artist": "Sergei Prokudin-Gorskii",
+  "date": "23 May 1908date QS:P571,+1908-05-23T00:00:00Z/11",
+  "license": "Public domain"
+ },
+ {
+  "id": "balzac",
+  "file": "balzac.jpg",
+  "commonsFile": "奥·巴尔扎克.png",
+  "source": "https://commons.wikimedia.org/wiki/File:%E5%A5%A5%C2%B7%E5%B7%B4%E5%B0%94%E6%89%8E%E5%85%8B.png",
+  "artist": "Louis-Auguste Bisson",
+  "date": "1842date QS:P571,+1842-00-00T00:00:00Z/9",
+  "license": "Public domain"
+ },
+ {
+  "id": "dumas",
+  "file": "dumas.jpg",
+  "commonsFile": "Nadar_-_Alexander_Dumas_père_(1802-1870)_-_Google_Art_Project_2.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Nadar_-_Alexander_Dumas_p%C3%A8re_(1802-1870)_-_Google_Art_Project_2.jpg",
+  "artist": "Nadar",
+  "date": "1855date QS:P571,+1855-00-00T00:00:00Z/9",
+  "license": "Public domain"
+ },
+ {
+  "id": "verne",
+  "file": "verne.jpg",
+  "commonsFile": "Jules_Verne_by_Étienne_Carjat.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Jules_Verne_by_%C3%89tienne_Carjat.jpg",
+  "artist": "Étienne Carjat / Adam Cuerden",
+  "date": "Published c. 9 February 1884[4]",
+  "license": "Public domain"
+ },
+ {
+  "id": "wilde",
+  "file": "wilde.jpg",
+  "commonsFile": "Oscar_Wilde_by_Napoleon_Sarony._Three-quarter-length_photograph,_seated_(cropped).jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Oscar_Wilde_by_Napoleon_Sarony._Three-quarter-length_photograph,_seated_(cropped).jpg",
+  "artist": "Napoleon Sarony / Adam Cuerden",
+  "date": "1882",
+  "license": "Public domain"
+ },
+ {
+  "id": "twain",
+  "file": "twain.jpg",
+  "commonsFile": "Mark_Twain_by_AF_Bradley_(cropped_2).jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Mark_Twain_by_AF_Bradley_(cropped_2).jpg",
+  "artist": "A.F. Bradley, New York",
+  "date": "1907",
+  "license": "Public domain"
+ },
+ {
+  "id": "poe",
+  "file": "poe.jpg",
+  "commonsFile": "Edgar_Allan_Poe,_circa_1849,_restored,_squared_off.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Edgar_Allan_Poe,_circa_1849,_restored,_squared_off.jpg",
+  "artist": "Unknown authorUnknown author; Restored by Yann Forget and Adam Cuerden",
+  "date": "1849-06",
+  "license": "Public domain"
+ },
+ {
+  "id": "whitman",
+  "file": "whitman.jpg",
+  "commonsFile": "Walt_Whitman_-_George_Collins_Cox.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Walt_Whitman_-_George_Collins_Cox.jpg",
+  "artist": "George Collins Cox / Adam Cuerden",
+  "date": "1887",
+  "license": "Public domain"
+ },
+ {
+  "id": "byron",
+  "file": "byron.jpg",
+  "commonsFile": "Byron_1813_by_Phillips.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Byron_1813_by_Phillips.jpg",
+  "artist": "Thomas Phillips",
+  "date": "1813date QS:P571,+1813-00-00T00:00:00Z/9",
+  "license": "Public domain"
+ },
+ {
+  "id": "keats",
+  "file": "keats.jpg",
+  "commonsFile": "John_Keats_by_William_Hilton_circa_1822_02.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:John_Keats_by_William_Hilton_circa_1822_02.jpg",
+  "artist": "William Hilton",
+  "date": "circa 1822date QS:P571,+1822-00-00T00:00:00Z/9,P1480,Q5727902",
+  "license": "Public domain"
+ },
+ {
+  "id": "shelley",
+  "file": "shelley.jpg",
+  "commonsFile": "Percy_Bysshe_Shelley_by_Alfred_Clint.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Percy_Bysshe_Shelley_by_Alfred_Clint.jpg",
+  "artist": "After Amelia Curran",
+  "date": "Original in 1819",
+  "license": "Public domain"
+ },
+ {
+  "id": "cervantes",
+  "file": "cervantes.jpg",
+  "commonsFile": "Cervantes_Jáuregui.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Cervantes_J%C3%A1uregui.jpg",
+  "artist": "Attributed to Juan de Jáuregui",
+  "date": "circa 1600date QS:P571,+1600-00-00T00:00:00Z/9,P1480,Q5727902",
+  "license": "Public domain"
+ },
+ {
+  "id": "rembrandt",
+  "file": "rembrandt.jpg",
+  "commonsFile": "Rembrandt_van_Rijn_-_Self-Portrait_-_Google_Art_Project.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Rembrandt_van_Rijn_-_Self-Portrait_-_Google_Art_Project.jpg",
+  "artist": "Rembrandt",
+  "date": "1659date QS:P571,+1659-00-00T00:00:00Z/9",
+  "license": "Public domain"
+ },
+ {
+  "id": "goya",
+  "file": "goya.jpg",
+  "commonsFile": "Vicente_López_Portaña_-_el_pintor_Francisco_de_Goya.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Vicente_L%C3%B3pez_Porta%C3%B1a_-_el_pintor_Francisco_de_Goya.jpg",
+  "artist": "Vicente López Portaña",
+  "date": "1826",
+  "license": "Public domain"
+ },
+ {
+  "id": "monet",
+  "file": "monet.jpg",
+  "commonsFile": "Claude_Monet_1899_Nadar_crop.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Claude_Monet_1899_Nadar_crop.jpg",
+  "artist": "Nadar",
+  "date": "1899",
+  "license": "Public domain"
+ },
+ {
+  "id": "manet",
+  "file": "manet.jpg",
+  "commonsFile": "Édouard_Manet,_en_buste,_de_face_-_Nadar.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:%C3%89douard_Manet,_en_buste,_de_face_-_Nadar.jpg",
+  "artist": "Nadar / Adam Cuerden",
+  "date": "before 1870date QS:P,+1870-00-00T00:00:00Z/7,P1326,+1870-00-00T00:00:00Z/9",
+  "license": "Public domain"
+ },
+ {
+  "id": "renoir",
+  "file": "renoir.jpg",
+  "commonsFile": "Pierre_Auguste_Renoir,_uncropped_image.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Pierre_Auguste_Renoir,_uncropped_image.jpg",
+  "artist": "UnknownUnknown Musée d'Orsay, Dist. RMN-Grand Palais / Patrice Schmidt",
+  "date": "circa 1875date QS:P,+1875-00-00T00:00:00Z/9,P1480,Q5727902",
+  "license": "Public domain"
+ },
+ {
+  "id": "cezanne",
+  "file": "cezanne.jpg",
+  "commonsFile": "Paul-Cezanne.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Paul-Cezanne.jpg",
+  "artist": "Unknown; Cézanne was born in 1839 and died in 1906",
+  "date": "1899-09-12",
+  "license": "Public domain"
+ },
+ {
+  "id": "vangogh",
+  "file": "vangogh.jpg",
+  "commonsFile": "Vincent_van_Gogh_-_Self-Portrait_-_Google_Art_Project_(454045).jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Vincent_van_Gogh_-_Self-Portrait_-_Google_Art_Project_(454045).jpg",
+  "artist": "Vincent van Gogh",
+  "date": "1887",
+  "license": "Public domain"
+ },
+ {
+  "id": "klimt",
+  "file": "klimt.jpg",
+  "commonsFile": "Klimt.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Klimt.jpg",
+  "artist": "Josef Anton Trčka",
+  "date": "1914",
+  "license": "Public domain"
+ },
+ {
+  "id": "durer",
+  "file": "durer.jpg",
+  "commonsFile": "Dürer_Alte_Pinakothek.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:D%C3%BCrer_Alte_Pinakothek.jpg",
+  "artist": "Albrecht Dürer",
+  "date": "1500",
+  "license": "Public domain"
+ },
+ {
+  "id": "holbein",
+  "file": "holbein.jpg",
+  "commonsFile": "Hans_Holbein_the_Younger,_self-portrait.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Hans_Holbein_the_Younger,_self-portrait.jpg",
+  "artist": "Hans Holbein the Younger",
+  "date": "between circa 1542 and circa 1543date QS:P,+1542-00-00T00:00:00Z/8,P1319,+1542-00-00T00:00:00Z/9,P1326,+1543-00-00T00:00:00Z/9,P1480,Q5727902",
+  "license": "Public domain"
+ },
+ {
+  "id": "velazquez",
+  "file": "velazquez.jpg",
+  "commonsFile": "Diego_Velázquez_Autorretrato_45_x_38_cm_-_Colección_Real_Academia_de_Bellas_Artes_de_San_Carlos_-_Museo_de_Bellas_Artes_de_Valencia.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Diego_Vel%C3%A1zquez_Autorretrato_45_x_38_cm_-_Colecci%C3%B3n_Real_Academia_de_Bellas_Artes_de_San_Carlos_-_Museo_de_Bellas_Artes_de_Valencia.jpg",
+  "artist": "Diego Velázquez",
+  "date": "circa 1650date QS:P571,+1650-00-00T00:00:00Z/9,P1480,Q5727902",
+  "license": "Public domain"
+ },
+ {
+  "id": "leopardi",
+  "file": "leopardi.jpg",
+  "commonsFile": "Giacomo_Leopardi_Ferrazzi_2.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Giacomo_Leopardi_Ferrazzi_2.jpg",
+  "artist": "Stanislao Ferrazzi",
+  "date": "1897",
+  "license": "Public domain"
+ },
+ {
+  "id": "foscolo",
+  "file": "foscolo.jpg",
+  "commonsFile": "Ugo_Foscolo.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Ugo_Foscolo.jpg",
+  "artist": "François-Xavier Fabre",
+  "date": "1813date QS:P571,+1813-00-00T00:00:00Z/9",
+  "license": "Public domain"
+ },
+ {
+  "id": "carducci",
+  "file": "carducci.jpg",
+  "commonsFile": "Giosuè_Carducci2.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Giosu%C3%A8_Carducci2.jpg",
+  "artist": "R. Borghi",
+  "date": "circa 1900date QS:P,+1900-00-00T00:00:00Z/9,P1480,Q5727902",
+  "license": "Public domain"
+ },
+ {
+  "id": "pascoli",
+  "file": "pascoli.jpg",
+  "commonsFile": "Giovanni_Pascoli_01.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Giovanni_Pascoli_01.jpg",
+  "artist": "Unknown authorUnknown author",
+  "date": "1914",
+  "license": "Public domain"
+ },
+ {
+  "id": "verga",
+  "file": "verga.jpg",
+  "commonsFile": "Portrait_of_Giovanni_Verga.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Portrait_of_Giovanni_Verga.jpg",
+  "artist": "not stated",
+  "date": "no later than 1920",
+  "license": "Public domain"
+ },
+ {
+  "id": "collodi",
+  "file": "collodi.jpg",
+  "commonsFile": "Carlo_Collodi.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Carlo_Collodi.jpg",
+  "artist": "Unknown authorUnknown author",
+  "date": "1890-11-02",
+  "license": "Public domain"
+ },
+ {
+  "id": "alfieri",
+  "file": "alfieri.jpg",
+  "commonsFile": "VAlfieriFabre.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:VAlfieriFabre.jpg",
+  "artist": "François-Xavier Fabre",
+  "date": "1794date QS:P571,+1794-00-00T00:00:00Z/9",
+  "license": "Public domain"
+ },
+ {
+  "id": "parini",
+  "file": "parini.jpg",
+  "commonsFile": "Portret_van_dichter_Giuseppe_Parini,_RP-P-1909-5262_(cropped).jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Portret_van_dichter_Giuseppe_Parini,_RP-P-1909-5262_(cropped).jpg",
+  "artist": "Rijksmuseum",
+  "date": "between 1772 and 1841date QS:P,+1500-00-00T00:00:00Z/6,P1319,+1772-00-00T00:00:00Z/9,P1326,+1841-00-00T00:00:00Z/9",
+  "license": "CC0"
+ },
+ {
+  "id": "vico",
+  "file": "vico.jpg",
+  "commonsFile": "GiambattistaVico.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:GiambattistaVico.jpg",
+  "artist": "Francesco Solimena",
+  "date": "18th centurydate QS:P571,+1750-00-00T00:00:00Z/7",
+  "license": "Public domain"
+ },
+ {
+  "id": "caruso",
+  "file": "caruso.jpg",
+  "commonsFile": "Postcard_of_Enrico_Caruso,_ca._1910.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Postcard_of_Enrico_Caruso,_ca._1910.jpg",
+  "artist": "Unknown photographer",
+  "date": "circa 1910date QS:P,+1910-00-00T00:00:00Z/9,P1480,Q5727902",
+  "license": "Public domain"
+ },
+ {
+  "id": "pellico",
+  "file": "pellico.jpg",
+  "commonsFile": "Contemporary_portrait_of_Silvio_Pellico.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Contemporary_portrait_of_Silvio_Pellico.jpg",
+  "artist": "Unknown authorUnknown author",
+  "date": "1850sdate QS:P,+1850-00-00T00:00:00Z/8",
+  "license": "Public domain"
+ },
+ {
+  "id": "nievo",
+  "file": "nievo.jpg",
+  "commonsFile": "Ippolito_Nievo_1860.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Ippolito_Nievo_1860.jpg",
+  "artist": "Unknown authorUnknown author",
+  "date": "1860",
+  "license": "Public domain"
+ }
+]

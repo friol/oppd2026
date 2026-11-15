@@ -7,14 +7,16 @@
   const SIZES = {
     s: { rows: 7, cols: 11, d0: 0.13, dMax: 0.24, maxLen: 9 },
     m: { rows: 10, cols: 15, d0: 0.14, dMax: 0.24, maxLen: 9 },
-    l: { rows: 12, cols: 17, d0: 0.17, dMax: 0.25, maxLen: 9 }
+    l: { rows: 12, cols: 17, d0: 0.17, dMax: 0.25, maxLen: 9, block: 6 }
   };
+  // block: side of the top-left square that holds the portrait (only when a portrait is given).
   // Extra initial black share per language (a smaller or less flexible word list needs more blacks;
   // starting closer to the density that usually works avoids wasting attempts).
   const LANG_D0 = { it: 0, en: 0.015 };
   const PER = 40;     // patterns tried at each density
   const BUDGET = 300; // search nodes per pattern
   const TRY = 8;      // candidate words tried per slot
+  const MAX_PORTRAITS = 8; // portrait candidates tried before giving up
 
   function mulberry32(seed) {
     return function () {
@@ -113,9 +115,11 @@
   }
 
   // Random black-cell pattern: black cells never touch each other orthogonally, no run is longer
-  // than maxLen, and every letter belongs to at least one run of 2+ letters.
-  function makePattern(R, C, maxLen, density, rng) {
+  // than maxLen, and every letter belongs to at least one run of 2+ letters. With block > 0 the
+  // top-left block × block square is black too (the picture); the density counts only the other cells.
+  function makePattern(R, C, maxLen, density, rng, block = 0) {
     const B = new Uint8Array(R * C);
+    for (let r = 0; r < block; r++) for (let c = 0; c < block; c++) B[r * C + c] = 1;
     const free = k => {
       const r = (k / C) | 0, c = k % C;
       return !B[k] && !(c > 0 && B[k - 1]) && !(c < C - 1 && B[k + 1]) && !(r > 0 && B[k - C]) && !(r < R - 1 && B[k + C]);
@@ -144,9 +148,9 @@
       if (!opts.length) return null;
       B[opts[Math.floor(rng() * opts.length)]] = 1;
     }
-    let count = 0;
+    let count = -block * block;
     for (const b of B) count += b;
-    for (let tries = 0; count < R * C * density && tries < 3000; tries++) {
+    for (let tries = 0; count < (R * C - block * block) * density && tries < 3000; tries++) {
       const k = Math.floor(rng() * R * C);
       if (free(k)) { B[k] = 1; count++; }
     }
@@ -184,7 +188,7 @@
   // Fills the slots with dictionary words. Each slot keeps a bitset domain of candidate words;
   // after every choice the allowed letters of shared cells are propagated to the crossing slots
   // (arc consistency), then the slot with the fewest candidates is filled next.
-  function fill(S, idx, rng) {
+  function fill(S, idx, rng, fixed) {
     const n = S.length;
     if (S.some(s => !idx[s.cells.length])) return null;
     const cross = S.map(() => []);
@@ -321,6 +325,15 @@
       return false;
     }
 
+    // A word fixed in advance (the portrait's answer): only that word in its slot, and nowhere else.
+    if (fixed) {
+      const x = ix[fixed.slot];
+      const j = x.ws.indexOf(fixed.word);
+      if (j < 0) return null;
+      for (let i = 0; i < n; i++) if (ix[i] === x) dom[i][j >>> 5] &= ~(1 << (j & 31));
+      dom[fixed.slot].fill(0);
+      dom[fixed.slot][j >>> 5] = 1 << (j & 31);
+    }
     if (!propagate(dom, S.map((_, i) => i))) return null;
     return rec(n) ? assigned : null;
   }
@@ -412,6 +425,13 @@
     }
     if (runs.length !== p.entries.length) err(p.entries.length + ' entries but ' + runs.length + ' words in the grid');
 
+    // The picture square must be all black, and the person's name must be in the grid with its clue.
+    const pic = p.portrait;
+    if (pic) {
+      for (let r = 0; r < pic.block; r++) for (let c = 0; c < pic.block; c++) if (p.solution[r][c] !== '#') err('The picture square has a letter at ' + r + ',' + c);
+      if (!p.entries.some(e => e.answer === pic.word && e.clue === pic.clue)) err(pic.word + ' (the person in the picture) is not in the grid');
+    }
+
     // Every letter cell must belong to at least one clued word.
     const covered = new Set();
     for (const run of runs) {
@@ -439,7 +459,8 @@
         words: runs.length,
         letters,
         crossed,
-        blacks: p.rows * p.cols - letters,
+        blacks: p.rows * p.cols - letters - (pic ? pic.block * pic.block : 0),
+        picture: pic ? pic.block * pic.block : 0,
         numbered: Math.max(0, ...numbers)
       }
     };
@@ -449,24 +470,60 @@
 
   // Builds a verified puzzle. The seed fully determines the result (budgets are counted in search
   // steps, not time). A candidate that fails verification is discarded and the search goes on.
+  // opts: { dict, lang, size, seed, portrait? }. portrait = { id, word, clue }: on sizes with a
+  // `block`, the top-left block × block square holds the picture and `word` (the person's name, not
+  // necessarily in the dictionary) is placed in a slot of its length with `clue` as its clue, in place
+  // of any dictionary clue of that word.
+  // opts.portraits = [candidate, ...] is tried in order (at most MAX_PORTRAITS): a name whose letters
+  // fit no grid is skipped and the next person is used, deterministically, so a link always gives the
+  // same puzzle. opts.portrait = one candidate.
   function generate(opts) {
     const cfg = SIZES[opts.size] || SIZES.m;
-    if (!indexCache.has(opts.dict)) indexCache.set(opts.dict, buildIndex(opts.dict));
-    const idx = indexCache.get(opts.dict);
+    const list = cfg.block ? (opts.portraits || (opts.portrait ? [opts.portrait] : [])).slice(0, MAX_PORTRAITS) : [];
+    let res = null;
+    for (const pic of list.length ? list : [null]) {
+      res = generateOne(Object.assign({}, opts, { portrait: pic }));
+      if (res.ok) return res;
+    }
+    return res;
+  }
+
+  function generateOne(opts) {
+    const cfg = SIZES[opts.size] || SIZES.m;
+    const pic = cfg.block && opts.portrait && opts.portrait.word.length <= cfg.maxLen ? opts.portrait : null;
+    const block = pic ? cfg.block : 0;
+    let dict = opts.dict;
+    if (!indexCache.has(opts.dict)) indexCache.set(opts.dict, { idx: buildIndex(opts.dict), withWord: new Map() });
+    const cache = indexCache.get(opts.dict);
+    let idx = cache.idx;
+    if (pic) {
+      dict = new Map(opts.dict);
+      dict.set(pic.word, pic.clue);
+      const k = pic.word + '|' + pic.clue;
+      if (!cache.withWord.has(k)) cache.withWord.set(k, { dict, idx: buildIndex(dict) });
+      ({ dict, idx } = cache.withWord.get(k));
+    }
     const rng = mulberry32(opts.seed * 7919 + 17);
     const t0 = Date.now();
     const rejected = [];
     let patterns = 0;
     for (let d = cfg.d0 + (LANG_D0[opts.lang] || 0); d <= cfg.dMax + 1e-9; d += 0.01) {
       for (let t = 0; t < PER; t++) {
-        const B = makePattern(cfg.rows, cfg.cols, cfg.maxLen, d, rng);
+        const B = makePattern(cfg.rows, cfg.cols, cfg.maxLen, d, rng, block);
         if (!B) continue;
         patterns++;
         const S = findSlots(B, cfg.rows, cfg.cols);
-        const words = fill(S, idx, rng);
+        let fixed = null;
+        if (pic) {
+          const fits = S.map((s, i) => i).filter(i => S[i].cells.length === pic.word.length);
+          if (!fits.length) continue;
+          fixed = { slot: fits[Math.floor(rng() * fits.length)], word: pic.word };
+        }
+        const words = fill(S, idx, rng, fixed);
         if (!words) continue;
-        const puzzle = buildPuzzle(cfg.rows, cfg.cols, B, S, words, opts.dict, opts.lang, opts.size, opts.seed);
-        const report = verify(puzzle, opts.dict);
+        const puzzle = buildPuzzle(cfg.rows, cfg.cols, B, S, words, dict, opts.lang, opts.size, opts.seed);
+        if (pic) puzzle.portrait = { id: pic.id, block, word: pic.word, clue: pic.clue };
+        const report = verify(puzzle, dict);
         if (report.ok) {
           report.patterns = patterns;
           report.rejected = rejected;

@@ -11,9 +11,51 @@
   }
   const LEVEL_NAMES = { e: 'Easy', h: 'Hard' };
   const LABELS = {
-    it: { across: 'Orizzontali', down: 'Verticali', name: 'Italiano' },
-    en: { across: 'Across', down: 'Down', name: 'English' }
+    it: { across: 'Orizzontali', down: 'Verticali', name: 'Italiano', portrait: 'Il personaggio nella foto' },
+    en: { across: 'Across', down: 'Down', name: 'English', portrait: 'The person in the picture' }
   };
+
+  // Large grids show a portrait in the top-left square; the seed picks it, so a link always
+  // reopens the same person. The answer is the person's name, clued as "the person in the picture".
+  const PORTRAITS = window.PORTRAITS || [];
+  // The candidates start at the one the seed picks and go on in list order: the generator uses the
+  // first whose name fits a grid.
+  function portraitsFor(opts) {
+    if (opts.size !== 'l') return [];
+    const n = PORTRAITS.length;
+    return PORTRAITS.map((_, k) => PORTRAITS[(opts.seed + k) % n]).slice(0, 8)
+      .map(p => ({ id: p.id, word: p[opts.lang], clue: LABELS[opts.lang].portrait }));
+  }
+  function portraitData() {
+    return P && P.portrait ? PORTRAITS.find(p => p.id === P.portrait.id) || null : null;
+  }
+
+  // Picture credits in the info dialog. The name and the file link would give the answer away,
+  // so they appear only once the puzzle is solved.
+  function renderPicInfo() {
+    const box = el('picInfo');
+    const p = portraitData();
+    box.hidden = !p;
+    if (!p) return;
+    box.textContent = '';
+    const h = document.createElement('h3');
+    h.textContent = 'Picture';
+    const t = document.createElement('p');
+    if (solved) {
+      t.append(p.name + ' — ' + p.artist + (p.date ? ', ' + p.date : '') + '. ' + p.license + ', ');
+      const a = document.createElement('a');
+      a.href = p.source;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.textContent = 'Wikimedia Commons';
+      t.append(a, '.');
+    } else {
+      t.textContent = 'Public-domain portrait from Wikimedia Commons. The name and the credits appear here once the puzzle is solved.';
+    }
+    box.append(h, t);
+    const img = gridEl.querySelector('.portrait img');
+    if (img) img.title = solved ? p.name : '';
+  }
   const SIZE_NAMES = { s: 'Small', m: 'Medium', l: 'Large' };
 
   const el = id => document.getElementById(id);
@@ -30,9 +72,12 @@
   }
 
   // Generation runs in a worker when possible (not available from file://), else on this thread.
+  // The worker gets the same version query as this script (index.html: "?v=…"), and passes it on to
+  // the scripts it imports, so a new version never runs with a stale cached generator.
+  const VERSION = (document.currentScript && new URL(document.currentScript.src).search) || '';
   let worker = null, reqId = 0, pending = null;
   try {
-    worker = new Worker('js/worker.js');
+    worker = new Worker('js/worker.js' + VERSION);
     worker.onmessage = e => {
       if (pending && e.data.id === pending.id) { const cb = pending.cb; pending = null; cb(e.data.res); }
     };
@@ -45,13 +90,15 @@
   }
 
   function runLocal(opts, cb) {
-    setTimeout(() => cb(C.generate({ dict: dict(opts.lang, opts.level), lang: opts.lang, size: opts.size, seed: opts.seed })), 30);
+    setTimeout(() => cb(C.generate({ dict: dict(opts.lang, opts.level), lang: opts.lang, size: opts.size, seed: opts.seed, portraits: portraitsFor(opts) })), 30);
   }
 
   function runGenerate(opts, cb) {
     if (!worker) { runLocal(opts, cb); return; }
-    pending = { id: ++reqId, opts, cb };
-    worker.postMessage({ id: pending.id, lang: opts.lang, level: opts.level, size: opts.size, seed: opts.seed });
+    const want = portraitsFor(opts).length > 0;
+    // A worker running an older generator would ignore the portrait: build the puzzle here then.
+    pending = { id: ++reqId, opts, cb: res => (want && res.ok && !res.puzzle.portrait ? runLocal(opts, cb) : cb(res)) };
+    worker.postMessage({ id: pending.id, lang: opts.lang, level: opts.level, size: opts.size, seed: opts.seed, portraits: portraitsFor(opts) });
   }
 
   let P = null;          // current puzzle
@@ -193,6 +240,7 @@
     buildGrid();
     buildClues();
     renderReport(report);
+    renderPicInfo();
 
     const first = order[0];
     dir = first.dir;
@@ -215,7 +263,8 @@
       'Every answer equals the letters the grid spells at that position and direction',
       'Every clue is the dictionary definition of its answer, and no answer and no clue is repeated',
       'Every letter belongs to at least one clued word; ' + Math.round(100 * s.crossed / s.letters) + '% of the letters are crossed both ways',
-      s.blacks + ' black cells (' + Math.round(100 * s.blacks / cells) + '% of the grid)',
+      s.blacks + ' black cells (' + Math.round(100 * s.blacks / cells) + '% of the grid' + (s.picture ? ' outside the picture' : '') + ')',
+      ...(s.picture ? ['The picture covers ' + s.picture + ' cells, and the person in it is one of the answers'] : []),
       r.patterns + ' black-cell patterns tried in ' + r.ms + ' ms' + (r.rejected.length ? ', ' + r.rejected.length + ' candidate(s) rejected' : '')
     ];
     const ul = d.querySelector('ul');
@@ -233,7 +282,22 @@
     gridEl.setAttribute('aria-rowcount', P.rows);
     gridEl.setAttribute('aria-colcount', P.cols);
     cells = [];
+    const pic = P.portrait;
+    if (pic) {
+      // One element over the whole square: the other cells flow around it in the CSS grid.
+      const box = document.createElement('div');
+      box.className = 'portrait';
+      box.style.gridArea = '1 / 1 / span ' + pic.block + ' / span ' + pic.block;
+      const img = document.createElement('img');
+      img.src = portraitData().file;
+      img.alt = LABELS[P.lang].portrait; // never the name: it is an answer
+      img.draggable = false;
+      box.appendChild(img);
+      gridEl.appendChild(box);
+    }
+    const inPic = i => pic && Math.floor(i / P.cols) < pic.block && i % P.cols < pic.block;
     for (let i = 0; i < sol.length; i++) {
+      if (inPic(i)) { cells.push(null); continue; }
       const d = document.createElement('div');
       if (!sol[i]) {
         d.className = 'cell block';
@@ -348,7 +412,10 @@
         solved = true;
         const t = fmt(elapsed);
         status('Solved in ' + t + '!', 'good');
-        el('doneText').textContent = 'You completed puzzle #' + P.seed + ' in ' + t + (revealed.size ? ' (' + revealed.size + ' letters revealed).' : '.');
+        const pd = portraitData();
+        el('doneText').textContent = 'You completed puzzle #' + P.seed + ' in ' + t + (revealed.size ? ' (' + revealed.size + ' letters revealed).' : '.') +
+          (pd ? ' The person in the picture is ' + pd.name + '.' : '');
+        renderPicInfo();
         const cat = category(P.lang, P.size, level);
         let rank, mine = 0;
         if (helped) rank = 'Letters were revealed in this puzzle: the time does not count for the best times.';
@@ -589,6 +656,18 @@
 
   // ---- events ----
   gridEl.addEventListener('pointerdown', ev => {
+    // A click on the picture selects the entry of the person in it (first empty cell, as for a clue click).
+    if (P && P.portrait && ev.target.closest('.portrait')) {
+      const e = P.entries.find(x => x.answer === P.portrait.word && x.clue === P.portrait.clue);
+      if (e) {
+        ev.preventDefault();
+        dir = e.dir;
+        cur = e.cells.find(i => !user[i]) ?? e.cells[0];
+        update();
+        focusKb();
+      }
+      return;
+    }
     const d = ev.target.closest('.cell');
     if (!d || d.classList.contains('block')) return;
     ev.preventDefault();
