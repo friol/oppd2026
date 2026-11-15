@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cruciverba</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%231b1a17'/%3E%3Crect x='1' y='1' width='6' height='6' fill='%23fff'/%3E%3Crect x='9' y='9' width='6' height='6' fill='%23fff'/%3E%3Crect x='9' y='1' width='6' height='6' fill='%23c8102e'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="masthead">
+  <div class="brand">
+    <h1>Cruciverba</h1>
+    <p class="tag" id="meta">Crossword generator</p>
+  </div>
+  <div class="controls">
+    <label>Language
+      <select id="lang">
+        <option value="it">Italiano</option>
+        <option value="en">English</option>
+      </select>
+    </label>
+    <label>Size
+      <select id="size">
+        <option value="s">Small (11×7)</option>
+        <option value="m">Medium (15×10)</option>
+        <option value="l">Large (17×12)</option>
+      </select>
+    </label>
+    <label>Level
+      <select id="level">
+        <option value="e">Easy</option>
+        <option value="h">Hard</option>
+      </select>
+    </label>
+    <button id="music" aria-pressed="true">♪ Music</button>
+    <button id="info" class="info" title="How to play and puzzle verification" aria-label="Information">i</button>
+    <button id="new" class="primary">New puzzle</button>
+  </div>
+</header>
+
+<main>
+  <section class="board">
+    <div class="clue-bar" id="clueBar"><span class="cb-num"></span><span class="cb-text"></span></div>
+    <div class="grid-wrap" id="gridWrap">
+      <div id="grid" class="grid" role="grid" aria-label="Crossword grid"></div>
+      <input id="kb" class="kb" type="text" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" aria-label="Type a letter">
+    </div>
+    <div class="toolbar">
+      <span id="timer" class="timer">00:00</span>
+      <button id="undo" title="Undo (Ctrl+Z; Ctrl+Y to redo)">Undo</button>
+      <button id="check">Check</button>
+      <button id="revealLetter">Reveal letter</button>
+      <button id="revealWord">Reveal word</button>
+      <button id="revealAll">Reveal all</button>
+      <button id="clear">Clear</button>
+      <button id="best">Best times</button>
+    </div>
+    <p id="status" class="status" aria-live="polite"></p>
+  </section>
+
+  <section class="clues">
+    <div class="clue-col"><h2 id="hAcross">Across</h2><ol id="across"></ol></div>
+    <div class="clue-col"><h2 id="hDown">Down</h2><ol id="down"></ol></div>
+  </section>
+</main>
+
+<dialog id="infoDlg">
+  <h2>How to play</h2>
+  <p class="help">Click a cell or a clue, then type. Arrows move, Space or a second click switches direction, Tab / Enter jumps to the next clue, Backspace deletes, Ctrl+Z undoes.</p>
+  <div id="verify">
+    <h3 class="verify-title"></h3>
+    <ul></ul>
+  </div>
+  <div class="dlg-actions">
+    <button id="infoClose" autofocus>Close</button>
+  </div>
+</dialog>
+
+<div id="busy" class="busy" hidden><div><span class="spinner"></span>Building and verifying the puzzle…</div></div>
+
+<dialog id="done">
+  <h2>Solved!</h2>
+  <p id="doneText"></p>
+  <p id="doneRank" class="rank"></p>
+  <div id="doneScores" class="scores"></div>
+  <div class="dlg-actions">
+    <button id="doneClose">Close</button>
+    <button id="doneNew" class="primary" autofocus>New puzzle</button>
+  </div>
+</dialog>
+
+<dialog id="scoresDlg">
+  <h2>Best times</h2>
+  <div id="scoresBody" class="scores"></div>
+  <p class="note">Only the first solution of a puzzle counts, and only if no letter was revealed. Click a puzzle number to play it again.</p>
+  <div class="dlg-actions">
+    <button id="scoresClose" autofocus>Close</button>
+  </div>
+</dialog>
+
+<script src="js/dict-it.js"></script>
+<script src="js/dict-it-hard.js"></script>
+<script src="js/dict-en.js"></script>
+<script src="js/generator.js"></script>
+<script src="js/main.js"></script>
+<script src="js/music.js"></script>
+</body>
+</html>
