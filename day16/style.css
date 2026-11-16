@@ -1,0 +1,12 @@
+:root { color-scheme: dark; }
+html, body { margin: 0; height: 100%; background: #02030a; overflow: hidden; }
+body { display: flex; align-items: center; justify-content: center; }
+canvas {
+  height: min(100vh, 150vw);
+  aspect-ratio: 2 / 3;
+  background: #050818;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  outline: none;
+}
