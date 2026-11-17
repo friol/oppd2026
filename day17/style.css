@@ -1,0 +1,159 @@
+/* Retro green-phosphor terminal */
+:root {
+  --bg: #020a04;
+  --fg: #39ff7a;
+  --dim: #1f9e4a;
+  --bright: #b6ffcf;
+  --warn: #ffd23f;
+  --sms: #7fe3ff;
+  --glow: 0 0 2px rgba(57, 255, 122, .9), 0 0 8px rgba(57, 255, 122, .45);
+  --font: "Lucida Console", "Consolas", "DejaVu Sans Mono", "Courier New", monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: radial-gradient(ellipse at center, #062512 0%, var(--bg) 75%) fixed, var(--bg);
+  color: var(--fg);
+  font-family: var(--font);
+  text-shadow: var(--glow);
+  overflow: hidden;
+}
+[hidden] { display: none !important; }
+
+/* CRT overlay: scanlines, vignette, slow flicker */
+.crt {
+  position: fixed; inset: 0; pointer-events: none; z-index: 10;
+  background:
+    repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0) 0, rgba(0, 0, 0, 0) 2px, rgba(0, 0, 0, .28) 3px),
+    radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 58%, rgba(0, 0, 0, .62) 100%);
+  animation: flicker 6s infinite steps(1);
+}
+@keyframes flicker { 0%, 100% { opacity: 1; } 47% { opacity: .93; } 48% { opacity: 1; } 83% { opacity: .96; } }
+
+.screen { position: fixed; inset: 0; }
+
+/* Title screen */
+#title {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; padding: 16px; cursor: pointer; text-align: center;
+}
+#title img {
+  width: min(900px, 94vw); height: auto; max-height: 62vh; object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 0 14px rgba(57, 255, 122, .25));
+  animation: float 4s ease-in-out infinite;
+}
+@keyframes float { 50% { transform: translateY(-6px); } }
+.melt {
+  position: fixed; z-index: 4; pointer-events: none;
+  filter: drop-shadow(0 0 14px rgba(57, 255, 122, .25));
+}
+#title p { transition: opacity .35s; }
+#title.melting p { opacity: 0; }
+#title.melting { cursor: default; }
+.press { font-size: clamp(16px, 3vw, 24px); letter-spacing: .2em; margin: 6px 0 0; }
+.sub { margin: 0; font-size: clamp(12px, 1.8vw, 15px); }
+.dim { color: var(--dim); }
+.blink { animation: blink 1.1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* Game screen */
+#game {
+  display: flex; flex-direction: column;
+  max-width: 1000px; margin: 0 auto; padding: 10px 16px 6px;
+  height: 100vh; height: 100dvh;
+}
+#top { flex: none; border-bottom: 1px solid var(--dim); padding-bottom: 6px; }
+#art {
+  margin: 0 auto; width: max-content; max-width: 100%;
+  font-family: var(--font);
+  font-size: clamp(6px, calc((100vw - 32px) / 39), 15px);
+  line-height: 1.15;
+  white-space: pre; overflow: hidden;
+  color: var(--fg);
+  min-height: calc(11 * 1.15em);
+  transition: opacity .3s;
+}
+#art.night { color: #23b555; }
+#art .lit { color: #ffcf4a; text-shadow: 0 0 6px rgba(255, 190, 60, .8); }
+#art .moon { color: #eafff0; text-shadow: 0 0 10px rgba(220, 255, 230, .9); }
+#art .star { color: var(--bright); }
+#art .tw { animation: twinkle 2.6s infinite; }
+@keyframes twinkle { 0%, 100% { opacity: 1; } 50% { opacity: .2; } }
+#status {
+  margin-top: 6px; padding: 3px 8px;
+  background: var(--fg); color: var(--bg); text-shadow: none;
+  font-size: clamp(11px, 1.7vw, 14px); font-weight: bold;
+  display: flex; flex-wrap: wrap; gap: 4px 18px; justify-content: space-between;
+}
+
+.musicbtn {
+  font: inherit; font-weight: bold; color: var(--bg); background: transparent;
+  border: 1px solid var(--bg); padding: 0 6px; cursor: pointer; text-shadow: none;
+}
+.musicbtn:hover { background: var(--bg); color: var(--fg); }
+
+#out {
+  flex: 1; overflow-y: auto; padding: 10px 2px 16px;
+  font-size: clamp(14px, 1.9vw, 17px); line-height: 1.45;
+  scrollbar-width: thin; scrollbar-color: var(--dim) transparent;
+  overflow-wrap: anywhere;
+}
+.line { white-space: pre-wrap; margin: 0 0 .45em; }
+.line.echo { color: var(--bright); margin-top: .9em; }
+.line.title { color: var(--bright); font-weight: bold; margin-top: .6em; text-transform: uppercase; letter-spacing: .06em; }
+.line.exits, .line.note { color: var(--dim); }
+.line.pc { color: #cdeeff; text-shadow: 0 0 5px rgba(150, 210, 255, .55); }
+.line.items { color: var(--bright); }
+.line.warn { color: var(--warn); text-shadow: 0 0 6px rgba(255, 210, 63, .5); }
+.line.sms { color: var(--sms); text-shadow: 0 0 6px rgba(127, 227, 255, .5); }
+.line.score { color: #fff27a; text-shadow: 0 0 6px rgba(255, 242, 122, .55); }
+.line.good { color: var(--bright); }
+.line.banner { color: var(--bright); font-weight: bold; text-align: center; letter-spacing: .12em; margin: 1em 0; }
+
+#prompt { position: relative; white-space: pre-wrap; margin-top: .9em; color: var(--bright); }
+#typed { white-space: pre-wrap; }
+.cur { animation: blink 1s steps(1) infinite; }
+#cmd {
+  position: absolute; inset: 0; width: 100%; opacity: 0;
+  font-size: 16px; border: 0; padding: 0; background: transparent; color: transparent; caret-color: transparent;
+}
+
+/* Full-screen map */
+#map {
+  z-index: 5; display: flex; flex-direction: column; align-items: center;
+  padding: 12px 16px; gap: 10px; cursor: pointer;
+  background: radial-gradient(ellipse at center, #062512 0%, var(--bg) 75%), var(--bg);
+}
+.maphead {
+  flex: none; width: 100%; max-width: 1400px; display: flex; justify-content: space-between; gap: 12px;
+  padding: 3px 8px; background: var(--fg); color: var(--bg); text-shadow: none; font-weight: bold;
+  font-size: clamp(11px, 1.7vw, 15px); letter-spacing: .08em;
+}
+#mappre {
+  flex: 1; min-height: 0; margin: 0; width: 100%;
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  font-family: var(--font); line-height: 1.2; white-space: pre; overflow: hidden;
+}
+#mappre .here { background: var(--fg); color: var(--bg); text-shadow: none; animation: pulse 1.1s steps(1) infinite; }
+@keyframes pulse { 50% { opacity: .45; } }
+#mappre .unk { color: var(--dim); }
+#mappre .npc { color: var(--warn); text-shadow: 0 0 6px rgba(255, 210, 63, .6); font-weight: bold; }
+#maplegend {
+  flex: none; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 22px;
+  font-size: clamp(11px, 1.6vw, 14px); max-width: 1400px;
+}
+#maplegend .here { background: var(--fg); color: var(--bg); text-shadow: none; padding: 0 2px; }
+#maplegend .unk { color: var(--dim); }
+#maplegend .npc { color: var(--warn); font-weight: bold; }
+.mapfoot { flex: none; color: var(--dim); font-size: clamp(11px, 1.6vw, 14px); letter-spacing: .15em; }
+
+/* Short windows: smaller picture and text so the first screen fits without scrolling. */
+@media (max-height: 720px) {
+  #art { font-size: clamp(6px, calc((100vw - 32px) / 39), 11px); }
+  #out { font-size: clamp(13px, 1.7vw, 15px); padding-top: 6px; }
+}
+
+@media (max-width: 600px) {
+  #game { padding: 8px 10px 4px; }
+}
