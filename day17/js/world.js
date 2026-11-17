@@ -29,6 +29,10 @@ const DEEDS = {
   vince:    { pts: 10, name: 'Caught Vince the pickpocket' },
   zormak:   { pts: 15, name: 'Lifted the Curse of Zormak on your old PC' },
   mortimer: { pts: 5, max: 6, name: 'Fed Mortimer, your cat' },
+  printer:  { pts: 10, name: 'Fixed the jammed office photocopier' },
+  coffee:   { pts: 5, max: 5, name: 'Brought Mr. Grumman his coffee' },
+  birthday: { pts: 15, name: "Wished Mom a happy birthday" },
+  presentation: { pts: 10, name: 'Nailed the Friday presentation' },
 };
 // Ending bonuses: accepted proposal 40, wearing the suit 10, all bills on time 10.
 const BONUS = 60;
@@ -144,6 +148,8 @@ const I = {
     desc: 'Four bags from Chez Nina. Shoes, mostly. Shoes are heavy.' },
   luckycap: { name: "Rocco's lucky cap", words: "lucky cap|bottle cap|rocco's cap|cap|charm", w: 0.01, at: null,
     desc: 'A rusty bottle cap on a string. According to Rocco, everybody in Rook Alley knows it.' },
+  earplugs: { name: 'a pair of earplugs', words: 'earplugs|ear plugs|plugs', w: 0.01, at: null,
+    desc: 'Foam earplugs. For noisy neighbours, snoring, and colleagues who talk about crypto.' },
   report: { name: 'the quarterly report', words: 'quarterly report|report|papers', w: 0.5, at: null,
     desc: 'Forty pages of charts nobody will read. Mr. Grumman wants it on his desk by THURSDAY at 5 PM.',
     read: 'Q3 sales: down. Q3 costs: up. Q3 coffee consumption: record high. Conclusion: "Synergies."' },
@@ -157,6 +163,7 @@ function mugCash(who) {
     return;
   }
   say(`${who} takes all your cash: $${S.cash}. Your bank card, luckily, he leaves.`);
+  diary(`Got mugged. Lost $${S.cash}. Normal city, normal crime.`);
   S.cash = 0;
 }
 function deliverBags() {
@@ -269,6 +276,7 @@ kitchen: {
   things: {
     'fridge|refrigerator|magnets': 'Inside: mustard, one egg of uncertain age, and light. Lots of light.',
     'bowl|cat bowl': () => S.f['catfed' + D()] ? "Mortimer's bowl, licked so clean it shines." : "Mortimer's bowl. EMPTY. The word MORTIMER is painted on it, as if anyone could forget.",
+    'calendar|kitchen calendar': 'The kitchen calendar, in your handwriting: TUE - Pinto shopping day. WED 8 PM - dinner at Laura\'s! THU - MOM\'S BIRTHDAY!!! (call her!), Ben\'s party at Club Velvet. FRI 10:30 - presentation (ugh), payday. SAT 8 PM - LUIGI\'S. THE RING.',
     'stove|cooker': 'You have used it twice. Both times the smoke alarm applauded.',
     'sink|mugs': 'A tower of mugs. Future-you will deal with it.',
     'table|kitchen table': 'A small table for two.',
@@ -397,7 +405,7 @@ landlord: {
     if (c.v === 'pay' || (c.v === 'give' && is(c.all, 'money|cash|rent|euro|dollar|dollars|bucks'))) {
       if (S.f.rentPaid) { say('"You already paid, boy. Don\'t confuse me."'); return true; }
       if (!spend(RENT)) { say(`"Six hundred dollars. CASH. Not a cent less." (You need $${RENT} in cash. The ATM is on Downtown Plaza.)`); return true; }
-      S.f.rentPaid = true;
+      S.f.rentPaid = true; diary('Paid the rent to Kowalski. He counted it three times.');
       say(`You count $${RENT} into his hand. He counts it again. And again. "Good boy. See you next month."`);
       return true;
     }
@@ -702,9 +710,9 @@ hardware: {
 supermarket: {
   name: 'Super Saver Supermarket', zone: 'north',
   closed: () => within(8, 21) ? null : 'The supermarket is closed (8 AM to 9 PM).',
-  desc: 'Fluorescent lights, a squeaky trolley, and music from 1987. Prices: BREAD $2, CHOCOLATES $3, CAT BISCUITS $9 a box (7 portions). Rose Lane is north.',
+  desc: 'Fluorescent lights, a squeaky trolley, and music from 1987. Prices: BREAD $2, CHOCOLATES $3, CAT BISCUITS $9 a box (7 portions), EARPLUGS $2. Rose Lane is north.',
   exits: { n: 'rose', out: 'rose' },
-  shop: { bread: 2, chocolate: 3 },
+  shop: { bread: 2, chocolate: 3, earplugs: 2 },
   things: { 'trolley': 'One wheel has its own opinion about direction.', 'music': 'A pan-flute version of a song you used to like.' },
   act(c) {
     if ((c.v === 'buy' || c.v === 'order') && is(c.all, 'cat food|catfood|cat biscuits|biscuits|box cat|food')) {
@@ -756,6 +764,7 @@ busstop: {
   things: { 'shelter|bench': 'Somebody wrote "BUS 24 NEVER COMES" with a marker. It\'s true.', 'traffic|road|avenue': 'Cars weave from lane to lane at 70 km/h.', 'timetable': 'Lines 12, 24, 37. You don\'t need a bus: everything is walking distance.' },
   act(c) {
     if ((c.v === 'go' && c.n === 's') || c.v === 'cross') {
+      if (!S.f.redWarned) { trafficFine(); return true; }
       gameOver('You step off the kerb between two parked vans. You never see the taxi doing seventy. ' +
         'The headline tomorrow: "JAYWALKING DEATHS UP 31%". Ordinary men cross at the crosswalk.', 'dead');
       return true;
@@ -916,6 +925,7 @@ bank: {
   exits: { e: 'plaza', out: 'plaza' },
   things: { 'teller': 'A teller with the expression of a closed door.', 'queue': 'Seven people. All of them sighing.' },
   act(c) {
+    if (S.f.cardGone && (c.v === 'talk' || c.v === 'ask' || is(c.all, 'card|bank card'))) { bankReturnsCard(); return true; }
     if (c.v === 'balance' || c.v === 'talk') { advance(20); say(`After twenty minutes in the queue, the teller tells you: "Balance $${S.bank}. Salary is credited on Friday at 5 PM. Withdrawals at the ATM outside."`); return true; }
     if (c.v === 'withdraw') { say('"Use the ATM outside, please."'); return true; }
   },
@@ -976,13 +986,14 @@ jeweler: {
     if ((c.v === 'buy' || c.v === 'pay') && is(c.all, 'ring|diamond|it')) {
       if (has('ring')) { say('You already have the ring. One wife is plenty.'); return true; }
       if (!has('wallet')) { say('You pat your pockets. No wallet, no card. Mr. Sparkle\'s smile freezes.'); return true; }
+      if (S.f.cardGone && S.cash < RING_PRICE) { say(`Your card is stuck inside the bank's ATM, and you don't have $${RING_PRICE} in cash. Get the card back at the bank counter first.`); return true; }
       if (S.bank + S.cash < RING_PRICE) {
         say(`Mr. Sparkle swipes your card. BEEP. DECLINED. "Perhaps after payday, sir?" (Bank: $${S.bank}, cash: $${S.cash}. Salary arrives Friday at 5 PM.)`);
         return true;
       }
-      const fromBank = Math.min(S.bank, RING_PRICE);
+      const fromBank = S.f.cardGone ? 0 : Math.min(S.bank, RING_PRICE);
       S.bank -= fromBank; S.cash -= RING_PRICE - fromBank;
-      place('ring', 'jeweler'); getItem('ring', true);
+      place('ring', 'jeweler'); getItem('ring', true); diary('Bought THE ring. It is in my pocket. I check it every four minutes.');
       say(`You pay $${RING_PRICE}` + (fromBank < RING_PRICE ? ` ($${fromBank} by card, the rest in cash)` : ' by card') +
         '. Mr. Sparkle places the ring in a velvet box. "She is a lucky woman, sir." You put it somewhere very, very safe.');
       return true;
@@ -1056,9 +1067,9 @@ openspace: {
       if (!w.am && within(9.26, 13)) {
         const pts = within(11, 13) ? 20 : 10;
         say(`Mr. Grumman pokes his head out of his office: "${clock()}! Do you think this is a HOLIDAY CAMP?" (Boss -${pts})`, 'warn');
-        bossMood(-pts);
+        bossMood(-pts); S.f.late = (S.f.late || 0) + 1; diary('Late for work. Grumman asked if this was a holiday camp.');
       } else if (w.am && !w.pm && within(14.26, 17)) {
-        say('"Long lunch, was it?" says Mr. Grumman, tapping his watch. (Boss -10)', 'warn'); bossMood(-10);
+        say('"Long lunch, was it?" says Mr. Grumman, tapping his watch. (Boss -10)', 'warn'); bossMood(-10); S.f.late = (S.f.late || 0) + 1;
       }
       if (S.over) return;
       if (d <= 3 && !S.f.reportTold) {
@@ -1107,7 +1118,7 @@ bossoffice: {
     if (c.v === 'give' && is(c.all, 'coffee|cup')) {
       if (!has('coffee')) { say('You have no coffee.'); return true; }
       lose('coffee');
-      if (once('bosscoffee' + D())) { say('"Black, no sugar. How did you know?" (Boss +5)'); bossMood(5); }
+      if (once('bosscoffee' + D())) { say('"Black, no sugar. How did you know?" (Boss +5)'); bossMood(5); deed('coffee'); }
       else say('"Another one? Are you trying to give me a heart attack?"');
       return true;
     }
@@ -1157,7 +1168,9 @@ copyroom: {
       if (S.f.jamFixed) { say('It\'s working. Don\'t jinx it.'); return true; }
       if (c.v === 'kick' || c.v === 'hit' || c.v === 'fight') { say('You kick the printer. It beeps angrily. PAPER JAM IN TRAY 2. Maybe OPEN it instead.'); return true; }
       S.f.jamFixed = true; advance(5);
-      say('You open the side panel and pull out a crumpled, half-eaten sheet of paper. The printer purrs back to life.');
+      say('You open the side panel and pull out a crumpled, half-eaten sheet of paper. The printer purrs back to life. ' +
+        'Somewhere in the open space, a dozen colleagues who had given up on it whisper "finally".');
+      deed('printer');
       if (S.f.printed && S.where.report === null && !S.f.reportDone && !has('report')) { place('report', 'copyroom'); say('Your quarterly report slides out into the tray!'); }
       return true;
     }
@@ -1239,7 +1252,7 @@ vip: {
     }
     S.enc = null; S.f.crystalNight = nightId();
     if (c.v === 'accept' || c.v === 'kiss' || c.v === 'flirt' || ((c.v === 'buy' || c.v === 'order' || c.v === 'give') && is(c.all, 'champagne|drink|bottle|glass|her|crystal'))) {
-      S.f.escort = true;
+      S.f.escort = true; diary('Bought champagne for a stranger in the VIP lounge. Chloe took a photo. I am an idiot.');
       let pay = 350; const c1 = Math.min(S.cash, pay); S.cash -= c1; S.bank -= (pay - c1);
       say('"A glass" turns out to be a bottle, and the bottle is $350. Crystal laughs at everything you say and leans very close. ' +
         `The waiter takes $${c1} in cash` + (pay > c1 ? ` and $${pay - c1} from your card` : '') + '.', 'warn');

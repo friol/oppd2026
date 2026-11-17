@@ -240,7 +240,8 @@ function miniExec(raw) {
       if (m.room === 'bridge' && word('troll')) { miniDie('You punch the troll. The troll punches you back. You fly gracefully into the bottomless chasm. It is, indeed, bottomless.'); return false; }
       if (m.room !== 'throne' || !word('dragon|zormak')) { miniSay('There is nothing here to fight.'); return false; }
       if (!has('sword')) { miniDie('You charge Zormak with your bare fists. He sneezes. You are now a small pile of ash with very surprised eyebrows.'); return false; }
-      m.f.won = true; S.f.zormakWon = true;
+      m.f.won = true; S.f.zormakWon = true; if (D() < 5 && within(9, 17)) S.f.zormakAtWork = true;
+      diary('Beat The Curse of Zormak on the old PC. Zormak moved to the seaside. Good for him.');
       miniSay('You raise the glowing sword. Zormak sees it, sighs, and closes his book. "The elven blade? Oh, FINE." ' +
         'After a short, very heroic fight he flaps away through the roof, shouting "I\'m moving to the seaside! Somewhere QUIET!" Gold rains down on you.');
       miniPoints(40);

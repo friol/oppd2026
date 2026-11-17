@@ -260,7 +260,8 @@ function catRevenge(day) {
   if (!pool.length) { say('In the night, Mortimer knocks every single object off your shelves. A protest about the empty bowl.', 'note'); return; }
   const id = pool[day % pool.length];
   lose(id);
-  S.f.catHid = id; S.f.catSpot = day % 2 ? 'bed' : 'sofa'; S.f.catNews = true;
+  S.f.catHid = id; S.f.catSpot = day % 2 ? 'bed' : 'sofa'; S.f.catNews = true; S.f.catEverHid = true;
+  diary(`Forgot to feed Mortimer. He hid ${I[id].name} somewhere. Cats do not forgive.`);
   if (!S.asleep) say('Out of the corner of your eye you see Mortimer dragging something away. Revenge for the empty bowl!', 'warn');
 }
 

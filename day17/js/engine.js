@@ -56,6 +56,7 @@ function advanceTo(t) { return t > S.t ? advance(t - S.t) : true; }
 function minuteEvent(t) {
   const d = D(t), m = t % 1440;
   if (m === 17 * 60 && d < 5) workEval(d);
+  if (!S.over && weekEvent(d, m) === 'stop') return 'stop';
   if (S.over) return 'stop';
   if (m === 0) {
     if (d === 3 && !S.f.elecPaid && !S.f.powerCut) {
@@ -123,6 +124,7 @@ function workEval(d) {
   if (d === 4) {
     S.bank += SALARY;
     say(`[SMS] First City Bank: "Salary credited: $${SALARY}. Balance: $${S.bank}."`, 'sms');
+    if (S.f.presBonus) { S.bank += 150; say('[SMS] First City Bank: "Bonus credited: $150 (Friday presentation)."', 'sms'); }
     if (S.boss >= 80) { S.bank += 200; say('[E-MAIL] Mr. Grumman: "Good week. There is a $200 bonus in your account. Don\'t get used to it."', 'sms'); }
   }
 }
@@ -140,6 +142,12 @@ function doWork() {
     if (w.am) { say('You already did the morning shift. It\'s lunch break from 1 PM.'); return; }
     w.am = true;
     say('You sit down and attack the mountain of folders. ' + flavour[d % 4]);
+    if (d === 4 && !S.f.meetingDone && H() < 11) {
+      if (H() < 10.5 && !advanceTo(at(4, 10.5))) return;
+      if (S.over || S.f.meetingDone) return;
+      startMeeting();
+      return;
+    }
     if (advanceTo(at(d, 13))) say('1 PM: lunch break! You are free until 2 PM.');
     return;
   }
@@ -217,6 +225,7 @@ function deed(k) {
   if (c >= (d.max || 1)) return false;
   S.deeds[k] = c + 1; S.score += d.pts;
   say(`[+${d.pts} points: ${d.name}]`, 'score');
+  if (k !== 'birthday' && k !== 'presentation') diary(d.name.replace(/your/g, 'my').replace(/Your/g, 'My') + '.');
   return true;
 }
 
@@ -253,12 +262,7 @@ function moveTo(dest, noEnter) {
 }
 function crossAvenue(dest) {
   if (S.light !== 'green') {
-    if (!S.f.redWarned) {
-      S.f.redWarned = true;
-      say('You step off the kerb on a RED light. A delivery van misses your nose by a centimetre, horn blaring. ' +
-        'You jump back onto the sidewalk, shaking. (Wait for the GREEN man: WAIT, or PUSH the BUTTON. Next time you might not be so lucky.)', 'warn');
-      return true;
-    }
+    if (!S.f.redWarned) { trafficFine(); return true; }
     gameOver('You step onto the crosswalk on a RED light. "It\'s only a second," you think. ' +
       'It is exactly the second a delivery van needs. The last thing you hear is a horn playing "La Cucaracha". ' +
       'Ordinary men wait for the green man.', 'dead');
@@ -361,6 +365,7 @@ function buildMap() {
 function goToSleep(forced) {
   const h = H();
   if (!forced && !(h >= 21 || h < 6)) { say(`You're not sleepy. It's only ${clock()}. (You can sleep after 9 PM.)`); return; }
+  if (!forced && partyKeepsAwake()) return;
   const cut = S.f.powerCut && !forced && S.loc === 'bedroom';
   const off = !forced && !cut && S.f.alarmOff;
   const base = h < 6 ? D() * 1440 : (D() + 1) * 1440;
@@ -411,6 +416,7 @@ function collapse() {
 // ----------------------------------------------------------- money, phone
 function atmWithdraw(c) {
   if (!has('wallet')) { say('Your bank card is in your wallet, and your wallet is not with you.'); return; }
+  if (atmCardTrouble()) return;
   const m = (c.all.match(/\d+/) || [])[0];
   if (!m) { say(`How much? For example: WITHDRAW 200. (Daily limit $${ATM_LIMIT}.)`); return; }
   const amt = parseInt(m, 10), used = S.atm[D()] || 0;
@@ -422,6 +428,7 @@ function atmWithdraw(c) {
 }
 function atmBalance() {
   if (!has('wallet')) { say('Your card is in your wallet, which is not with you.'); return; }
+  if (atmCardTrouble()) return;
   say(`ATM: balance $${S.bank}. Withdrawn today: $${S.atm[D()] || 0} of $${ATM_LIMIT}.`);
 }
 
@@ -441,6 +448,7 @@ function callPhone(c) {
   }
   if (is(who, 'mom|mother|mum|mama|ma|parents')) {
     if (!within(8, 22)) { say('It\'s too late to call Mom. She would think somebody died.'); return; }
+    if (D() === 3 && !S.f.bdayCalled) { advance(40); birthdayCall(); return; }
     advance(20);
     if (!S.deeds.mom) {
       say('Mom: "FINALLY! Are you eating? Is Laura well? When are you getting MARRIED? Your cousin Gary is already on his second wife!" ' +
@@ -505,6 +513,8 @@ function gameOver(text, kind) {
     dumped: '*** LAURA HAS LEFT YOU ***', evicted: '*** EVICTED ***', meh: '*** THE END... SORT OF ***', lose: '*** GAME OVER ***' }[kind];
   say(title, 'banner');
   say(`Final score: ${S.score} of ${MAX_SCORE}. ${rank()}`, 'score');
+  showDiary(true);
+  showAchievements();
   say(kind === 'win' ? 'Type RESTART to play again.' : 'Type UNDO to take back your last move, LOAD to restore a saved game, or RESTART.');
 }
 
@@ -541,7 +551,7 @@ const VERBS = [
   ['report', 'report'], ['make', 'make'], ['cook', 'make'], ['clean', 'clean'], ['flirt', 'flirt'], ['flirt with', 'flirt'], ['lean', 'lean'],
   ['cross', 'cross'], ['go', 'go'], ['walk', 'go'], ['head', 'go'], ['enter', 'enter'], ['exit', 'exit'], ['leave', 'exit'],
   ['score', 'score'], ['points', 'score'], ['status', 'score'], ['time', 'time'], ['hint', 'hint'], ['hints', 'hint'],
-  ['map', 'map'], ['m', 'map'], ['music', 'music'], ['soundtrack', 'music'], ['mute', 'mute'], ['unmute', 'unmute'], ['load', 'load'], ['restore', 'load'], ['restart', 'restart'], ['undo', 'undo'], ['commands', 'help'],
+  ['diary', 'diary'], ['journal', 'diary'], ['complain', 'complain'], ['join', 'join'], ['party', 'join'], ['map', 'map'], ['m', 'map'], ['music', 'music'], ['soundtrack', 'music'], ['mute', 'mute'], ['unmute', 'unmute'], ['load', 'load'], ['restore', 'load'], ['restart', 'restart'], ['undo', 'undo'], ['commands', 'help'],
 ].sort((a, b) => b[0].split(' ').length - a[0].split(' ').length);
 
 const STOP = new Set(['the', 'a', 'an', 'some', 'my', 'please', 'mr', 'mrs', 'ms', 'miss']);
@@ -775,6 +785,10 @@ function showScore() {
 
 function showHint() {
   const h = [], d = D(), hr = H(), w = S.work[d] || {};
+  if (S.f.cardGone) h.push('The ATM ate your bank card. Get it back at the counter inside First City Bank (weekdays 8:30 AM - 4 PM): try the lunch break.');
+  if (partyOn() && L[S.loc].zone === 'home') h.push('Party in 2B! COMPLAIN to the neighbours, JOIN the party, or buy EARPLUGS at the supermarket.');
+  if (D() === 3 && !S.f.bdayCalled) h.push("Today is Mom's BIRTHDAY (it's on the kitchen calendar). CALL MOM before 10 PM!");
+  if ((D() === 3 || (D() === 4 && H() < 10.5)) && !S.f.meetingDone) h.push('Friday at 10:30 AM: the presentation. Be at your desk WORKING in the morning.');
   if (S.f.catHid) h.push(`Mortimer hid something of yours (${I[S.f.catHid].name}). Look under the ${S.f.catSpot === 'bed' ? 'bed in the bedroom' : 'sofa in the living room'}.`);
   if (!S.f['catfed' + D()] && H() >= 17) h.push('Mortimer\'s bowl is empty. FEED the cat (boxes of cat biscuits at the supermarket on Rose Lane), or he will take revenge tonight.');
   if (S.f.alarmOff && D() < 5) h.push('Your alarm clock is switched OFF: you will sleep until 9:40 and be late for work. SET ALARM in the bedroom.');
@@ -811,7 +825,7 @@ const HELP_TEXT = [
   ' Money:    BUY thing, PAY bill, PAY RENT, SELL thing, WITHDRAW 200, BALANCE',
   ' Phone:    CALL LAURA / MOM / POLICE',
   ' Life:     WORK, SLEEP, WAIT (Z), WAIT 30, WAIT UNTIL 20, EXERCISE, DANCE, PUSH BUTTON, PLAY (the PC at home)...',
-  ' Game:     MAP, MUSIC (ON/OFF), SCORE, TIME, HINT, SAVE, LOAD, UNDO, RESTART',
+  ' Game:     MAP, DIARY (DIARY WEEK), MUSIC (ON/OFF), SCORE, TIME, HINT, SAVE, LOAD, UNDO, RESTART',
   'You can carry 6 kg in your hands and pockets, 20 kg with a backpack.',
 ];
 
@@ -847,6 +861,12 @@ const PC_META = new Set(['save', 'load', 'undo', 'music', 'mute', 'unmute']);
 function exec(raw) {
   const c = parse(raw);
   if (!c) return;
+  if (S && S.enc === 'meeting' && !S.over && !['save', 'load', 'undo', 'music', 'mute', 'unmute', 'help', 'hint', 'score', 'time', 'diary'].includes(c.v)) {
+    undoStack.push(JSON.stringify(S));
+    meetingAnswer(raw);
+    RENDER();
+    return;
+  }
   if (S && S.pc && !S.over && !(PC_META.has(c.v) && !(c.v === 'save' && c.all))) {
     undoStack.push(JSON.stringify(S));
     if (undoStack.length > 50) undoStack.shift();
@@ -871,6 +891,7 @@ function exec(raw) {
     say(on ? 'Music ON. (Type MUSIC OFF to turn it off.)' : 'Music OFF. (Type MUSIC ON to turn it back on.)', 'note');
     RENDER(); return;
   }
+  if (c.v === 'diary') { showDiary(is(c.all, 'week|all|whole')); return; }
   if (c.v === 'map') { say('You picture the city in your head... (press any key to close the map)', 'note'); SHOWMAP(buildMap()); return; }
   if (c.v === 'score') { showScore(); return; }
   if (c.v === 'time') { say(`It is ${DAYS[D()]}, ${clock()}.`); return; }
@@ -883,7 +904,7 @@ function exec(raw) {
   S.turn++;
 
   const loc = L[S.loc], locBefore = S.loc, npcBefore = npcsHere();
-  let handled = !S.enc && npcAct(c);
+  let handled = !S.enc && (npcAct(c) || weekAct(c));
   if (!handled && !(S.enc && FREE.has(c.v)) && loc.act) {
     handled = !!loc.act(c);
     if (!handled && (c.v === 'ask' || c.v === 'order')) handled = !!loc.act({ ...c, v: c.v === 'ask' ? 'talk' : 'buy' });
