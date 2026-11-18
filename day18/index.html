@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kario Mart</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <canvas id="gl"></canvas>
+
+  <div id="title" class="screen">
+    <div class="press">PRESS ENTER</div>
+    <div class="credits">Arrows / WASD drive &middot; Space drift &middot; X use item &middot; C look back &middot; M music &middot; Esc pause</div>
+  </div>
+
+  <div id="menu" class="screen hidden">
+    <img class="mini-logo" src="img/title.png" alt="">
+    <div class="menu-wrap">
+      <div class="menu-rows" id="menuRows"></div>
+      <div class="menu-info">
+        <div class="info-card" id="trackInfo">
+          <canvas id="trackPreview" width="260" height="190"></canvas>
+          <h3 id="trackName"></h3>
+          <p id="trackBlurb"></p>
+          <p class="best" id="trackBest"></p>
+        </div>
+        <div class="info-card" id="carInfo">
+          <h3 id="carName"></h3>
+          <p id="carBlurb"></p>
+          <div class="stat"><span>SPEED</span><div class="bar"><i id="statSpeed"></i></div></div>
+          <div class="stat"><span>ACCEL</span><div class="bar"><i id="statAccel"></i></div></div>
+          <div class="stat"><span>HANDLING</span><div class="bar"><i id="statHand"></i></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="menu-help">&uarr;&darr; choose &middot; &larr;&rarr; change &middot; Enter start &middot; Esc back</div>
+  </div>
+
+  <div id="hud" class="hidden">
+    <div id="hud-item"><div class="slot"><canvas id="itemIcon" width="96" height="96"></canvas></div><div id="itemName"></div></div>
+    <div id="hud-left">
+      <div id="hud-lap">LAP <b id="lapNum">1</b><span id="lapTot">/3</span></div>
+      <div id="hud-time">0:00.00</div>
+      <div id="hud-laps"></div>
+    </div>
+    <div id="hud-pos"><span id="posNum">8</span><span id="posSuf">th</span></div>
+    <div id="hud-speed"><div id="speedNum">0</div><div class="unit">km/h <span class="gear">GEAR <b id="gearNum">N</b></span></div><canvas id="tacho" width="600" height="200"></canvas></div>
+    <canvas id="minimap" width="240" height="240"></canvas>
+    <div id="hud-msg"></div>
+    <img id="hud-count" alt="">
+    <img id="hud-pic" alt="">
+    <div id="hud-flash"></div>
+    <div id="hud-wrong">WRONG WAY!</div>
+    <div id="hud-skip">Enter: skip</div>
+  </div>
+
+  <div id="pause" class="screen dim hidden">
+    <div class="panel">
+      <h2>PAUSED</h2>
+      <div class="list" id="pauseList"></div>
+    </div>
+  </div>
+
+  <div id="results" class="screen dim hidden">
+    <div class="panel wide">
+      <h2 id="resTitle">RESULTS</h2>
+      <table id="resTable"></table>
+      <div class="res-help" id="resHelp">Enter: continue</div>
+    </div>
+  </div>
+
+  <div id="loading" class="hidden"><span>LOADING</span></div>
+</div>
+
+<script src="js/three.min.js"></script>
+<script src="js/GLTFLoader.js"></script>
+<script src="js/carsdata.js"></script>
+<script src="js/post.js"></script>
+<script src="js/util.js"></script>
+<script src="js/engine_dsp.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/uisfx.js"></script>
+<script src="js/rocketsound.js"></script>
+<script src="js/track.js"></script>
+<script src="js/fx.js"></script>
+<script src="js/cars.js"></script>
+<script src="js/items.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
