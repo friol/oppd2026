@@ -77,6 +77,19 @@ const UiSfx = (() => {
     }),
     // back / cancel: a short falling blip
     back: play((ac, o) => { tone(ac, o, 700, 330, 0.12, 'triangle', 0.45); }),
+    // the game is paused: two falling notes, the sound "freezes"
+    pause: play((ac, o) => {
+      tone(ac, o, 880, 860, 0.09, 'triangle', 0.42);
+      tone(ac, o, 587.33, 570, 0.16, 'triangle', 0.42, 0.075);
+      tone(ac, o, 1760, 700, 0.2, 'sine', 0.1);
+    }),
+    // the game goes on: two rising notes and a short airy sweep
+    resume: play((ac, o) => {
+      whoosh(ac, o, 400, 2600, 0.22, 0.16);
+      tone(ac, o, 587.33, 600, 0.09, 'triangle', 0.4);
+      tone(ac, o, 880, 900, 0.1, 'triangle', 0.4, 0.07);
+      tone(ac, o, 1318.5, 1330, 0.22, 'sine', 0.16, 0.14);
+    }),
     // start of the race: rising arpeggio over a sweep
     start: play((ac, o) => {
       whoosh(ac, o, 250, 3400, 0.5, 0.5);

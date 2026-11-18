@@ -24,7 +24,7 @@ const RocketSound = (() => {
       voices.clear();
       bus = ac.createGain();
       bus.gain.value = 0.55;
-      bus.connect(ac.destination);
+      bus.connect(Engine.world || ac.destination);
       noiseBuf = ac.createBuffer(1, ac.sampleRate * 1.5, ac.sampleRate);
       const d = noiseBuf.getChannelData(0);
       for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;

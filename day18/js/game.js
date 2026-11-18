@@ -1,4 +1,4 @@
-// Kario Mart: game states, camera, input, HUD, menus and race management.
+// undefAIned: game states, camera, input, HUD, menus and race management.
 'use strict';
 
 const MODES = ['Quick Race', 'Grand Prix', 'Time Trial'];
@@ -18,9 +18,13 @@ const store = {
 
 const game = {
   state: 'boot', time: 0, cars: [], player: null, track: null, trackIndex: -1,
-  settings: Object.assign({ mode: 0, track: 0, car: 0, diff: 1 }, store.get('settings', {})),
+  settings: Object.assign({ mode: 0, track: 0, car: 0, diff: 1, gfx: 0 }, store.get('settings', {})),
   gp: null, raceTime: 0, stateT: 0, finishCount: 0
 };
+// graphics preset: no saved choice yet = measure the frame time on the title screen (autoDetectGfx)
+game.autoGfx = store.get('settings', {}).gfx === undefined;
+if (!QUALITY[game.settings.gfx]) game.settings.gfx = 0;
+Q = QUALITY[game.settings.gfx];
 // settings.car is the car type (0-2); older saves stored one of the 9 models
 if (!(game.settings.car >= 0 && game.settings.car < CAR_TYPES.length)) game.settings.car = CAR_MODELS[game.settings.car] ? CAR_MODELS[game.settings.car].type : 0;
 const playerModel = () => CAR_TYPES[game.settings.car].template;
@@ -34,7 +38,7 @@ function trackData(i) { return trackCache[i] || (trackCache[i] = genTrack(TRACKS
 // ---------------------------------------------------------------- renderer
 
 const renderer = new THREE.WebGLRenderer({ canvas: $('gl'), antialias: false, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, Q.pixelRatio) * Q.scale);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 // tone mapping and sRGB conversion happen in the last post-processing pass (FINAL_SHADER)
@@ -100,17 +104,30 @@ const FINAL_SHADER = {
       gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
     }`
 };
-const post = (() => {
-  const rt = new THREE.WebGLRenderTarget(16, 16, { type: THREE.HalfFloatType, samples: 4 });
+let post = null;
+// (re)creates the post-processing chain for the current preset Q: MSAA samples, bloom or not
+function buildPost() {
+  if (post) { post.composer.passes.forEach(p => p.dispose && p.dispose()); post.composer.dispose(); }
+  const rt = new THREE.WebGLRenderTarget(16, 16, { type: THREE.HalfFloatType, samples: Q.msaa });
   const composer = new THREE.EffectComposer(renderer, rt);
-  const renderPass = new THREE.RenderPass(scene, camera);
-  composer.addPass(renderPass);
-  const bloom = new THREE.UnrealBloomPass(new THREE.Vector2(256, 256), 0.2, 0.35, 1.1);   // strength, radius, threshold (HDR: only lights, sun, sparks)
-  composer.addPass(bloom);
+  composer.addPass(new THREE.RenderPass(scene, camera));
+  let bloom = null;
+  if (Q.bloom) {
+    bloom = new THREE.UnrealBloomPass(new THREE.Vector2(256, 256), 0.2, 0.35, 1.1);   // strength, radius, threshold (HDR: only lights, sun, sparks)
+    composer.addPass(bloom);
+  }
   const final = new THREE.ShaderPass(FINAL_SHADER);
   composer.addPass(final);
   return { composer, bloom, final };
-})();
+}
+post = buildPost();
+// colour grade of the current track (tint, exposure, saturation) into the final pass
+function applyGrade() {
+  const gr = (game.theme && game.theme.grade) || {};
+  post.final.uniforms.tint.value.set(...(gr.tint || [1, 1, 1]));
+  post.final.uniforms.exposure.value = gr.exposure || 1;
+  post.final.uniforms.saturation.value = gr.saturation || 1.08;
+}
 game.camPos = camera.position;
 game.fx = new FX(scene);
 game.skids = new SkidMarks(scene);
@@ -131,11 +148,12 @@ const keys = {};
 const pad = { steer: 0, throttle: 0, brake: 0, drift: false, item: false, look: false, prev: {} };
 window.addEventListener('keydown', e => {
   Engine.init();   // audio needs a user gesture
+  if (game.state !== 'paused') Music.resume();   // the browser blocks the music until the first key press: retry now
   if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
   if (!keys[e.code]) onKey(e.code);
   keys[e.code] = true;
 });
-window.addEventListener('pointerdown', () => Engine.init());
+window.addEventListener('pointerdown', () => { Engine.init(); if (game.state !== 'paused') Music.resume(); });
 window.addEventListener('keyup', e => { keys[e.code] = false; });
 window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; if (racingState()) setPaused(true); });
 
@@ -191,6 +209,7 @@ function setTrack(i) {
   if (game.trackIndex === i && built) return;
   clearCars();
   if (game.items) { game.items.dispose(); game.items = null; }
+  if (game.hazards) { game.hazards.dispose(); game.hazards = null; }
   if (built) built.dispose();
   game.fx.clear();
   game.trackIndex = i;
@@ -198,10 +217,7 @@ function setTrack(i) {
   game.theme = THEMES[TRACKS[i].theme];
   built = buildTrackScene(game.track, scene, renderer);
   game.sunDir = built.sunDir;
-  const gr = game.theme.grade || {};
-  post.final.uniforms.tint.value.set(...(gr.tint || [1, 1, 1]));
-  post.final.uniforms.exposure.value = gr.exposure || 1;
-  post.final.uniforms.saturation.value = gr.saturation || 1.08;
+  applyGrade();
   hud.prepareMinimap();
 }
 function clearCars() {
@@ -281,6 +297,12 @@ const hud = {
     c.width = c.height = W;
     const g = c.getContext('2d');
     drawTrackShape(g, tr, this.mm, 13, 8);
+    // hazards on the map: ice (cyan), sand (sand), rockslides (red), ramps (orange)
+    const dot = (i, color) => { const x = this.mm.tx(tr.x[i]), y = this.mm.tz(tr.z[i]); g.beginPath(); g.arc(x, y, 5, 0, 6.28); g.fillStyle = '#160e2a'; g.fill(); g.beginPath(); g.arc(x, y, 3.4, 0, 6.28); g.fillStyle = color; g.fill(); };
+    for (const p of tr.ice) dot((p.a + p.b) >> 1, '#8fe6ff');
+    for (const p of tr.sand) dot((p.a + p.b) >> 1, '#e8c470');
+    for (const s of tr.slides) dot(s.idx, '#ff5a3a');
+    for (const r of tr.ramps) dot(r.a + 3, '#ff9a1e');
     this.mmStatic = c;
   },
   lastPlace: 0,
@@ -556,7 +578,10 @@ function startAttract() {
   setTrack(0);
   const roster = aiRoster(8, Date.now() & 0xffff);
   spawnCars(roster.map((r, i) => ({ slot: i, model: r.model, driver: r.driver, skill: 0.9 + Math.random() * 0.08 })));
+  if (game.items) game.items.dispose();
+  if (game.hazards) game.hazards.dispose();
   game.items = new Items(game);
+  game.hazards = new Hazards(game);
   game.cars.forEach(c => { c.speed = 0; });
   cam.follow = null; cam.modeT = 0;
 }
@@ -566,6 +591,7 @@ function menuPreview() {
   const ti = s.mode === 1 ? 0 : s.track;
   if (game.trackIndex !== ti) setTrack(ti);
   if (!game.items) game.items = new Items(game);
+  if (!game.hazards) game.hazards = new Hazards(game);
   spawnCars([{ slot: 0, model: playerModel(), driver: { name: 'You', color: PLAYER_COLOR }, player: true }]);
 }
 
@@ -577,7 +603,9 @@ function startRace() {
   setTimeout(() => {
     setTrack(ti);
     if (game.items) game.items.dispose();
+    if (game.hazards) game.hazards.dispose();
     game.items = new Items(game);
+    game.hazards = new Hazards(game);
     game.fx.clear();
     const cls = CLASSES[s.diff];
     const entries = [];
@@ -694,6 +722,7 @@ function simulateCars(dt, racing, attract) {
   }
   carCollisions();
   game.items.update(dt);
+  if (game.hazards) game.hazards.update(dt);
   for (const c of game.cars) c.syncMesh(dt);
   if (!racing) return;
   // laps and finish
@@ -715,6 +744,7 @@ function simulateCars(dt, racing, attract) {
         const best = Math.min(...c.lapTimes);
         // lap 2 / lap 3 graphics (img/lap2.png, lap3.png); text for other lap counts
         const n = c.maxLap + 1;
+        if (built) built.crowdBurst(0.7, 0.3);   // a lap done: the stands cheer
         if (n === 2 || n === 3) { hud.banner('lap' + n, 1500); Sfx.play('lap' + n, 0.9); }
         else if (c.maxLap === laps - 1) { hud.msg('FINAL LAP!', '#ff6a1a'); setTimeout(() => hud.msg(''), 1600); }
         else { hud.msg('LAP ' + n); setTimeout(() => hud.msg(''), 1200); }
@@ -736,6 +766,7 @@ function onPlayerFinish() {
   else hud.msg(game.settings.mode === 2 ? 'FINISH!' : ordinal(p.place) + '!', '#fff');
   saveBest(p);
   Sfx.play('finish', 0.95);
+  if (built) built.crowdBurst(1, 0.1);   // and again at the finish
   setState('finish');
 }
 
@@ -820,13 +851,56 @@ function setPaused(on) {
     showScreen('pause');
     Sfx.suspend();
     Music.pause();
+    UiSfx.pause();
   } else if (!on && game.state === 'paused') {
     showScreen(null);
     game.state = game.pausedFrom;
     game.stateT = game.pausedT;
     Sfx.resume();
     Music.resume();
+    UiSfx.resume();
   }
+}
+
+const TITLE_MUSIC = 'muzik/titles.mp3';   // tune of the title demo and of the menu
+
+// Applies game.settings.gfx: resolution, post-processing chain, car lacquer, and rebuilds the
+// current track (shadow map, terrain, props and grass depend on the preset). `then` runs after,
+// to respawn whatever was on the track.
+function changeQuality(then) {
+  Q = QUALITY[game.settings.gfx] || QUALITY[0];
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, Q.pixelRatio) * Q.scale);
+  post = buildPost();
+  resize();
+  applyGrade();
+  for (const m of [CarAssets.material, CarAssets.redMaterial]) if (m) { m.clearcoat = Q.clearcoat ? 1 : 0; m.needsUpdate = true; }
+  const ti = game.trackIndex;
+  if (ti >= 0) { game.trackIndex = -1; setTrack(ti); }
+  if (then) then();
+}
+function showToast(text, ms) {
+  const el = $('toast');
+  el.textContent = text;
+  el.classList.add('show');
+  clearTimeout(showToast.t);
+  showToast.t = setTimeout(() => el.classList.remove('show'), ms || 6000);
+}
+// First run (no saved choice): the median frame time on the title screen decides the preset.
+const autoGfx = { frames: 0, times: [] };
+function autoDetectGfx(ms) {
+  if (document.hidden) return;
+  if (++autoGfx.frames < 90) return;             // let the shaders compile and the caches warm up
+  if (ms < 200) autoGfx.times.push(ms);           // ignore hiccups (tab switches)
+  if (autoGfx.times.length < 150) return;
+  game.autoGfx = false;
+  const t = autoGfx.times.sort((a, b) => a - b), med = t[t.length >> 1];
+  if (med > 25) {                                 // below ~40 fps: this PC needs the Low preset
+    game.settings.gfx = 1;
+    store.set('settings', game.settings);
+    showToast('Graphics set to Low for this PC. You can change it in the menu (GRAPHICS).');
+    showLoading(true);
+    setTimeout(() => { changeQuality(() => startAttract()); showLoading(false); }, 30);
+  } else store.set('settings', game.settings);    // remember that High was chosen
 }
 
 const menu = { sel: 0 };
@@ -835,6 +909,7 @@ const MENU_ROWS = [
   { id: 'track', label: 'TRACK', values: () => TRACKS.map(t => t.name), off: () => game.settings.mode === 1 },
   { id: 'car', label: 'CAR', values: () => CAR_TYPES.map(t => t.name) },
   { id: 'diff', label: 'CLASS', values: () => CLASSES.map(c => c.name), off: () => game.settings.mode === 2 },
+  { id: 'gfx', label: 'GRAPHICS', values: () => ['High (modern PC)', 'Low (older PC)'] },
   { id: 'go', label: 'START RACE' }
 ];
 function renderMenu() {
@@ -898,6 +973,11 @@ function menuChange(d) {
   const n = r.values().length;
   s[r.id] = (s[r.id] + d + n) % n;
   store.set('settings', s);
+  if (r.id === 'gfx') {
+    showLoading(true);
+    setTimeout(() => { changeQuality(() => menuPreview()); showLoading(false); }, 30);
+    return;
+  }
   if (r.id === 'track' || r.id === 'mode') {
     const ti = s.mode === 1 ? 0 : s.track;
     if (ti !== game.trackIndex) {
@@ -919,7 +999,7 @@ function menuAction(k) {
   }
 }
 function openMenu() {
-  Music.stop();
+  Music.play(TITLE_MUSIC);
   showScreen('menu');
   $('hud').classList.add('hidden');
   setState('menu');
@@ -935,7 +1015,7 @@ function buildList(id, items, sel) {
     d.className = 'row' + (i === sel ? ' sel' : '');
     d.innerHTML = '<span>' + t + '</span>';
     d.addEventListener('mouseenter', () => UiSfx.hover());
-    d.addEventListener('click', () => { game.listSel = i; UiSfx.confirm(); listAction(i); });
+    d.addEventListener('click', () => { game.listSel = i; if (i !== 0) UiSfx.confirm(); listAction(i); });
     el.appendChild(d);
   });
   game.listSel = sel;
@@ -944,7 +1024,7 @@ function listAction(i) {
   if (game.state !== 'paused') return;
   if (i === 0) setPaused(false);
   else if (i === 1) { Sfx.stopAll(); Music.stop(); showScreen(null); startRace(); }
-  else { Sfx.stopAll(); Music.stop(); game.gp = null; game.items && game.items.dispose(); game.items = null; openMenu(); }
+  else { Sfx.stopAll(); Music.stop(); game.gp = null; game.items && game.items.dispose(); game.items = null; game.hazards && game.hazards.dispose(); game.hazards = null; openMenu(); }
 }
 
 function onKey(code) {
@@ -960,16 +1040,16 @@ function onKey(code) {
     else if (code === 'ArrowLeft' || code === 'KeyA') { if (menuCanChange()) UiSfx.change(-1); menuChange(-1); renderMenu(); }
     else if (code === 'ArrowRight' || code === 'KeyD') { if (menuCanChange()) UiSfx.change(1); menuChange(1); renderMenu(); }
     else if (code === 'Enter') menuAction('Enter');
-    else if (code === 'Escape') { UiSfx.back(); showScreen('title'); setState('title'); showLoading(true); setTimeout(() => { startAttract(); showLoading(false); }, 30); }
+    else if (code === 'Escape') { UiSfx.back(); Music.play(TITLE_MUSIC); showScreen('title'); setState('title'); showLoading(true); setTimeout(() => { startAttract(); showLoading(false); }, 30); }
     return;
   }
   if (st === 'paused') {
-    if (code === 'Escape' || code === 'KeyP') { UiSfx.back(); setPaused(false); }
+    if (code === 'Escape' || code === 'KeyP') setPaused(false);     // (setPaused plays the resume sound)
     else if (code === 'ArrowUp' || code === 'ArrowDown') {
       UiSfx.move();
       game.listSel = (game.listSel + (code === 'ArrowUp' ? 2 : 1)) % 3;
       buildList('pauseList', ['Resume', 'Restart race', 'Quit to menu'], game.listSel);
-    } else if (code === 'Enter') { UiSfx.confirm(); listAction(game.listSel); }
+    } else if (code === 'Enter') { if (game.listSel !== 0) UiSfx.confirm(); listAction(game.listSel); }
     return;
   }
   if (st === 'results') {
@@ -999,6 +1079,7 @@ function updateSpeedFx(dt) {
     blurT = Math.max(0, v - 0.75) * 0.05 + (p.boost > 0 ? 0.03 : 0);
     linesT = p.boost > 0 ? 0.8 : smooth(0.95, 1.2, v) * 0.4;
     hazeT = p.boost > 0 ? 0.9 : 0;
+    if (!Q.speedFx) { blurT = 0; hazeT = 0; }   // Low: no radial blur / heat haze
     // rumble strips and driving through the grass
     if (Math.abs(p.lat) > game.track.hw - 0.6 && Math.abs(p.lat) < game.track.hw + 1.7 && game.track.kerb[p.idx] && p.speed > 8) addShake(dt * 2.2);
     else if (p.offroad && p.speed > 10) addShake(dt * 1.6);
@@ -1014,6 +1095,23 @@ function updateSpeedFx(dt) {
   u.speedLines.value += (linesT - u.speedLines.value) * damp(6, dt);
   shake.value = Math.max(0, shake.value - dt * 1.7);
   if (!racing) shake.value = Math.min(shake.value, 0.4);
+}
+
+// How enclosed the place of the player is: the reverb of the canyon (the barriers close in, rock arches
+// overhead) and of the ice tunnel (the roofed part, a little before and after the portals).
+function updateSpace() {
+  const p = game.player, tr = game.track;
+  let canyon = 0, tunnel = 0;
+  if (p && tr && ['intro', 'countdown', 'race', 'finish'].includes(game.state)) {
+    const i = p.idx;
+    if (tr.canyon && i >= tr.canyon.a - 2 && i <= tr.canyon.b + 2) canyon = smooth(0, 0.7, (BARRIER - tr.barrier[i]) / (BARRIER - 4.6));
+    for (const a of tr.arches || []) canyon = Math.max(canyon, 0.55 * smooth(16, 3, Math.abs(i - a)));
+    if (tr.tunnel) {
+      const s0 = tr.tunnel.a + tr.tunnel.ramp, s1 = tr.tunnel.b - tr.tunnel.ramp;
+      tunnel = smooth(s0 - 12, s0 + 2, i) * smooth(s1 + 12, s1 - 2, i);
+    }
+  }
+  Engine.setSpace(canyon, tunnel);
 }
 
 // Player engine: on from the intro to the end of the race, silent in menus and pause
@@ -1058,6 +1156,15 @@ function exhaustSmoke(p, dt, thr, grid) {
 let last = performance.now();
 function frame(now) {
   requestAnimationFrame(frame);
+  try { frameBody(now); }
+  catch (e) {
+    // a bug in the game logic must not freeze the picture: log it once per message and keep drawing
+    if (frame.lastErr !== e.message) { frame.lastErr = e.message; console.error('Frame error:', e); }
+    try { post.composer.render(0); } catch (e2) { }
+  }
+}
+function frameBody(now) {
+  if (game.autoGfx && game.state === 'title') autoDetectGfx(now - last);
   let dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   pollPad();
@@ -1109,10 +1216,11 @@ function frame(now) {
       game.lastCount = 0;
       hud.count('countgo');
       Sfx.play('go', 0.95);
+      if (built) built.crowdBurst(1, 0.22);   // the crowd cheers at GO
       setTimeout(() => hud.count(null), 900);
       if (game.firstThrottle !== null && thr) {
         if (game.firstThrottle > 0.2 && game.firstThrottle < 1.1) { p.boost = 1.2; hud.flash('ROCKET START!', '#ffb43a'); }
-        else if (game.firstThrottle > 2.2) { p.stall = 1.1; hud.flash('STALLED!', '#ff4b4b'); }
+        else if (game.firstThrottle > 2.2) { p.slowStart = SLOW_START; hud.flash('SLOW START', '#ff9a3c'); }   // too early: slower acceleration
       }
       for (const c of game.cars) if (!c.isPlayer && Math.random() < 0.35) c.boost = 0.8;
     }
@@ -1142,6 +1250,7 @@ function frame(now) {
   game.fx.update(st === 'paused' ? 0 : dt, camera, renderer.domElement.height);
   game.skids.update();
   updateEngineSound(dt);
+  updateSpace();
   // rockets in flight: Doppler whine (silent in menus and while paused)
   RocketSound.update(game.items ? game.items.rockets : [], camera, dt, st !== 'paused' && !!game.items && st !== 'menu' && st !== 'title' && st !== 'results');
   Music.update(dt);
@@ -1159,6 +1268,7 @@ loadCarAssets(() => {
   showLoading(false);
   showScreen('title');
   setState('title');
+  Music.play(TITLE_MUSIC);
 });
 $('title').addEventListener('click', () => { if (game.state === 'title') openMenu(); });
 requestAnimationFrame(frame);

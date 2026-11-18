@@ -3,7 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kario Mart</title>
+<title>undefAIned</title>
+<link rel="icon" type="image/png" sizes="32x32" href="img/favicon.png">
+<link rel="icon" type="image/x-icon" sizes="16x16 32x32 64x64" href="img/favicon.ico">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -16,7 +18,7 @@
   </div>
 
   <div id="menu" class="screen hidden">
-    <img class="mini-logo" src="img/title.png" alt="">
+    <img class="mini-logo" src="img/logo.png" alt="undefAIned">
     <div class="menu-wrap">
       <div class="menu-rows" id="menuRows"></div>
       <div class="menu-info">
@@ -35,7 +37,6 @@
         </div>
       </div>
     </div>
-    <div class="menu-help">&uarr;&darr; choose &middot; &larr;&rarr; change &middot; Enter start &middot; Esc back</div>
   </div>
 
   <div id="hud" class="hidden">
@@ -46,7 +47,7 @@
       <div id="hud-laps"></div>
     </div>
     <div id="hud-pos"><span id="posNum">8</span><span id="posSuf">th</span></div>
-    <div id="hud-speed"><div id="speedNum">0</div><div class="unit">km/h <span class="gear">GEAR <b id="gearNum">N</b></span></div><canvas id="tacho" width="600" height="200"></canvas></div>
+    <div id="hud-speed"><div class="speedrow"><div class="unit">km/h <span class="gear">GEAR <b id="gearNum">N</b></span></div><div id="speedNum">0</div></div><canvas id="tacho" width="600" height="200"></canvas></div>
     <canvas id="minimap" width="240" height="240"></canvas>
     <div id="hud-msg"></div>
     <img id="hud-count" alt="">
@@ -72,6 +73,7 @@
   </div>
 
   <div id="loading" class="hidden"><span>LOADING</span></div>
+  <div id="toast"></div>
 </div>
 
 <script src="js/three.min.js"></script>
@@ -84,6 +86,7 @@
 <script src="js/uisfx.js"></script>
 <script src="js/rocketsound.js"></script>
 <script src="js/track.js"></script>
+<script src="js/hazards.js"></script>
 <script src="js/fx.js"></script>
 <script src="js/cars.js"></script>
 <script src="js/items.js"></script>

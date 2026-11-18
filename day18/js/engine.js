@@ -15,7 +15,7 @@ const Engine = (() => {
   const SHIFT_UP = 0.22, SHIFT_DOWN = 0.22;  // duration of a shift, seconds
   const MIN_UP = 0.65, MIN_DOWN = 0.9;       // minimum time in a gear before the next up / down shift
   const VOL = 0.9;
-  let ac = null, out = null, eng = null, noiseBuf = null;
+  let ac = null, out = null, eng = null, noiseBuf = null, world = null, space = null, spC = -1, spT = -1;
   let gearNow = 1, neutralNow = true, rpmNow = IDLE, shiftT = 0, shiftDir = 0, time = 0, inGear = 0;
 
   const WORKLET_SRC = EngineDSP.toString() + `
@@ -25,6 +25,67 @@ const Engine = (() => {
     }
     registerProcessor('kario-engine', KarioEngine);`;
 
+  // ---- the world bus and its reverb
+  // Everything that happens in the scene (engine, rockets, boulders, and on http(s) also the sample
+  // effects) goes through `world`: dry to the speakers, plus a send to two convolution reverbs that
+  // are turned up by the place of the player: the canyon (barriers closing in, rock arches: a few
+  // slapback echoes between the walls and a dark tail) and the ice tunnel (brighter, longer, with the
+  // flutter echo of two parallel walls). Impulse responses are generated: noise with an exponential
+  // decay + the reflections.
+  function makeIR(kind) {
+    const tunnel = kind === 'tunnel', sr = ac.sampleRate, len = Math.floor(sr * (tunnel ? 2.4 : 1.7));
+    const buf = ac.createBuffer(2, len, sr), tau = tunnel ? 0.62 : 0.42, lpc = tunnel ? 0.55 : 0.3;
+    for (let ch = 0; ch < 2; ch++) {
+      const d = buf.getChannelData(ch);
+      let lp = 0;
+      for (let i = 0; i < len; i++) {
+        const t = i / sr, env = Math.exp(-t / tau) * Math.min(1, t * 120);
+        lp += ((Math.random() * 2 - 1) * env - lp) * lpc;
+        d[i] = lp * 0.55;
+      }
+      // reflections between the walls (about 30 m apart: one every ~90 ms)
+      const gap = tunnel ? 0.092 : 0.078, n = tunnel ? 12 : 5;
+      for (let k = 1; k <= n; k++) {
+        const at = Math.floor((k * gap + ch * 0.0037 + (Math.random() - 0.5) * 0.004) * sr), g = Math.pow(tunnel ? 0.78 : 0.6, k);
+        for (let j = 0; j < 30 && at + j < len; j++) d[at + j] += g * (Math.random() * 2 - 1) * Math.exp(-j / 8);
+      }
+    }
+    return buf;
+  }
+  function buildWorld() {
+    world = ac.createGain();
+    const dry = ac.createGain();
+    world.connect(dry); dry.connect(ac.destination);
+    const send = ac.createGain(), pre = ac.createDelay(0.2);
+    pre.delayTime.value = 0.014;
+    world.connect(send); send.connect(pre);
+    space = { dry };
+    for (const kind of ['canyon', 'tunnel']) {
+      const conv = ac.createConvolver(), tone = ac.createBiquadFilter(), g = ac.createGain();
+      conv.buffer = makeIR(kind);
+      tone.type = 'lowpass'; tone.frequency.value = kind === 'tunnel' ? 7500 : 5200;
+      g.gain.value = 0;
+      pre.connect(conv); conv.connect(tone); tone.connect(g); g.connect(ac.destination);
+      space[kind] = g;
+    }
+  }
+  // How enclosed the place of the listener is: canyon / tunnel, 0 (open air) .. 1 (fully inside)
+  function setSpace(canyon, tunnel) {
+    if (!space) return;
+    if (Math.abs(canyon - spC) < 0.01 && Math.abs(tunnel - spT) < 0.01) return;
+    spC = canyon; spT = tunnel;
+    const t = ac.currentTime;
+    space.canyon.gain.setTargetAtTime(0.6 * canyon, t, 0.1);
+    space.tunnel.gain.setTargetAtTime(0.75 * tunnel, t, 0.1);
+    space.dry.gain.setTargetAtTime(1 - 0.18 * Math.max(canyon, tunnel), t, 0.1);
+  }
+  // Routes an <audio> element through the world bus (only when served over http: from file:// the
+  // browser treats the file as another origin and would silence it)
+  function routeElement(el) {
+    if (!ac || !world || el._routed || location.protocol === 'file:') return;
+    try { ac.createMediaElementSource(el).connect(world); el._routed = true; } catch (e) { }
+  }
+
   // Needs a user gesture: called from the first key press / click
   function init() {
     if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
@@ -33,7 +94,9 @@ const Engine = (() => {
     ac = new AC();
     out = ac.createGain();
     out.gain.value = 0.5;     // under the nitro / shield samples
-    out.connect(ac.destination);
+    buildWorld();
+    out.connect(world);
+    if (typeof Sfx !== 'undefined' && Sfx.attach) Sfx.attach();
     noiseBuf = ac.createBuffer(1, ac.sampleRate * 0.3, ac.sampleRate);
     const nd = noiseBuf.getChannelData(0);
     for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
@@ -51,7 +114,7 @@ const Engine = (() => {
       const node = new AudioWorkletNode(ac, 'kario-engine', { numberOfInputs: 0, outputChannelCount: [1] });
       node.connect(out);
       eng.set = p => node.port.postMessage(p); eng.mode = 'worklet';
-    }).catch(e => { console.warn('Kario Mart: AudioWorklet unavailable, using ScriptProcessor', e && e.message); fallback(); });
+    }).catch(e => { console.warn('undefAIned: AudioWorklet unavailable, using ScriptProcessor', e && e.message); fallback(); });
   }
 
   // Short filtered noise burst
@@ -130,7 +193,9 @@ const Engine = (() => {
   }
 
   return {
-    init, set,
+    init, set, setSpace, routeElement,
+    get world() { return world; },
+    get space() { return space; },
     get mode() { return eng ? eng.mode : null; },
     get rpm() { return rpmNow; },
     get gear() { return gearNow; },

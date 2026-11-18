@@ -36,11 +36,16 @@ const THEMES = {
 
 const TRACKS = [
   { name: 'Green Valley', theme: 'meadow', seed: 5, pts: 10, radius: 230, stretch: 1.3, wobble: 0.34, elev: 4, width: 20, laps: 3,
-    blurb: 'Rolling meadows, lakes and leafy trees. A friendly track to learn drifting.', music: 'muzik/drifting.ai.mp3' },
+    hazards: { ramps: 2 },
+    blurb: 'Rolling meadows, lakes and leafy trees, with two jump ramps. A friendly track to learn drifting.', music: 'muzik/drifting.ai.mp3' },
   { name: 'Canyon Run', theme: 'desert', seed: 23, pts: 12, radius: 270, stretch: 1.15, wobble: 0.42, elev: 13, width: 19, laps: 3,
-    blurb: 'Sun-baked sand, cacti and red mesas. Fast sweepers with some sneaky hairpins.' },
+    canyon: true, arches: 3, hazards: { ramps: 2, sand: 4, slides: 3 },
+    blurb: 'Sun-baked sand, rock arches and a narrow canyon where boulders fall. Watch out for sand traps!',
+    music: 'muzik/western canyon run.mp3' },
   { name: 'Frosty Peaks', theme: 'snow', seed: 61, pts: 12, radius: 300, stretch: 1.2, wobble: 0.45, elev: 20, width: 18, laps: 3,
-    blurb: 'Steep climbs and plunging descents between snowy pines. For experts only.' }
+    tunnel: true, hazards: { ramps: 2, ice: 5 },
+    blurb: 'Steep climbs, an ice tunnel and slippery ice patches. For experts only.',
+    music: 'muzik/ascension.run.mp3' }
 ];
 
 // ---------------------------------------------------------------- generation
@@ -161,6 +166,7 @@ function finishTrack(def, t) {
     if (!tr.grid.has(key)) tr.grid.set(key, []);
     tr.grid.get(key).push(i);
   }
+  planRockFeatures(tr, def);
   // item box rows and boost pads
   const rng = RNG(def.seed * 31 + 7);
   tr.itemRows = [0.13, 0.38, 0.62, 0.86].map(f => Math.floor(f * N));
@@ -174,7 +180,66 @@ function finishTrack(def, t) {
       tr.pads.push({ idx: i, lat: (rng() * 2 - 1) * tr.hw * 0.5 });
     }
   }
+  planHazards(tr, def);
   return tr;
+}
+
+// Rock features of the canyon track: where the narrow canyon and the arches go.
+// tr.barrier[i] = distance (m) of the barrier from the asphalt edge at sample i (BARRIER everywhere,
+// less inside the canyon: it is also the limit of the car collisions, see Car.update).
+// tr.canyon = {a, b, ramp}: first / last sample of the canyon, ramp = samples to narrow down / widen up.
+// tr.tunnel = {a, b, ramp}: the same for the ice tunnel (roofed between a + ramp and b - ramp).
+// tr.arches = sample indices of the rock arches over the road.
+function planRockFeatures(tr, def) {
+  const N = tr.N, ks = tr.ks;
+  tr.barrier = new Float32Array(N).fill(BARRIER);
+  tr.canyon = null;
+  tr.tunnel = null;
+  tr.arches = [];
+  const curv = (i, w) => { let s = 0; for (let j = -w; j <= w; j++) s += Math.abs(ks[(i + j + N) % N]); return s / (2 * w + 1); };
+  // the straightest and most level stretch of LEN samples (the core is what is left without the two
+  // ramps), away from the start straight and the grid
+  const findStraight = (LEN, RAMP) => {
+    let best = -1, bs = 1e9;
+    for (let i = 150; i + LEN < N - 70; i += 2) {
+      let s = 0;
+      for (let j = RAMP; j < LEN - RAMP; j += 2) s += Math.abs(ks[i + j]);
+      for (let j = RAMP; j < LEN - RAMP; j += 10) s += Math.abs(tr.y[i + j + 10] - tr.y[i + j]) * 0.002;
+      if (s < bs) { bs = s; best = i; }
+    }
+    return best;
+  };
+  // the barriers close in to MIN m from the asphalt along the ramps
+  const narrow = (a, LEN, RAMP, MIN) => {
+    for (let i = a; i <= a + LEN; i++) {
+      const t = Math.min(smooth(a, a + RAMP, i), smooth(a + LEN, a + LEN - RAMP, i));
+      tr.barrier[i] = lerp(BARRIER, MIN, t);
+    }
+  };
+  if (def.canyon) {
+    const LEN = 170, RAMP = 30, best = findStraight(LEN, RAMP);
+    if (best >= 0) { tr.canyon = { a: best, b: best + LEN, ramp: RAMP }; narrow(best, LEN, RAMP, 4.6); }
+  }
+  // the ice tunnel (Frosty Peaks): 190 samples, of which 130 (260 m) are roofed
+  if (def.tunnel) {
+    const LEN = 190, RAMP = 30, best = findStraight(LEN, RAMP);
+    if (best >= 0) { tr.tunnel = { a: best, b: best + LEN, ramp: RAMP }; narrow(best, LEN, RAMP, 5.5); }
+  }
+  tr.zone = tr.canyon || tr.tunnel;       // where nothing grows and nothing is scattered
+  if (def.arches) {
+    const cands = [];
+    for (let i = 150; i < N - 90; i += 3) {
+      if (tr.canyon && i > tr.canyon.a - 45 && i < tr.canyon.b + 45) continue;
+      cands.push([curv(i, 12), i]);
+    }
+    cands.sort((a, b) => a[0] - b[0]);
+    // the first arch is the gate of the canyon; the others go on the straightest places, far apart
+    if (tr.canyon) tr.arches.push(tr.canyon.a - 8);
+    for (const [, i] of cands) {
+      if (tr.arches.length >= def.arches) break;
+      if (tr.arches.every(a => Math.abs(a - i) > 150)) tr.arches.push(i);
+    }
+  }
 }
 
 // Global nearest sample (via spatial hash); returns {idx, d}
@@ -481,6 +546,378 @@ function detailTexture() {
   return t;
 }
 
+// The ice tunnel: a roofed stretch of road through a mound of ice and snow. A ring of points (two
+// straight walls and a half-ellipse roof, K points) is placed at every other sample; the inside
+// is a smooth surface (cyan ice, a faint glow), the outside a thicker shell (white snow), the two
+// ends are closed with a frame between the inner and the outer ring, so the portal is a hole in a wall.
+// On top of that: stalactites hanging from the roof, strips of light along the roof, and big ice
+// crystals on the mound.
+function iceTunnel(tr, seed) {
+  const tn = tr.tunnel, hw = tr.hw, group = new THREE.Group();
+  const s0 = tn.a + tn.ramp, s1 = tn.b - tn.ramp;
+  const samples = [];
+  for (let i = s0; i < s1; i += 2) samples.push(i);
+  samples.push(s1);
+  const WALL = 2.6, ARCH = 6.2, STEPS = 14;
+  // ring points [offset across the road, height, angle on the roof (undefined on the walls)]
+  const ring = W => {
+    const p = [[-W, -0.5], [-W, 0.8], [-W, WALL]];
+    for (let k = 1; k < STEPS; k++) { const f = Math.PI * (1 - k / STEPS); p.push([W * Math.cos(f), WALL + ARCH * Math.sin(f), f]); }
+    p.push([W, WALL], [W, 0.8], [W, -0.5]);
+    return p;
+  };
+  const K = ring(10).length, nS = samples.length;
+  const S = [];
+  // ice ribs: every 32 m a band where the wall bulges inwards (and is lighter)
+  const rib = i => smooth(0.8, 0.98, Math.sin(i * Math.PI / 16));
+  samples.forEach(i => {
+    const W = hw + tr.barrier[i] + 0.9;
+    const Px = tr.x[i], Py = tr.y[i] - 0.4, Pz = tr.z[i], Lx = -tr.tz[i], Lz = tr.tx[i];
+    const inner = [], outer = [];
+    ring(W).forEach((p, j) => {
+      let dx, dy;                                                                    // outward direction
+      if (p[2] === undefined) { dx = p[0] < 0 ? -1 : 1; dy = 0; }
+      else { const nx = p[0] / W, ny = (p[1] - WALL) / ARCH, l = Math.hypot(nx, ny) || 1; dx = nx / l; dy = ny / l; }
+      // the inner wall is slightly uneven, but only away from the road
+      const crag = (j > 1 && j < K - 2) ? 0.5 * noise2(i * 0.12, j * 0.8, seed) - 0.55 * rib(i) : 0;
+      inner.push([Px + Lx * (p[0] + dx * crag), Py + p[1] + dy * crag, Pz + Lz * (p[0] + dx * crag)]);
+      // the outer shell: thicker on the roof, sunk into the ground at the foot
+      const th = 3.6 + (p[2] === undefined ? 0 : 5.5 * Math.pow(Math.sin(p[2]), 1.4)) + 1.2 * noise2(i * 0.07 + 40, j * 0.6, seed + 2);
+      let ox = p[0] + dx * th, oy = p[1] + dy * th;
+      if (j === 0 || j === K - 1) { ox = p[0] + dx * (th + 2.5); oy = -3.5; }
+      outer.push([Px + Lx * ox, Py + oy, Pz + Lz * ox]);
+    });
+    S.push({ inner, outer, i });
+  });
+  const c = new THREE.Color();
+  const grid = (key, colorFn) => {
+    const pos = new Float32Array(nS * K * 3), col = new Float32Array(nS * K * 3), idx = [];
+    S.forEach((s, si) => s[key].forEach((p, j) => {
+      pos.set(p, (si * K + j) * 3);
+      colorFn(c, p, s.i, j);
+      col.set([c.r, c.g, c.b], (si * K + j) * 3);
+    }));
+    for (let si = 0; si < nS - 1; si++) for (let j = 0; j < K - 1; j++) {
+      const a = si * K + j, b = a + 1, cc = a + K, d = cc + 1;
+      idx.push(a, b, cc, b, d, cc);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    g.setIndex(idx);
+    g.computeVertexNormals();
+    return g;
+  };
+  const innerGeo = grid('inner', (col, p, i, j) => {
+    const h = clamp((p[1] - tr.y[i]) / 8, 0, 1);
+    col.set(0xd6f6ff).lerp(c.set(0x78b4f0), h);       // pale cyan at the foot, blue on the roof
+    col.multiplyScalar(0.8 + 0.4 * noise2(i * 0.1, j * 0.7, seed + 5));
+    col.lerp(c.set(0xffffff), 0.75 * smooth(0.62, 0.8, noise2(i * 0.05 + 70, j * 0.45, seed + 6)));   // frost patches
+    col.lerp(c.set(0xf2fbff), 0.55 * rib(i));         // the ribs are paler
+  });
+  const outerGeo = grid('outer', (col, p, i, j) => {
+    const h = clamp((p[1] - tr.y[i]) / 12, 0, 1);
+    col.set(0x9cc4ef).lerp(c.set(0xffffff), smooth(0.15, 0.7, h));      // blue ice at the foot, snow on top
+    col.multiplyScalar(0.9 + 0.15 * noise2(i * 0.09 + 9, j * 0.5, seed + 7));
+  });
+  // portals: the frame between the inner and the outer ring at both ends
+  const cp = [];
+  for (const si of [0, nS - 1]) {
+    const { inner, outer } = S[si];
+    for (let j = 0; j < K - 1; j++) cp.push(...inner[j], ...inner[j + 1], ...outer[j], ...inner[j + 1], ...outer[j + 1], ...outer[j]);
+  }
+  const capGeo = new THREE.BufferGeometry();
+  capGeo.setAttribute('position', new THREE.Float32BufferAttribute(cp, 3));
+  capGeo.computeVertexNormals();
+  const capCol = new Float32Array(cp.length);
+  c.set(0xcfe4fa);
+  for (let k = 0; k < capCol.length; k += 3) { capCol[k] = c.r; capCol[k + 1] = c.g; capCol[k + 2] = c.b; }
+  capGeo.setAttribute('color', new THREE.BufferAttribute(capCol, 3));
+
+  const innerMat = toon({ vertexColors: true, roughness: 0.12, envMapIntensity: 0.55, emissive: 0x2a86d0, emissiveIntensity: 0.4, side: THREE.DoubleSide });
+  const outerMat = toon({ vertexColors: true, roughness: 0.4, envMapIntensity: 0.7, side: THREE.DoubleSide });
+  const inner = new THREE.Mesh(innerGeo, innerMat), outer = new THREE.Mesh(outerGeo, outerMat), caps = new THREE.Mesh(capGeo, outerMat);
+  inner.receiveShadow = true;
+  outer.castShadow = outer.receiveShadow = true;
+  caps.castShadow = caps.receiveShadow = true;
+  group.add(inner, outer, caps);
+
+  // stalactites hanging from the roof (and a few icicles on the walls)
+  const rn = RNG(seed + 9);
+  const iceMat = toon({ color: 0xbfe6ff, roughness: 0.1, envMapIntensity: 1.4, emissive: 0x2a6fb0, emissiveIntensity: 0.3, transparent: true, opacity: 0.9 });
+  const stal = [];
+  S.forEach(s => {
+    const n = Math.floor(rn() * 2.4);
+    for (let k = 0; k < n; k++) {
+      const j = 3 + Math.floor(rn() * (K - 6));
+      const p = s.inner[j], h = 0.5 + rn() * (j > 4 && j < K - 5 ? 1.7 : 0.9), r = 0.14 + rn() * 0.26;
+      stal.push([p[0], p[1] - h / 2 + 0.05, p[2], r, h]);
+    }
+  });
+  const stalGeo = new THREE.ConeGeometry(1, 1, 6).rotateX(Math.PI);        // tip down
+  const stalMesh = new THREE.InstancedMesh(stalGeo, iceMat, stal.length);
+  stal.forEach((e, i) => {
+    mtxTmp.compose(vTmp.set(e[0], e[1], e[2]), qTmp.identity(), sTmp.set(e[3], e[4], e[3]));
+    stalMesh.setMatrixAt(i, mtxTmp);
+  });
+  group.add(stalMesh);
+
+  // strips of light along the roof (HDR colour: they bloom), every 14 m on both sides
+  const lights = [];
+  S.forEach((s, si) => {
+    if (si % 7 !== 3) return;
+    for (const j of [5, K - 6]) lights.push([s.inner[j], Math.atan2(tr.tz[s.i], tr.tx[s.i])]);
+  });
+  const lightMat = new THREE.MeshBasicMaterial({ color: new THREE.Color().setRGB(0.5, 1.7, 2.8) });
+  const lightMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(5, 0.22, 0.22), lightMat, lights.length);
+  lights.forEach((e, i) => {
+    qTmp.setFromAxisAngle(yAxis, -e[1]);
+    mtxTmp.compose(vTmp.set(e[0][0], e[0][1] - 0.15, e[0][2]), qTmp, sTmp.set(1, 1, 1));
+    lightMesh.setMatrixAt(i, mtxTmp);
+  });
+  group.add(lightMesh);
+  // a dashed strip of light along the foot of both walls (a bit dimmer: it is much longer)
+  const foot = [];
+  S.forEach((s, si) => {
+    if (si % 2) return;
+    const Lx = -tr.tz[s.i], Lz = tr.tx[s.i], a = Math.atan2(tr.tz[s.i], tr.tx[s.i]);
+    for (const [j, d] of [[1, 1], [K - 2, -1]]) foot.push([s.inner[j][0] + Lx * d * 0.12, s.inner[j][1] + 0.1, s.inner[j][2] + Lz * d * 0.12, a]);
+  });
+  const footMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(3.2, 0.12, 0.12), new THREE.MeshBasicMaterial({ color: new THREE.Color().setRGB(0.25, 1.1, 1.9) }), foot.length);
+  foot.forEach((e, i) => {
+    qTmp.setFromAxisAngle(yAxis, -e[3]);
+    mtxTmp.compose(vTmp.set(e[0], e[1], e[2]), qTmp, sTmp.set(1, 1, 1));
+    footMesh.setMatrixAt(i, mtxTmp);
+  });
+  group.add(footMesh);
+
+  // big ice crystals on top of the mound and by the portals
+  const crystals = [];
+  for (let k = 0; k < 34; k++) {
+    const si = Math.floor(rn() * nS), s = S[si];
+    const near = k < 8 ? (k % 2 ? 1 : nS - 2) : si;                  // some at the portals
+    const t = S[Math.min(nS - 1, Math.max(0, near))];
+    const j = 7 + Math.floor(rn() * 5);
+    const p = t.outer[j];
+    crystals.push([p[0], p[1] - 0.6, p[2], 0.5 + rn() * 1.2, 2.5 + rn() * 6, (rn() - 0.5) * 0.7, rn() * 6.28]);
+  }
+  const crGeo = new THREE.ConeGeometry(1, 1, 6).translate(0, 0.5, 0);     // base on the ground, tip up
+  const crMesh = new THREE.InstancedMesh(crGeo, iceMat, crystals.length);
+  crystals.forEach((e, i) => {
+    eTmp.set(e[5], e[6], (rn() - 0.5) * 0.5);
+    qTmp.setFromEuler(eTmp);
+    mtxTmp.compose(vTmp.set(e[0], e[1], e[2]), qTmp, sTmp.set(e[3], e[4], e[3]));
+    crMesh.setMatrixAt(i, mtxTmp);
+  });
+  crMesh.castShadow = true;
+  group.add(crMesh);
+  return group;
+}
+const mtxTmp = new THREE.Matrix4(), vTmp = new THREE.Vector3(), qTmp = new THREE.Quaternion(), sTmp = new THREE.Vector3(), eTmp = new THREE.Euler(), yAxis = new THREE.Vector3(0, 1, 0);
+
+// ---------------------------------------------------------------- the crowd
+
+// One spectator, built once and instanced ~1100 times. Local axes: origin at the feet on the step,
+// y up, the person looks towards +z. Every vertex carries aMeta = (part, side): part 0 trousers,
+// 1 shirt, 2 skin, 3 hair, 4 cap, 5 wide-brim hat, 6 beanie; side = -1 / +1 for the vertices of
+// the arms (they are rotated about the shoulder in the vertex shader) and 0 for the rest.
+function spectatorGeometry() {
+  const pos = [], nor = [], meta = [];
+  const add = (g, part, side) => {
+    const ng = g.index ? g.toNonIndexed() : g;
+    ng.computeVertexNormals();
+    const P = ng.attributes.position.array, N = ng.attributes.normal.array;
+    for (let i = 0; i < P.length; i++) { pos.push(P[i]); nor.push(N[i]); }
+    for (let i = 0; i < P.length / 3; i++) meta.push(part, side);
+  };
+  const box = (w, h, d, x, y, z, part, side) => add(new THREE.BoxGeometry(w, h, d).translate(x, y, z), part, side);
+  // legs, torso
+  for (const sx of [-1, 1]) box(0.17, 0.8, 0.2, sx * 0.11, 0.4, 0, 0, 0);
+  box(0.46, 0.55, 0.26, 0, 1.075, 0, 1, 0);
+  // arms: sleeve (hangs from the shoulder at y = 1.33) and hand
+  for (const sx of [-1, 1]) {
+    box(0.11, 0.36, 0.11, sx * 0.285, 1.33 - 0.18, 0, 1, sx);
+    box(0.095, 0.24, 0.095, sx * 0.285, 1.33 - 0.36 - 0.12, 0, 2, sx);
+  }
+  // head and hair (20-face spheres: low-poly on purpose)
+  add(new THREE.IcosahedronGeometry(0.125, 0).scale(1, 1.1, 1).translate(0, 1.52, 0), 2, 0);
+  add(new THREE.IcosahedronGeometry(0.13, 0).scale(1, 0.78, 1).translate(0, 1.575, -0.055), 3, 0);   // set back: the face stays free
+  // hats (only the chosen one is drawn: the others collapse in the vertex shader)
+  add(new THREE.CylinderGeometry(0.145, 0.145, 0.07, 8).translate(0, 1.63, 0), 4, 0);           // cap
+  box(0.2, 0.02, 0.12, 0, 1.61, 0.15, 4, 0);                                                      //   visor
+  add(new THREE.CylinderGeometry(0.31, 0.31, 0.025, 8).translate(0, 1.6, 0), 5, 0);              // wide brim
+  add(new THREE.CylinderGeometry(0.12, 0.135, 0.12, 8).translate(0, 1.67, 0), 5, 0);             //   crown
+  add(new THREE.IcosahedronGeometry(0.145, 0).scale(1, 0.85, 1).translate(0, 1.58, 0), 6, 0);   // beanie
+  add(new THREE.IcosahedronGeometry(0.045, 0).translate(0, 1.72, 0), 6, 0);                      //   pompom
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  g.setAttribute('aMeta', new THREE.Float32BufferAttribute(meta, 2));
+  return g;
+}
+
+// Shared uniforms of the crowd shader
+const CROWD_U = { uTime: { value: 0 }, uWaveU: { value: -999 }, uWaveAmp: { value: 0 }, uExc: { value: [0, 0, 0] } };
+// The animation runs in the vertex shader, so a thousand spectators cost no CPU time:
+//   iInfo  = (phase, how much the person likes to stand up, position along the track in m, stand index)
+//   iInfo2 = (hat 0..3, waves an arm on their own, skin index, hair index)
+//   iShirt = shirt colour, iExtra.x = trousers index
+// Seated people lower the body and shorten the legs; excitement (a car passes, GO!, the finish) and
+// the wave make people stand up, jump and raise their arms.
+function crowdMaterial() {
+  const m = toon({ roughness: 0.9 });
+  m.onBeforeCompile = sh => {
+    for (const k in CROWD_U) sh.uniforms[k] = CROWD_U[k];
+    sh.vertexShader = `attribute vec2 aMeta; attribute vec4 iInfo; attribute vec4 iInfo2; attribute vec3 iShirt; attribute vec4 iExtra;
+      uniform float uTime; uniform float uWaveU; uniform float uWaveAmp; uniform float uExc[3];
+      varying vec3 vCrowd;
+      const vec3 SKIN[6] = vec3[6](vec3(0.98, 0.84, 0.72), vec3(0.93, 0.74, 0.60), vec3(0.82, 0.60, 0.44), vec3(0.64, 0.44, 0.30), vec3(0.45, 0.30, 0.20), vec3(0.30, 0.20, 0.14));
+      const vec3 HAIR[6] = vec3[6](vec3(0.10, 0.08, 0.07), vec3(0.28, 0.17, 0.09), vec3(0.50, 0.32, 0.14), vec3(0.85, 0.70, 0.38), vec3(0.55, 0.55, 0.57), vec3(0.62, 0.20, 0.10));
+      const vec3 PANTS[5] = vec3[5](vec3(0.14, 0.20, 0.36), vec3(0.10, 0.10, 0.12), vec3(0.45, 0.38, 0.28), vec3(0.28, 0.30, 0.34), vec3(0.20, 0.30, 0.22));
+      ` + sh.vertexShader
+      .replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>
+      float cPart = aMeta.x, cSide = aMeta.y;
+      float cEx = uExc[int(iInfo.w)];
+      float cWv = smoothstep(9.0, 2.0, abs(iInfo.z - uWaveU)) * uWaveAmp;
+      float cSf = clamp(iInfo.y + cEx * 0.9 + cWv * 1.1, 0.0, 1.0);            // 0 seated .. 1 standing
+      float cUp = clamp(cEx * 1.5 + cWv, 0.0, 1.0);                             // arms up
+      float cJump = (cEx * 0.8 + cWv * 0.6) * abs(sin(uTime * (6.0 + fract(iInfo.x * 0.37) * 2.5) + iInfo.x)) * 0.2 * cSf;
+      float cAng = 0.0;
+      if (cSide != 0.0) {
+        float up = cUp;
+        if (cSide > 0.0) up = max(up, iInfo2.y * (0.55 + 0.45 * sin(uTime * 3.0 + iInfo.x)));   // a fan waving on their own
+        float vr = fract(sin(iInfo.x * 12.9898 + cSide * 3.1) * 43758.5453);       // this arm of this person
+        up *= 0.7 + 0.45 * vr;
+        cAng = cSide * (0.1 + clamp(up, 0.0, 1.0) * (1.9 + 0.8 * vr) + sin(uTime * (6.0 + 6.0 * vr) + iInfo.x * 3.0 + cSide) * 0.35 * clamp(up, 0.0, 1.0));
+      }
+      float cCos = cos(cAng), cSin = sin(cAng);
+      if (cSide != 0.0) objectNormal = vec3(cCos * objectNormal.x - cSin * objectNormal.y, cSin * objectNormal.x + cCos * objectNormal.y, objectNormal.z);`)
+      .replace('#include <begin_vertex>', `vec3 transformed = vec3(position);
+      float hatSel = iInfo2.x;                                                    // 0 none, 1 cap, 2 brim, 3 beanie
+      if (cPart > 3.5 && abs(cPart - 3.0 - hatSel) > 0.5) transformed *= 0.0;
+      if (cPart > 2.5 && cPart < 3.5 && hatSel > 1.5) transformed *= 0.0;       // no hair under a brim or a beanie
+      if (cSide != 0.0) {                                                         // arm: rotate about the shoulder
+        vec3 pv = vec3(cSide * 0.285, 1.33, 0.0);
+        vec3 d = transformed - pv;
+        transformed = pv + vec3(cCos * d.x - cSin * d.y, cSin * d.x + cCos * d.y, d.z);
+      }
+      if (cPart < 0.5) transformed.y *= 1.0 - 0.44 * (1.0 - cSf);                 // seated: shorter legs, body lower
+      else transformed.y -= 0.35 * (1.0 - cSf);
+      transformed.y += cJump;
+      transformed.x += sin(uTime * 1.3 + iInfo.x) * 0.03 * smoothstep(0.7, 1.4, transformed.y);   // idle sway
+      vec3 cCol = cPart < 0.5 ? pow(PANTS[int(iExtra.x)], vec3(2.2))
+                : cPart < 1.5 ? iShirt
+                : cPart < 2.5 ? pow(SKIN[int(iInfo2.z)], vec3(2.2))
+                : cPart < 3.5 ? pow(HAIR[int(iInfo2.w)], vec3(2.2))
+                : iShirt * 0.85;
+      vCrowd = cCol;`);
+    sh.fragmentShader = 'varying vec3 vCrowd;\n' + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n diffuseColor.rgb *= vCrowd;');
+  };
+  m.customProgramCacheKey = () => 'crowd';
+  return m;
+}
+
+// ---------------------------------------------------------------- rock arches and canyon walls
+
+const ROCK_PAL = [0xb5532e, 0xc9693c, 0xa04a2a, 0xd98250, 0xbf5f35, 0xe39a64, 0x9a4527].map(h => new THREE.Color(h));
+// Colours a non-indexed geometry face by face with horizontal rock strata: bands about 1.7 m tall,
+// slightly wavy, each with its own shade (a layered sandstone look)
+function strataFaces(geo, seed) {
+  const P = geo.attributes.position, n = P.count, col = new Float32Array(n * 3), c = new THREE.Color();
+  for (let f = 0; f < n; f += 3) {
+    const cx = (P.getX(f) + P.getX(f + 1) + P.getX(f + 2)) / 3, cy = (P.getY(f) + P.getY(f + 1) + P.getY(f + 2)) / 3, cz = (P.getZ(f) + P.getZ(f + 1) + P.getZ(f + 2)) / 3;
+    const band = Math.floor(cy / 1.7 + fbm(cx * 0.06 + cz * 0.06, cy * 0.12, seed, 2) * 1.6);
+    c.copy(ROCK_PAL[(((band * 5) % 7) + 7) % 7]).multiplyScalar(0.8 + 0.4 * hash2(band, seed, 5));
+    for (let k = 0; k < 3; k++) { col[(f + k) * 3] = c.r; col[(f + k) * 3 + 1] = c.g; col[(f + k) * 3 + 2] = c.b; }
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  return geo;
+}
+// Concatenates non-indexed geometries into one with flat normals
+function mergeFlat(list) {
+  let n = 0;
+  for (const g of list) n += g.attributes.position.count;
+  const pos = new Float32Array(n * 3);
+  let o = 0;
+  for (const g of list) { pos.set(g.attributes.position.array, o); o += g.attributes.position.array.length; }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  out.computeVertexNormals();
+  return out;
+}
+
+// A natural rock arch over the road. Local axes: x across the road, y up, z along the road;
+// origin on the ground at the centre. R = half the span (the pillars stand at x = +-R).
+function archGeometry(R, seed) {
+  const rr = RNG(seed), list = [];
+  // the arch itself: half a torus (the tube is 3.6 m thick), squashed in height to a 24 m peak and
+  // stretched along the road (about 19 m deep), then roughened
+  const tor = new THREE.TorusGeometry(R, 3.6, 7, 20, Math.PI);
+  tor.scale(1, 24 / R, 2.7);
+  list.push(jitterGeo(tor, 2.4, seed));
+  for (const sd of [-1, 1]) {
+    // pillar sunk into the ground
+    const cyl = new THREE.CylinderGeometry(6.6, 9.8, 22, 9, 5);
+    cyl.translate(sd * R, 3, 0);
+    list.push(jitterGeo(cyl, 2.2, seed + sd * 7));
+    // loose boulders at the foot
+    for (let k = 0; k < 4; k++) {
+      const b = new THREE.DodecahedronGeometry(3.4 + rr() * 3.4, 0);
+      b.scale(1.2, 0.8 + rr() * 0.5, 1);
+      b.translate(sd * R + (rr() - 0.5) * 16, 0.6 + rr() * 2, (rr() - 0.5) * 18);
+      list.push(jitterGeo(b, 1.6, seed + k * 11 + sd));
+    }
+  }
+  return strataFaces(mergeFlat(list), seed);
+}
+
+// The walls of the narrow canyon: a rocky mass on each side of the road, from the barrier up to
+// 28-44 m, with an overhang-free craggy inner face, a flat-ish top and an outer slope. The walls
+// rise out of the ground along the entrance ramp and sink back along the exit ramp.
+function canyonWalls(tr, seed) {
+  const cn = tr.canyon, N = tr.N, hw = tr.hw;
+  const frac = [0, 0.1, 0.22, 0.34, 0.46, 0.58, 0.7, 0.82, 0.92, 1.0];
+  const outer = [[5, 0.985], [13, 0.92], [24, 0.65], [36, 0.2], [46, -0.15]];
+  const samples = [];
+  for (let i = cn.a; i < cn.b; i += 2) samples.push(i);
+  samples.push(cn.b);
+  const rows = [[], []];                     // [side][k] = list of points across the wall
+  [-1, 1].forEach((side, si) => {
+    for (const i of samples) {
+      const t = Math.min(smooth(cn.a, cn.a + cn.ramp, i), smooth(cn.b, cn.b - cn.ramp, i));
+      const H = (28 + 16 * fbm(i * 0.03, side * 3.1 + 5, seed, 2)) * t;
+      const oIn = hw + tr.barrier[i] + 0.9;
+      const base = tr.y[i] - 3;
+      const pts = [];
+      const place = (off, f) => {
+        pts.push([tr.x[i] - tr.tz[i] * off * side, base + (H + 3) * f, tr.z[i] + tr.tx[i] * off * side]);
+      };
+      let oTop = oIn;
+      for (const f of frac) {
+        const crag = f * (0.4 + 2.6 * noise2(i * 0.11 + side * 13, f * 6, seed));
+        oTop = oIn + 0.1 * H * f + crag;
+        place(oTop, f);
+      }
+      for (const [d, f] of outer) place(oTop + d, f);
+      rows[si].push(pts);
+    }
+  });
+  const list = [];
+  for (let si = 0; si < 2; si++) {
+    const pos = [];
+    for (let k = 0; k + 1 < rows[si].length; k++) {
+      const A = rows[si][k], B = rows[si][k + 1];
+      for (let j = 0; j + 1 < A.length; j++) {
+        pos.push(...A[j], ...A[j + 1], ...B[j], ...A[j + 1], ...B[j + 1], ...B[j]);
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    list.push(g);
+  }
+  return strataFaces(mergeFlat(list), seed + 3);
+}
+
 // ---------------------------------------------------------------- scene building
 
 function buildTrackScene(tr, scene, renderer) {
@@ -540,9 +977,9 @@ function buildTrackScene(tr, scene, renderer) {
   group.add(hemi);
   const sun = new THREE.DirectionalLight(th.sun, th.sunInt);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(4096, 4096);
+  sun.shadow.mapSize.set(Q.shadow, Q.shadow);
   const sc = sun.shadow.camera;
-  sc.left = -60; sc.right = 60; sc.top = 60; sc.bottom = -60; sc.near = 1; sc.far = 500;
+  sc.left = -Q.shadowSize; sc.right = Q.shadowSize; sc.top = Q.shadowSize; sc.bottom = -Q.shadowSize; sc.near = 1; sc.far = 500;
   sun.shadow.bias = -0.0004;
   sun.shadow.normalBias = 0.03;
   sun.shadow.radius = 3;
@@ -712,7 +1149,7 @@ function buildTrackScene(tr, scene, renderer) {
   const b = tr.bounds, margin = 520;
   const tx0 = b.minX - margin, tz0 = b.minZ - margin;
   const tW = b.maxX - b.minX + margin * 2, tD = b.maxZ - b.minZ + margin * 2;
-  const step = 6, nx = Math.ceil(tW / step), nz = Math.ceil(tD / step);
+  const step = Q.terrainStep, nx = Math.ceil(tW / step), nz = Math.ceil(tD / step);
   const tPos = new Float32Array((nx + 1) * (nz + 1) * 3), tCol = new Float32Array((nx + 1) * (nz + 1) * 3);
   const g0 = new THREE.Color(th.grass[0]), g1 = new THREE.Color(th.grass[1]), gf = new THREE.Color(th.grassFar);
   const tmp = new THREE.Color();
@@ -790,9 +1227,9 @@ function buildTrackScene(tr, scene, renderer) {
   // ---- side barriers (instanced blocks following the offset lines)
   const barrierPts = [];
   for (const side of [-1, 1]) {
-    const off = hw + BARRIER;
     let acc = 0, px = null, pz = null;
     for (let i = 0; i < N; i++) {
+      const off = hw + tr.barrier[i];     // closer to the road inside the canyon
       const x = tr.x[i] - tr.tz[i] * off * side, z = tr.z[i] + tr.tx[i] * off * side;
       if (px !== null) acc += Math.hypot(x - px, z - pz);
       px = x; pz = z;
@@ -824,6 +1261,7 @@ function buildTrackScene(tr, scene, renderer) {
   const placeProps = (type, count, opts) => {
     const geo = propGeometry(type);
     if (!geo || !count) return;
+    if (!opts.far) count = Math.max(1, Math.round(count * Q.props));   // fewer trees and rocks on Low
     const list = [];
     let guard = 0;
     while (list.length < count && guard++ < count * 40) {
@@ -841,6 +1279,7 @@ function buildTrackScene(tr, scene, renderer) {
       }
       const n = trackNearest(tr, x, z, keepOut + (opts.big || 0) + 2);
       if (n.idx >= 0) continue;
+      if (tr.zone) { const m = trackNearest(tr, x, z, 75); if (m.idx >= tr.zone.a - 12 && m.idx <= tr.zone.b + 12) continue; }   // no props inside the rock / ice
       const h = terrainH(x, z).h;
       if (th.water && h < waterLevel + 0.6) continue;
       const s = (opts.scale || 1) * (0.75 + rng() * 0.6);
@@ -881,7 +1320,7 @@ function buildTrackScene(tr, scene, renderer) {
   // in 120 m chunks (r147 does not cull the instances of one mesh), each chunk with its own
   // bounding sphere, and switched off by distance every frame.
   const coverChunks = [];
-  {
+  if (Q.cover > 0) {
     const kinds = groundKinds(def.theme), rg = RNG(def.seed * 29 + 3);
     const mats = kinds.map(k => k.wind ? windMaterial({ vertexColors: true, roughness: 0.95, envMapIntensity: 0.35 }, k.wind, 'g' + k.name) : toon({ vertexColors: true, roughness: 0.9 }));
     const total = kinds.reduce((a, k) => a + k.share, 0);
@@ -891,6 +1330,7 @@ function buildTrackScene(tr, scene, renderer) {
       const lists = kinds.map(() => []);
       let sx = 0, sz = 0, sy = 0, cnt = 0;
       for (let s = c * CH; s < Math.min(N, (c + 1) * CH); s++) {
+        if (tr.zone && s >= tr.zone.a - 8 && s <= tr.zone.b + 8) continue;   // rock walls or the tunnel there
         for (const side of [-1, 1]) {
           // run-off area between the shoulder and the barrier (dense), and beyond the barrier (thinner)
           const nA = Math.floor(0.45 * SPACING * widthA + rg()), nB = Math.floor(0.2 * SPACING * widthB + rg());
@@ -936,10 +1376,29 @@ function buildTrackScene(tr, scene, renderer) {
     }
     anim.push((dt, t, cam) => {
       for (const ch of coverChunks) {
-        const vis = Math.hypot(cam.position.x - ch.x, cam.position.y - ch.y, cam.position.z - ch.z) - ch.rad < 230;
+        const vis = Math.hypot(cam.position.x - ch.x, cam.position.y - ch.y, cam.position.z - ch.z) - ch.rad < Q.coverDist;
         for (const m of ch.meshes) m.visible = vis;
       }
     });
+  }
+
+  // ---- rock features (Canyon Run): arches over the road and the narrow canyon
+  {
+    const rockMat = toon({ vertexColors: true, roughness: 1, side: THREE.DoubleSide });
+    (tr.arches || []).forEach((s, n) => {
+      const m = new THREE.Mesh(archGeometry(hw + tr.barrier[s] + 11, def.seed * 3 + n), rockMat);
+      m.position.set(tr.x[s], tr.y[s] - 0.4, tr.z[s]);
+      m.rotation.y = Math.PI / 2 - Math.atan2(tr.tz[s], tr.tx[s]);     // local x across the road, z along it
+      m.castShadow = m.receiveShadow = true;
+      group.add(m);
+    });
+    if (tr.tunnel) group.add(iceTunnel(tr, def.seed));
+    buildHazardMeshes(tr, def, group, th);
+    if (tr.canyon) {
+      const m = new THREE.Mesh(canyonWalls(tr, def.seed), rockMat);
+      m.castShadow = m.receiveShadow = true;
+      group.add(m);
+    }
   }
 
   // ---- distant mountain ring
@@ -995,8 +1454,8 @@ function buildTrackScene(tr, scene, renderer) {
       g.fillStyle = '#e8302a'; g.fillRect(0, 32, w, h - 64);
       g.font = 'italic 900 56px "Arial Black", Impact, sans-serif';
       g.textAlign = 'center'; g.textBaseline = 'middle';
-      g.lineWidth = 8; g.strokeStyle = '#111'; g.strokeText('KARIO MART', w / 2, h / 2 + 2);
-      g.fillStyle = '#ffd23a'; g.fillText('KARIO MART', w / 2, h / 2 + 2);
+      g.lineWidth = 8; g.strokeStyle = '#111'; g.strokeText('undefAIned', w / 2, h / 2 + 2);
+      g.fillStyle = '#ffd23a'; g.fillText('undefAIned', w / 2, h / 2 + 2);
     });
     // local +x is the driving direction, so the wide faces are +x / -x (material slots 0 and 1)
     const banMat = toon({ map: banTex, roughness: 0.6 });
@@ -1008,10 +1467,13 @@ function buildTrackScene(tr, scene, renderer) {
     group.add(gant);
   }
 
-  // ---- grandstands beside the start straight
+  // ---- grandstands beside the start straight, with the crowd
+  const crowdState = { ex: [0, 0, 0], burst: 0, burstDecay: 0.25, waveT: 9, waveOn: false };
   {
-    const crowdPos = [];
     const standMat = toon({ color: 0x8890a8 });
+    const crowdPos = [], standC = [];
+    const high = Q.crowd >= 1;
+    const cols = high ? 38 : 26, colStep = high ? 0.9 : 1.35, subRows = high ? [-0.5, 0.5] : [0];
     for (const sd of [1]) {
       for (let k = -1; k <= 1; k++) {
         const s = (k * 22 + N) % N;
@@ -1020,12 +1482,16 @@ function buildTrackScene(tr, scene, renderer) {
         const st = new THREE.Group();
         st.position.set(gx, gy, gz);
         st.rotation.y = -Math.atan2(tr.tz[s], tr.tx[s]);
+        standC.push({ x: gx, z: gz });
         for (let r = 0; r < 5; r++) {
-          const bx = new THREE.Mesh(new THREE.BoxGeometry(36, 1.2 + r * 1.2, 2.2), standMat);
-          bx.position.set(0, (1.2 + r * 1.2) / 2, sd * (r * 2.2));
+          const top = 1.2 + r * 1.2;
+          const bx = new THREE.Mesh(new THREE.BoxGeometry(36, top, 2.2), standMat);
+          bx.position.set(0, top / 2, sd * (r * 2.2));
           bx.castShadow = bx.receiveShadow = true;
           st.add(bx);
-          for (let c = 0; c < 26; c++) crowdPos.push({ g: st, x: -17 + c * 1.35 + Math.random() * 0.3, y: 1.2 + r * 1.2 + 0.5, z: sd * (r * 2.2) });
+          for (const sz of subRows) for (let c = 0; c < cols; c++) {
+            crowdPos.push({ g: st, k: k + 1, x: -17 + c * colStep + (Math.random() - 0.5) * 0.25, y: top, z: sd * (r * 2.2 + sz) + (Math.random() - 0.5) * 0.3, u: k * 22 * SPACING + (-17 + c * colStep) });
+          }
         }
         const roof = new THREE.Mesh(new THREE.BoxGeometry(38, 0.6, 13), toon({ color: th.barrier[0] }));
         roof.position.set(0, 10.5, sd * 4.4);
@@ -1035,33 +1501,85 @@ function buildTrackScene(tr, scene, renderer) {
         group.add(st);
       }
     }
-    const crowdGeo = new THREE.BoxGeometry(0.8, 1, 0.6);
-    const crowd = new THREE.InstancedMesh(crowdGeo, toon({}), crowdPos.length);
-    const cc = new THREE.Color();
-    const pal = [0xff4d4d, 0x4da6ff, 0xffd84d, 0x5ee07a, 0xff8ad8, 0xffffff, 0xff9a3c, 0x9a7bff];
+    // the people: random but repeatable looks, with the clothes of the place
+    const nP = crowdPos.length, rc = RNG(def.seed * 17 + 5);
+    const info = new Float32Array(nP * 4), info2 = new Float32Array(nP * 4), shirt = new Float32Array(nP * 3), extra = new Float32Array(nP * 4);
+    const shirtPal = (def.theme === 'desert' ? [0xf3e2b0, 0xd9843a, 0xc0392b, 0x2b6f8a, 0xf5f0e6, 0x8a5a2b, 0xe8b04a, 0x3d3d3d]
+      : def.theme === 'snow' ? [0x2a7bff, 0xe8302a, 0xffd23a, 0x1fae6a, 0xff7ab8, 0x222a44, 0xffffff, 0xff9a1e]
+        : [0xff4d4d, 0x4da6ff, 0xffd84d, 0x5ee07a, 0xff8ad8, 0xffffff, 0xff9a3c, 0x9a7bff, 0x2e8be0]).map(h => new THREE.Color(h));
+    const hatOf = () => {                         // [none, cap, wide brim, beanie] chances per place
+      const r = rc(), w = def.theme === 'desert' ? [0.3, 0.45, 0.9, 1] : def.theme === 'snow' ? [0.3, 0.38, 0.38, 1] : [0.6, 0.95, 1, 1];
+      return r < w[0] ? 0 : r < w[1] ? 1 : r < w[2] ? 2 : 3;
+    };
+    const crowd = new THREE.InstancedMesh(spectatorGeometry(), crowdMaterial(), nP);
+    const crowdW = new Float32Array(nP * 3);      // head positions in the world, for the flashes
+    const upY = new THREE.Vector3(0, 1, 0);
     crowdPos.forEach((p, i) => {
       p.g.updateMatrixWorld(true);
       v.set(p.x, p.y, p.z).applyMatrix4(p.g.matrixWorld);
-      mtx.compose(v, q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), p.g.rotation.y), sc1);
+      const sc = 0.92 + rc() * 0.16;
+      mtx.compose(v, q.setFromAxisAngle(upY, p.g.rotation.y + Math.PI + (rc() - 0.5) * 0.5), new THREE.Vector3(sc, sc, sc));
       crowd.setMatrixAt(i, mtx);
-      crowd.setColorAt(i, cc.set(pal[i % pal.length]));
+      crowdW[i * 3] = v.x; crowdW[i * 3 + 1] = v.y + 1.5 * sc; crowdW[i * 3 + 2] = v.z;
+      const sr = rc();
+      info.set([rc() * Math.PI * 2, sr < 0.55 ? 0 : sr < 0.85 ? 0.1 + rc() * 0.3 : 0.85, p.u, p.k], i * 4);
+      info2.set([hatOf(), rc() < 0.12 ? 1 : 0, Math.floor(rc() * 6), Math.floor(rc() * 6)], i * 4);
+      const c = shirtPal[Math.floor(rc() * shirtPal.length)];
+      shirt.set([c.r, c.g, c.b], i * 3);
+      extra.set([Math.floor(rc() * 5), 0, 0, 0], i * 4);
     });
+    crowd.geometry.setAttribute('iInfo', new THREE.InstancedBufferAttribute(info, 4));
+    crowd.geometry.setAttribute('iInfo2', new THREE.InstancedBufferAttribute(info2, 4));
+    crowd.geometry.setAttribute('iShirt', new THREE.InstancedBufferAttribute(shirt, 3));
+    crowd.geometry.setAttribute('iExtra', new THREE.InstancedBufferAttribute(extra, 4));
+    crowd.receiveShadow = true;
     group.add(crowd);
-    const crowdBase = crowdPos.map((p, i) => { const m = new THREE.Matrix4(); crowd.getMatrixAt(i, m); return m; });
-    anim.push((dt, t) => {
-      // a cheering crowd: every spectator bounces a little
-      for (let i = 0; i < crowdBase.length; i++) {
-        mtx.copy(crowdBase[i]);
-        mtx.elements[13] += Math.max(0, Math.sin(t * 7 + i * 1.7)) * 0.35;
-        crowd.setMatrixAt(i, mtx);
+    const U = CROWD_U, cs = crowdState, rw = RNG(def.seed * 5 + 1);
+    anim.push((dt, t, cam) => {
+      U.uTime.value = t;
+      const gm = typeof game !== 'undefined' ? game : null;
+      // excitement of each stand: cars passing by (the player counts the most), plus the bursts at
+      // GO, at every lap and at the finish. It rises fast and dies down slowly.
+      for (let k = 0; k < 3; k++) {
+        let target = cs.burst;
+        if (gm) for (const c of gm.cars) {
+          const d = Math.hypot(c.x - standC[k].x, c.z - standC[k].z);
+          target = Math.max(target, smooth(75, 28, d) * smooth(3, 15, c.speed) * (c.isPlayer ? 1 : 0.65));
+        }
+        cs.ex[k] += (target - cs.ex[k]) * (1 - Math.exp(-(target > cs.ex[k] ? 6 : 0.6) * dt));
+        U.uExc.value[k] = cs.ex[k];
       }
-      crowd.instanceMatrix.needsUpdate = true;
+      cs.burst = Math.max(0, cs.burst - cs.burstDecay * dt);
+      // the wave: from time to time a band of standing people runs along the stands
+      cs.waveT -= dt;
+      if (!cs.waveOn && cs.waveT <= 0) { cs.waveOn = true; U.uWaveU.value = -85; U.uWaveAmp.value = 1; }
+      if (cs.waveOn) {
+        U.uWaveU.value += 30 * dt;
+        if (U.uWaveU.value > 85) { cs.waveOn = false; U.uWaveAmp.value = 0; cs.waveT = 18 + rw() * 22; }
+      }
+      // camera flashes (more when the crowd is excited): a short, bright (HDR: it blooms) point
+      if (Q.bloom && gm && gm.fx && dt > 0) {
+        const mean = (cs.ex[0] + cs.ex[1] + cs.ex[2]) / 3;
+        let n = Math.floor((4 + 12 * mean) * dt + Math.random());
+        while (n-- > 0) {
+          for (let tries = 0; tries < 6; tries++) {
+            const i = Math.floor(Math.random() * nP), x = crowdW[i * 3], y = crowdW[i * 3 + 1], z = crowdW[i * 3 + 2];
+            const d = Math.hypot(x - cam.position.x, y - cam.position.y, z - cam.position.z);
+            if (d > 170) continue;
+            const size = 0.4 + d * 0.013;
+            gm.fx.glow.add({ x, y, z, vx: 0, vy: 0, vz: 0, life: 0.07 + Math.random() * 0.06, s0: size, s1: size * 0.5, r: 5, g: 5, b: 4.5, a: 1 });
+            break;
+          }
+        }
+      }
     });
   }
 
   return {
     group, sun, sunDir, terrainH,
     update(dt, t, cam) { for (const f of anim) f(dt, t, cam); },
+    // the crowd cheers: amount 0..1, decay = how fast it dies down (per second)
+    crowdBurst(amount, decay) { crowdState.burst = Math.max(crowdState.burst, amount); crowdState.burstDecay = decay || 0.25; },
     dispose() {
       scene.remove(group);
       if (envTex) { envTex.dispose(); scene.environment = null; }

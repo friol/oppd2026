@@ -28,10 +28,10 @@ const Sfx = {
   }
 };
 Sfx.load('nitro', 'soundfx/nitro.mp3', 6);
-// "three, two, one" one second apart, made from three.two.one.wav: "fight" cut off, echo added
-Sfx.load('countdown', 'soundfx/countdown.wav', 1);
+// "three, two, one" one second apart, made from the original three.two.one sample: "fight" cut off, echo added
+Sfx.load('countdown', 'soundfx/countdown.mp3', 1);
 // "Get ready": plays at the start of the intro, before the countdown (3.7 s, like the intro)
-Sfx.load('getready', 'soundfx/get.ready.wav', 1);
+Sfx.load('getready', 'soundfx/get.ready.mp3', 1);
 Sfx.load('finish', 'soundfx/finish.mp3', 1);   // the player crosses the finish line
 Sfx.load('lap2', 'soundfx/lap2.mp3', 1);       // the player finishes lap 1 (starts lap 2)
 Sfx.load('lap3', 'soundfx/lap3.mp3', 1);       // the player finishes lap 2 (starts lap 3)
@@ -49,12 +49,12 @@ Sfx.fadeOut = function (name, sec) {
     }, 16);
   }
 };
-// "GO!" with lots of echo, made from go.ogg (see CLAUDE.md)
-Sfx.load('go', 'soundfx/go.wav', 1);
-Sfx.load('splat', 'soundfx/splat.wav', 4);
-Sfx.load('explosion', 'soundfx/explosion.wav', 4);
-Sfx.load('gem', 'soundfx/gem.wav', 4);   // item pickup: hexaedron.wav with echo (tools/gem_echo.py)
-Sfx.load('drift', 'soundfx/drift.wav', 6);   // start of a skid (the loop is drift_loop.wav)
+// "GO!" with lots of echo, made from go.dry.mp3 (see CLAUDE.md)
+Sfx.load('go', 'soundfx/go.mp3', 1);
+Sfx.load('splat', 'soundfx/splat.mp3', 4);
+Sfx.load('explosion', 'soundfx/explosion.mp3', 4);
+Sfx.load('gem', 'soundfx/gem.mp3', 4);   // item pickup: hexaedron.mp3 with echo (tools/gem_echo.py)
+Sfx.load('drift', 'soundfx/drift.mp3', 6);   // start of a skid (the loop is drift_loop.mp3)
 // One-shot at a world position: full volume within 10 m of the camera, silent beyond ~100 m
 Sfx.playAt = function (name, pos, cam, volume, range) {
   const d = cam ? Math.hypot(cam.x - pos.x, cam.y - pos.y, cam.z - pos.z) : 0;
@@ -67,8 +67,9 @@ Sfx.loop = function (src) {
   const a = new Audio(src);
   a.loop = true;
   a.preload = 'auto';
+  Engine.routeElement(a);
   const h = {
-    on: false,
+    on: false, el: a,
     set(volume) {
       if (volume > 0.02) {
         a.volume = clamp(volume, 0, 1);
@@ -85,6 +86,11 @@ Sfx.loop = function (src) {
   };
   Sfx.loops.add(h);
   return h;
+};
+// Routes the elements that exist before the audio context (the pools) through the reverb bus
+Sfx.attach = function () {
+  for (const k in this.pools) for (const a of this.pools[k].list) Engine.routeElement(a);
+  for (const h of this.loops) Engine.routeElement(h.el);
 };
 Sfx.pauseLoops = function () { for (const h of Sfx.loops) h.pause(); };
 // One-shot sounds during the pause menu: suspend, then resume or stop
@@ -117,12 +123,15 @@ const SMOKE_FRAG = `varying vec4 vC; varying float vS;
 // Race music: one <audio> element (works from file://), looping, with fades.
 // M toggles it; the choice is remembered in localStorage (kario18:music).
 const Music = {
-  el: null, src: null, target: 0, vol: 0, VOL: 0.45,
+  el: null, src: null, target: 0, vol: 0, VOL: 0.45, old: null, oldVol: 0,
   on: (() => { try { return localStorage.getItem('kario18:music') !== 'off'; } catch (e) { return true; } })(),
   play(src) {
-    if (!src) { this.stop(); return; }
-    if (this.src !== src) {
-      if (this.el) this.el.pause();
+    if (!src) { this.fadeOut(); return; }     // a track without music: the current one fades out
+    if (this.src !== src || !this.el) {
+      // another track: the old one fades out while the new one fades in
+      if (this.old) this.old.pause();
+      this.old = null;
+      if (this.el && !this.el.paused) { this.old = this.el; this.oldVol = this.vol; }
       this.el = new Audio(src);
       this.el.loop = true;
       this.src = src;
@@ -137,7 +146,7 @@ const Music = {
     const r = this.el.play();
     if (r && r.catch) r.catch(() => { });
   },
-  pause() { if (this.el) this.el.pause(); },
+  pause() { if (this.el) this.el.pause(); if (this.old) { this.old.pause(); this.old = null; } },
   fadeOut() { this.target = 0; },
   stop() { this.target = 0; this.vol = 0; if (this.el) { this.el.pause(); this.el.currentTime = 0; } },
   toggle() {
@@ -147,6 +156,10 @@ const Music = {
     return this.on;
   },
   update(dt) {
+    if (this.old) {
+      this.oldVol -= dt * 0.6;
+      if (this.oldVol <= 0.001) { this.old.pause(); this.old = null; } else this.old.volume = clamp(this.oldVol, 0, 1);
+    }
     if (!this.el) return;
     this.vol += clamp(this.target - this.vol, -dt * 0.6, dt * 0.6);   // ~0.75 s fades
     this.el.volume = clamp(this.vol, 0, 1);
@@ -192,6 +205,7 @@ class ParticleSystem {
     scene.add(this.points);
   }
   add(p) {
+    if (Q.particles < 1 && Math.random() > Q.particles) return;   // Low: half of the particles
     if (this.list.length >= this.max) this.list.shift();
     p.age = 0;
     if (p.seed === undefined) p.seed = Math.random();
@@ -338,11 +352,12 @@ class FX {
     }
   }
   // Soft billowing smoke (same soft puffs as the exhaust). grey: 0 = black .. 1 = white
-  puff(x, y, z, vx, vy, vz, grey, size, life, alpha) {
+  // tint = [r, g, b] multipliers (a brownish dust cloud, for instance)
+  puff(x, y, z, vx, vy, vz, grey, size, life, alpha, tint) {
     const g = lin(clamp(grey + (Math.random() - 0.5) * 0.08, 0, 1));
     this.smokeSys.add({ x, y, z, vx, vy, vz, grav: -1.2, drag: 1.6, turb: 6, soft: true,
       life: life * (0.8 + Math.random() * 0.4), s0: size * 0.35, s1: size * (0.9 + Math.random() * 0.5),
-      r: g, g: g, b: g * 1.03, a: alpha });
+      r: g * (tint ? tint[0] : 1), g: g * (tint ? tint[1] : 1), b: g * (tint ? tint[2] : 1.03), a: alpha });
   }
   // Generic smoke column (rocket trail, kept for compatibility)
   smoke(x, y, z) {

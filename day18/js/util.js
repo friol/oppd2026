@@ -7,6 +7,20 @@ THREE.ColorManagement.legacyMode = false;
 // Look: realistic (PBR materials, no outlines). Set outlines back to true for the old toon look.
 const GFX = { outlines: false };
 
+// Graphics presets, chosen in the menu (row GRAPHICS) and applied by changeQuality() in game.js.
+//   pixelRatio / scale: render resolution (device pixel ratio cap, extra scale below 1 = softer)
+//   msaa: antialiasing samples of the HDR target; bloom: glow pass; shadow: sun shadow map size
+//   and the half width (m) it covers; cover: grass / flowers / drifts on (1) or off (0);
+//   props: share of trees, rocks and bushes; terrainStep: ground mesh cell (m);
+//   coverDist: draw distance of the ground cover; speedFx: radial blur and heat haze;
+//   clearcoat: car paint lacquer layer; particles: share of the smoke / spark particles kept
+//   crowd: 1 = 1100 spectators + camera flashes, below 1 = about 400 spectators, no flashes
+const QUALITY = [
+  { name: 'High', pixelRatio: 2, scale: 1, msaa: 4, bloom: true, shadow: 4096, shadowSize: 60, cover: 1, props: 1, terrainStep: 6, coverDist: 230, speedFx: true, clearcoat: true, particles: 1, crowd: 1 },
+  { name: 'Low', pixelRatio: 1, scale: 0.8, msaa: 0, bloom: false, shadow: 1024, shadowSize: 45, cover: 0, props: 0.45, terrainStep: 10, coverDist: 120, speedFx: false, clearcoat: false, particles: 0.5, crowd: 0.4 }
+];
+let Q = QUALITY[0];
+
 // Deterministic PRNG (mulberry32)
 function RNG(seed) {
   let a = seed >>> 0;

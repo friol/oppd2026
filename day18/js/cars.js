@@ -205,11 +205,11 @@ function loadCarAssets(done) {
     CarAssets.pix = cg.getImageData(0, 0, 512, 512).data;
     // glossy car paint: clear coat over the palette colours, sky reflections from the env map
     CarAssets.material = new THREE.MeshPhysicalMaterial({
-      map: tex, roughness: 0.38, metalness: 0.2, clearcoat: 1, clearcoatRoughness: 0.08, envMapIntensity: 1.1,
+      map: tex, roughness: 0.38, metalness: 0.2, clearcoat: Q.clearcoat ? 1 : 0, clearcoatRoughness: 0.08, envMapIntensity: 1.1,
       shadowSide: THREE.DoubleSide   // the bodies are open underneath: cast with both faces
     });
     CarAssets.redMaterial = new THREE.MeshPhysicalMaterial({
-      color: PLAYER_PAINT, roughness: 0.32, metalness: 0.08, clearcoat: 1, clearcoatRoughness: 0.05, envMapIntensity: 0.9,
+      color: PLAYER_PAINT, roughness: 0.32, metalness: 0.08, clearcoat: Q.clearcoat ? 1 : 0, clearcoatRoughness: 0.05, envMapIntensity: 0.9,
       shadowSide: THREE.DoubleSide
     });
     CarAssets.wheelMaterial = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.55, metalness: 0.5 });
@@ -331,6 +331,8 @@ function buildCarMesh(model, red) {
 
 const TOP_SPEED = 46;       // m/s with speed stat 1.0
 const REVERSE_SPEED = 12;
+const AIR_G = 24;          // gravity of a jump off a ramp (a bit floaty)
+const SLOW_START = 2.5;     // seconds of reduced acceleration after jumping the start
 const proj = {};
 const _wp = new THREE.Vector3(), _wd = new THREE.Vector3();
 
@@ -372,7 +374,7 @@ class Car {
     this.hopY = 0; this.hopV = 0;
     this.slide = 0; this.lean = 0; this.pitch = 0;
     this.drift = { on: false, dir: 0, charge: 0, level: 0 };
-    this.boost = 0; this.spin = 0; this.spinAngle = 0; this.shield = 0; this.stall = 0;
+    this.boost = 0; this.spin = 0; this.spinAngle = 0; this.shield = 0; this.slowStart = 0;
     this.item = null; this.itemRoll = 0; this.pendingItem = null;
     this.dist = g.idx - tr.N;     // continuous progress in samples, 0 = start line
     this.prevIdx = g.idx;
@@ -382,7 +384,10 @@ class Car {
     this.offroad = false; this.wrongTimer = 0; this.stuckTimer = 0;
     this.turnRate = 0;
     this.lat = g.lat;
-    this.ai = { lane: (Math.random() * 2 - 1) * 3, laneT: 2 + Math.random() * 3, itemT: 0, holdT: 0 };
+    this.iceK = 0; this.sandK = 0; this.slipVis = 0;                 // how much of ice / sand is under the car, how sideways it slides
+    this.flying = false; this.airT = 0;
+    this.rampH = 0; this.rampS = -1; this.rampLen = 0;
+    this.ai = { lane: (Math.random() * 2 - 1) * 3, laneT: 2 + Math.random() * 3, itemT: 0, holdT: 0, useRamp: Math.random() < 0.55 };
     this.syncMesh(0);
   }
   get lap() { return Math.floor(this.dist / this.game.track.N) + 1; }
@@ -395,8 +400,9 @@ class Car {
       return false;
     }
     if (this.spin > 0) return false;
-    this.spin = kind === 'rocket' ? 1.6 : 1.2;
+    this.spin = kind === 'rocket' ? 1.6 : kind === 'rock' ? 1.1 : 1.2;
     this.spinKind = kind;
+    this.flying = false;
     if (this.isPlayer) addShake(kind === 'rocket' ? 0.95 : 0.6);
     // initial puff of tyre smoke all around the car
     for (let i = 0; i < 14; i++) {
@@ -405,12 +411,12 @@ class Car {
         Math.cos(a) * s, 0.8 + Math.random(), Math.sin(a) * s, kind === 'rocket' ? 0.35 : 0.85, 3.4, 1.8, 0.5);
     }
     this.drift.on = false; this.drift.charge = 0;
-    this.speed *= kind === 'rocket' ? 0.15 : 0.35;
-    if (kind === 'rocket') this.hopV = 9;
+    this.speed *= kind === 'rocket' ? 0.15 : kind === 'rock' ? 0.3 : 0.35;
+    if (kind === 'rocket') this.hopV = 9; else if (kind === 'rock') this.hopV = 6;
     if (this.isPlayer) {
       if (kind === 'oil') this.game.hud.flashPic('splat');
       else if (kind === 'rocket') this.game.hud.flashPic('boom');
-      else this.game.hud.flash('BONK!', '#ff5a3c');
+      else this.game.hud.flash(kind === 'rock' ? 'ROCK!' : 'BONK!', '#ff5a3c');
     }
     return true;
   }
@@ -421,13 +427,14 @@ class Car {
     let maxV = this.top * this.skill;
     if (this.boost > 0) maxV *= 1.32;
     else if (this.offroad) maxV *= 0.5;
+    else maxV *= 1 - 0.42 * this.sandK;                      // sand slows the car down
     // before the start (and in the menu) the cars stand still: no brake, or it would become reverse gear
     if (!racing) { inp.throttle = 0; inp.brake = 0; inp.steer = 0; inp.drift = false; this.speed *= 1 - damp(4, dt); }
 
     // timers
     this.boost = Math.max(0, this.boost - dt);
     this.shield = Math.max(0, this.shield - dt);
-    this.stall = Math.max(0, this.stall - dt);
+    this.slowStart = Math.max(0, this.slowStart - dt);
     if (this.itemRoll > 0) {
       this.itemRoll -= dt;
       if (this.itemRoll <= 0) { this.item = this.pendingItem; this.pendingItem = null; }
@@ -441,24 +448,25 @@ class Car {
       steer = 0;
       if (this.spin <= 0) this.spinAngle = 0;
       this.spinSmoke(dt);
-    } else if (this.stall > 0) {
-      this.speed *= 1 - damp(3, dt);
     } else {
-      if (inp.throttle) {
+      const ctl = !this.flying;               // in the air the pedals do nothing
+      if (ctl && inp.throttle) {
         const r = clamp(this.speed / maxV, 0, 1);
         // progressive: brisk launch, the last km/h come slowly (top speed in ~6 s), so the
         // 5 gears of the engine sound are spread over time
-        if (this.speed < maxV) this.speed += this.accel * 0.75 * (1 - 0.9 * Math.pow(r, 1.3)) * dt;
+        // a start before the lights: slower acceleration (55%) that returns to normal in 2.5 s
+        const slow = this.slowStart > 0 ? 1 - 0.45 * (this.slowStart / SLOW_START) : 1;
+        if (this.speed < maxV) this.speed += this.accel * 0.75 * slow * (1 - 0.45 * this.iceK) * (1 - 0.3 * this.sandK) * (1 - 0.9 * Math.pow(r, 1.3)) * dt;
       }
-      if (inp.brake) {
-        if (this.speed > 0.5) this.speed -= 32 * dt;
+      if (ctl && inp.brake) {
+        if (this.speed > 0.5) this.speed -= 32 * (1 - 0.7 * this.iceK) * dt;
         else this.speed = Math.max(this.speed - 14 * dt, -REVERSE_SPEED);
       }
-      if (!inp.throttle && !inp.brake) {
+      if (ctl && !inp.throttle && !inp.brake) {
         const d = Math.min(Math.abs(this.speed), 7 * dt);
         this.speed -= Math.sign(this.speed) * d;
       }
-      if (this.speed > maxV) this.speed = Math.max(maxV, this.speed - (this.offroad ? 34 : 18) * dt);
+      if (this.speed > maxV) this.speed = Math.max(maxV, this.speed - (this.offroad ? 34 : 18 + 16 * this.sandK) * dt);
       if (this.boost > 0 && this.speed < maxV) this.speed = Math.min(maxV, this.speed + 45 * dt);
     }
 
@@ -479,7 +487,7 @@ class Car {
     const highSpeed = clamp(this.speed / this.top, 0, 1);
     let turn;
     if (d.on) {
-      turn = d.dir * this.turn * (0.72 + 0.5 * steer * d.dir) * 0.98;
+      turn = d.dir * this.turn * (0.72 + 0.5 * steer * d.dir) * 0.98 * (1 - 0.35 * this.iceK);
       d.charge += dt * (steer * d.dir > 0.3 ? 1.35 : 0.8);
       d.level = d.charge > 2.3 ? 2 : d.charge > 0.95 ? 1 : 0;
       if (d.level > 0) {
@@ -487,26 +495,42 @@ class Car {
         this.sparks(col);
       }
     } else {
-      turn = steer * this.turn * (1 - 0.45 * highSpeed);
+      turn = steer * this.turn * (1 - 0.45 * highSpeed) * (1 - 0.5 * this.iceK) * (this.flying ? 0.35 : 1);   // little grip on ice, little control in the air
     }
+    const oldH = this.heading;
     if (this.spin <= 0) this.heading += turn * sf * dt;
+    // on ice the car keeps part of its old direction of travel: what the turn takes away from the
+    // velocity goes into the sliding momentum `ext`, which dies out slowly
+    if (this.iceK > 0.02 && this.spin <= 0 && this.speed > 0) {
+      const k = this.iceK * 0.92 * this.speed;
+      this.ext.x += (Math.cos(oldH) - Math.cos(this.heading)) * k;
+      this.ext.z += (Math.sin(oldH) - Math.sin(this.heading)) * k;
+    }
     this.turnRate = turn * sf;
 
     // integrate motion
     const fxv = Math.cos(this.heading), fzv = Math.sin(this.heading);
     this.x += (fxv * this.speed + this.ext.x) * dt;
     this.z += (fzv * this.speed + this.ext.z) * dt;
-    const ek = 1 - damp(5, dt);
+    const ek = 1 - damp(5 - 4.2 * this.iceK, dt);
     this.ext.x *= ek; this.ext.z *= ek;
+    // how sideways the car travels (the body is shown yawed by this angle)
+    this.slipVis = -Math.atan2(this.ext.x * -Math.sin(this.heading) + this.ext.z * Math.cos(this.heading), Math.max(6, this.speed));
 
     // follow the track
     this.idx = trackLocal(tr, this.x, this.z, this.idx, 16);
     trackProject(tr, this.x, this.z, this.idx, proj);
-    const limit = tr.hw + BARRIER - 1.3;
+    const limit = tr.hw + tr.barrier[this.idx] - 1.3;     // the barrier is closer in the canyon
     if (Math.abs(proj.lat) > limit) {
       const sgn = Math.sign(proj.lat), over = Math.abs(proj.lat) - limit;
       const nx = -proj.tz * sgn, nz = proj.tx * sgn;   // outward wall normal
       this.x -= nx * over; this.z -= nz * over;
+      const eo = this.ext.x * nx + this.ext.z * nz;      // sliding sideways into the wall: it bounces back
+      if (eo > 0) {
+        this.ext.x -= nx * eo * 1.4; this.ext.z -= nz * eo * 1.4;
+        if (eo > 5) fx.burst(this.x + nx * 1.2, this.y + 0.6, this.z + nz * 1.2, 0xffe08a, 6, 5);
+        if (this.isPlayer && eo > 6) addShake(clamp(eo / 40, 0.1, 0.5));
+      }
       const vn = (fxv * nx + fzv * nz) * Math.sign(this.speed);
       if (vn > 0) {
         const imp = Math.abs(this.speed);
@@ -525,6 +549,10 @@ class Car {
     this.lat = proj.lat;
     const alat = Math.abs(proj.lat);
     this.offroad = alat > tr.hw + 1.5;
+    // ice / sand under the wheels (smoothed, so the change is not a step; nothing in the air)
+    const sfc = surfaceAt(tr, proj.i, proj.lat), grounded = this.hopY > 0.35 ? 0 : 1;
+    this.iceK += (sfc.ice * grounded - this.iceK) * damp(14, dt);
+    this.sandK += (sfc.sand * grounded - this.sandK) * damp(14, dt);
     // stick to the road: height under the front and the rear axle (no lag, otherwise the car
     // sinks on climbs; two samples so the wheels stay on the surface in dips and over crests)
     const off = alat > tr.hw + 3 ? -0.3 : alat > tr.hw + 1.6 ? -0.15 : 0;
@@ -532,16 +560,32 @@ class Car {
     const hF = roadHeight(tr, this.x + hx, this.z + hz, this.idx), hB = roadHeight(tr, this.x - hx, this.z - hz, this.idx);
     // the off-road dip eases in, the road height itself is followed exactly
     this.offY = (this.offY || 0) + (off - (this.offY || 0)) * damp(10, dt);
-    this.y = (hF + hB) / 2 + this.offY;
-    this.groundPitch = Math.atan2(hF - hB, 2.5);
-    this.hopV -= 30 * dt;
+    // jump ramps: the surface rises under the car; leaving the far end of the ramp = take off
+    const rs = rampState(tr, proj);
+    this.y = (hF + hB) / 2 + this.offY + rs.h;
+    this.groundPitch = Math.atan2(hF - hB, 2.5) + rs.pitch;
+    if (rs.r) { this.rampS = rs.s; this.rampLen = rs.r.len; }
+    if (this.rampH > 0.05 && rs.h <= 0.001 && this.hopY < 0.2) {
+      if (this.rampS > this.rampLen - 1.2 && this.speed > 14) this.launch();
+      else { this.hopY += this.rampH; this.hopV = 0; }          // left by the side or too slow: it just drops
+    }
+    this.rampH = rs.h;
+    // vertical motion: the little hop of a drift, or the flight off a ramp (floatier)
+    this.hopV -= (this.flying ? AIR_G : 30) * dt;
     this.hopY = Math.max(0, this.hopY + this.hopV * dt);
-    if (this.hopY <= 0 && this.hopV < 0) this.hopV = 0;
+    if (this.hopY <= 0 && this.hopV < 0) { this.hopV = 0; if (this.flying) this.land(); }
+    if (this.flying) {
+      this.airT += dt;
+    }
 
     // offroad dust
     if (this.offroad && Math.abs(this.speed) > 6 && Math.random() < 0.6) {
       fx.dust(this.x - fxv * 2, this.y + 0.3, this.z - fzv * 2, this.game.theme.grass[1]);
     }
+    if (this.sandK > 0.2 && Math.abs(this.speed) > 6) {                  // a cloud of sand behind the wheels
+      for (let n = 0; n < 2; n++) if (Math.random() < 0.75 * this.sandK) fx.dust(this.x - fxv * 2, this.y + 0.35, this.z - fzv * 2 + (Math.random() - 0.5), 0xd9b878);
+    }
+    if (this.iceK > 0.3 && Math.abs(this.slipVis) > 0.12 && Math.random() < 0.45) fx.dust(this.x - fxv * 2, this.y + 0.3, this.z - fzv * 2, 0xeaf4ff);   // ice spray
     if (this.boost > 0) this.flames();
 
     // progress, laps
@@ -553,7 +597,7 @@ class Car {
     const ta = Math.atan2(proj.tz, proj.tx);
     const dirDot = Math.cos(this.heading - ta);
     if (dirDot < -0.2 && this.speed > 4 && this.spin <= 0) this.wrongTimer += dt; else this.wrongTimer = 0;
-    this.pitch = this.groundPitch;
+    this.pitch = this.groundPitch + (this.flying ? 0.12 - 0.3 * clamp(this.airT / 1.1, 0, 1) : 0);     // nose up at take off, down when landing
 
     if (racing && Math.abs(this.speed) < 2 && !this.finished) this.stuckTimer += dt; else this.stuckTimer = 0;
   }
@@ -590,6 +634,7 @@ class Car {
       else if (this.spin > 0 && this.speed > 3) a = 0.6;
       else if (this.input.throttle && this.launchT < 1.1 && this.speed < 16) a = 0.55 * (1 - this.speed / 16) + (this.boost > 0 ? 0.3 : 0);
       else if (this.input.brake && this.speed > 18) a = 0.35;
+      else if (this.iceK > 0.3 && Math.abs(this.slipVis) > 0.16 && this.speed > 8) a = 0.4 * this.iceK;     // sliding on ice
     }
     // tyre screech: same conditions as the marks; on oil for the whole spin, on any surface
     let screech = a;
@@ -669,7 +714,7 @@ class Car {
     }
   }
 
-  // drift.wav at the start of a skid (natural attack), then the seamless drift_loop.wav while
+  // drift.mp3 at the start of a skid (natural attack), then the seamless drift_loop.mp3 while
   // it lasts; volume from the skid strength and the distance from the camera
   updateScreech(level, dt) {
     const cp = this.game.camPos;
@@ -678,7 +723,7 @@ class Car {
     if (vol > 0.02) {
       if (!this.screeching) { this.screeching = true; this.screechT = 0; Sfx.play('drift', vol); }
       this.screechT += dt;
-      if (!this.skidSnd) this.skidSnd = Sfx.loop('soundfx/drift_loop.wav');
+      if (!this.skidSnd) this.skidSnd = Sfx.loop('soundfx/drift_loop.mp3');
       this.skidSnd.set(this.screechT > 0.35 ? vol : 0);
     } else {
       this.screeching = false;
@@ -691,6 +736,27 @@ class Car {
     if (this.skidSnd) { this.skidSnd.dispose(); this.skidSnd = null; }
   }
 
+  // Taking off the far end of a ramp: a jump with a boost in the air
+  launch() {
+    const fx = this.game.fx;
+    this.hopY += this.rampH;
+    this.hopV = clamp(8 + this.speed * 0.2, 11, 14);
+    this.flying = true; this.airT = 0;
+    this.boost = Math.max(this.boost, 1.7);
+    this.drift.on = false; this.drift.charge = 0; this.drift.level = 0;
+    for (let i = 0; i < 12; i++) fx.spark(this.x, this.y + 0.4, this.z, 0xffb040, -Math.cos(this.heading) * 8 + (Math.random() - 0.5) * 6, -Math.sin(this.heading) * 8 + (Math.random() - 0.5) * 6);
+    HazardSfx.launch(this, this.isPlayer ? 1 : 0.6);
+    if (this.isPlayer) { this.game.hud.flashPic('boost'); addShake(0.3); }
+  }
+  // Back on the road: dust and a thud
+  land() {
+    const fx = this.game.fx;
+    this.flying = false;
+    for (let i = 0; i < 10; i++) fx.dust(this.x + (Math.random() - 0.5) * 3, this.y + 0.3, this.z + (Math.random() - 0.5) * 3, this.game.theme.grass[1]);
+    HazardSfx.thud(this, this.isPlayer ? 1 : 0.5);
+    if (this.isPlayer) addShake(0.4);
+  }
+
   respawn() {
     const tr = this.game.track;
     const i = this.idx;
@@ -699,6 +765,7 @@ class Car {
     this.speed = 0; this.ext.x = this.ext.z = 0; this.spin = 0; this.spinAngle = 0;
     this.drift.on = false;
     this.stuckTimer = 0;
+    this.flying = false; this.rampH = 0; this.hopY = 0; this.hopV = 0; this.iceK = 0; this.sandK = 0; this.slipVis = 0;
   }
 
   sparks(col) {
@@ -739,7 +806,7 @@ class Car {
     m.root.position.set(this.x, this.y, this.z);
     m.root.rotation.y = -this.heading;
     // visual drift slide angle, body lean, pitch on slopes
-    const slideT = this.drift.on ? this.drift.dir * 0.42 : this.input.steer * 0.05 * clamp(this.speed / 20, 0, 1);
+    const slideT = (this.drift.on ? this.drift.dir * 0.42 : this.input.steer * 0.05 * clamp(this.speed / 20, 0, 1)) + clamp(this.slipVis || 0, -0.6, 0.6);
     this.slide += (slideT - this.slide) * damp(8, dt || 1);
     const leanT = -this.turnRate * 0.05 * clamp(this.speed / 20, 0, 1);
     this.lean += (leanT - this.lean) * damp(6, dt || 1);
@@ -793,7 +860,27 @@ function updateAI(car, dt, game) {
     if (ahead < -N / 2) ahead += N;
     if (ahead > 0 && ahead < 18 && Math.abs(oil.lat - car.lat) < 3) lane += (oil.lat > car.lat ? -1 : 1) * 5;
   }
-  const tLat = clamp(tr.racing[ti] * 0.9 + lane, -tr.hw + 2, tr.hw - 2);
+  // boulders on the road
+  if (game.hazards) for (const rk of game.hazards.rocks) {
+    let ahead = rk.idx - car.idx;
+    if (ahead < -N / 2) ahead += N;
+    if (ahead > 0 && ahead < 22 && Math.abs(rk.lat - car.lat) < rk.r + 2.4) lane += (rk.lat > car.lat ? -1 : 1) * 6;
+  }
+  // ice / sand patches ahead: keep out of them when only a part of the road is covered; go slower on ice
+  let forced = null, onIce = false;
+  for (const list of [tr.ice, tr.sand]) for (const p of list) {
+    const ahead = p.a - car.idx;
+    if (ahead > 26 || car.idx > p.b + 2) continue;
+    if (list === tr.ice) onIce = true;
+    if (p.l1 - p.l0 < tr.hw * 1.7 && ahead > -2) forced = (p.l0 + p.l1) / 2 > 0 ? Math.max(-tr.hw + 2, p.l0 - 2.6) : Math.min(tr.hw - 2, p.l1 + 2.6);
+  }
+  // jump ramps: some drivers aim at them
+  if (ai.useRamp) for (const r of tr.ramps) {
+    const ahead = r.a - car.idx;
+    if (ahead > 0 && ahead < 30) forced = r.lat;
+  }
+  let tLat = clamp(tr.racing[ti] * 0.9 + lane, -tr.hw + 2, tr.hw - 2);
+  if (forced !== null) tLat = forced;
   const px = tr.x[ti] - tr.tz[ti] * tLat, pz = tr.z[ti] + tr.tx[ti] * tLat;
   const want = Math.atan2(pz - car.z, px - car.x);
   const diff = wrapAngle(want - car.heading);
@@ -807,6 +894,7 @@ function updateAI(car, dt, game) {
   const T = car.turn;
   let vCorner = kmax > 0 ? T / (kmax + 0.45 * T / car.top) : 999;
   vCorner *= 0.97;
+  if (onIce) vCorner = Math.min(vCorner, car.top * 0.72);       // the grip is gone: ease off
   // rubber banding against the player
   const pl = game.player;
   const rel = pl && pl !== car ? (pl.dist - car.dist) * SPACING : 0;

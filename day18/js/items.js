@@ -144,8 +144,9 @@ class Items {
         gr.addColorStop(0.55, 'rgba(255,255,255,0.12)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
         g.fillStyle = gr; g.fillRect(0, 0, w, h);
       }),
-      // no depth test: otherwise the road cuts the halo with a straight edge
-      blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, transparent: true, opacity: 0.85
+      // depth tested (so cars and hills hide it); small (radius 1.3 m: a bigger halo reaches the road and is cut by it with a straight edge; the gem floats 1.2-1.6 m
+      // above the road) not to be cut by the road surface
+      blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 1
     });
     for (const row of tr.itemRows) {
       for (let k = -2; k <= 2; k++) {
@@ -163,7 +164,7 @@ class Items {
         core.scale.setScalar(1.6);
         core.renderOrder = 2;
         const halo = new THREE.Sprite(this.haloMat);
-        halo.scale.setScalar(5);
+        halo.scale.setScalar(2.6);
         halo.renderOrder = 1;
         m.add(halo, gem, core);
         this.group.add(m);
@@ -300,7 +301,7 @@ class Items {
       const beat = Math.sin(t * 4 + b.phase);
       b.mesh.scale.setScalar(b.grow * (1 + beat * 0.07));
       b.core.scale.setScalar(1.3 + Math.max(0, Math.sin(t * 4 + b.phase - 0.6)) * 0.9);
-      b.halo.scale.setScalar(4.6 + beat * 0.6);
+      b.halo.scale.setScalar(2.5 + beat * 0.3);
       b.gem.rotation.set(t * 0.6 + b.phase, t * 1.1 + b.phase, 0.4);
       b.mesh.position.y = b.y + Math.sin(t * 2.5 + b.phase) * 0.2;
       for (const c of g.cars) {
@@ -383,10 +384,11 @@ class Items {
       if (hitCar || r.life <= 0) {
         if (hitCar) hitCar.hit('rocket');
         g.fx.explosion(nx, ny, nz);
-        // explosion.wav: loud for everyone, audible from far away
+        // explosion.mp3: loud for everyone, audible from far away
         Sfx.playAt('explosion', { x: nx, y: ny, z: nz }, g.camPos, hitCar && hitCar.isPlayer ? 1 : 0.85, 180);
         // shake from the blast, if it goes off near the player
-        const dpl = Math.hypot(g.player.x - nx, g.player.z - nz);
+        // (the title demo has no player)
+        const dpl = g.player ? Math.hypot(g.player.x - nx, g.player.z - nz) : 1e9;
         if (dpl < 35) addShake(0.5 * (1 - dpl / 35));
         this.group.remove(r.mesh);
         this.rockets.splice(i, 1);

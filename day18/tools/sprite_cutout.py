@@ -8,6 +8,8 @@
 #   python tools/sprite_cutout.py "<...>/lap2.lap3.boost.splat.jpg" lap2:19:320:29:277 lap3:346:652:29:277 boost:679:1052:29:277 splat:1078:1315:29:277
 #   python tools/sprite_cutout.py "<...>/place.bestlap.boom.jpg" --inset=6 place1:37:281:257:510 place2:296:550:257:510 place3:565:811:257:510 bestlap:826:1080:271:510 boom:1050:1359:16:269
 # name:x0:x1:y0:y1 = inner area of each frame in sheet pixels.
+# Optional --scale=N (default 2: pixel art enlarged with nearest neighbour; 1 = keep the size).
+#   python tools/sprite_cutout.py "<...>/undefAIned.logo.jpg" --inset=0 --scale=1 logo:0:1408:0:768
 # Optional --inset=N (default 2): extra pixels cut inside the area, to drop the blurry rim of the
 # frame lines (JPEG ringing) when the frame is thick.
 import os, sys
@@ -19,9 +21,12 @@ SRC = sys.argv[1]
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'img')
 CELLS = {}
 INSET = 2
+SCALE = 2
 for a in sys.argv[2:]:
     if a.startswith('--inset='):
         INSET = int(a.split('=')[1]); continue
+    if a.startswith('--scale='):
+        SCALE = int(a.split('=')[1]); continue
     n, x0, x1, y0, y1 = a.split(':')
     CELLS[n] = (int(x0), int(x1), int(y0), int(y1))
 
@@ -64,6 +69,7 @@ for name, (x0, x1, y0, y1) in CELLS.items():
     img = Image.fromarray(rgba, 'RGBA')
     img = img.crop(img.getchannel('A').point(lambda v: 255 if v > 20 else 0).getbbox())
     # pixel art: upscale x2 with nearest neighbour so it stays crisp when shown large
-    img = img.resize((img.width * 2, img.height * 2), Image.NEAREST)
+    if SCALE > 1:
+        img = img.resize((img.width * SCALE, img.height * SCALE), Image.NEAREST)
     img.save(os.path.join(OUT, name + '.png'))
     print(name, img.size)

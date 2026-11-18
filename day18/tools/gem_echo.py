@@ -1,13 +1,13 @@
-# Builds soundfx/gem.wav from soundfx/hexaedron.wav: the item pickup sound with a little
+# Builds soundfx/gem.mp3 from soundfx/hexaedron.mp3: the item pickup sound with a little
 # stereo echo (two short ping-pong delays, darker at every repeat).
-# Run from day18: python tools/gem_echo.py
-import os, wave
+# Run from day18: python tools/gem_echo.py [output folder]   (default soundfx)
+import os, sys
 import numpy as np
+from audio_io import read, write_mp3
 
 here = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'soundfx')
-w = wave.open(os.path.join(here, 'hexaedron.wav'))
-sr, ch = w.getframerate(), w.getnchannels()
-d = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16).reshape(-1, ch).astype(np.float32) / 32768
+out_dir = sys.argv[1] if len(sys.argv) > 1 else here
+sr, d = read(os.path.join(here, 'hexaedron.mp3'))
 dry = d.mean(1)
 
 tail = int(1.1 * sr)
@@ -27,8 +27,5 @@ for i in range(len(L)):
     L[i] += lpL * mix; R[i] += lpR * mix
 out = np.stack([L, R], 1)
 out *= 10 ** (-1 / 20) / np.abs(out).max()
-o = wave.open(os.path.join(here, 'gem.wav'), 'wb')
-o.setnchannels(2); o.setsampwidth(2); o.setframerate(sr)
-o.writeframes((out * 32767).astype(np.int16).tobytes())
-o.close()
-print('gem.wav', round(len(out) / sr, 2), 's')
+write_mp3(os.path.join(out_dir, 'gem.mp3'), out, sr)
+print('gem.mp3', round(len(out) / sr, 2), 's')
