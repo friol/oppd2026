@@ -190,7 +190,7 @@ class Channel {
       if (!this.dBuf || this.dBuf.length !== size) this.dBuf = new Float32Array(size);
       const db = this.dBuf;
       const t = Math.max(1, Math.min(size - 2, Math.floor(this.dlyY * 0.05 * sr)));
-      const wet = this.dw, fbk = 0.1 + wet * 0.55, din = this.dIn;
+      const wet = this.dw, fbk = 0.15 + wet * 0.45, din = this.dIn;
       let w = this.dPos;
       for (let i = 0; i < n; i++) {
         let r = w - t; if (r < 0) r += size;
@@ -287,7 +287,7 @@ class Engine {
     let ord = this.ord, row = this.row + 1;
     const jump = this.jumpOrd, brk = this.breakRow;
     this.jumpOrd = -1; this.breakRow = -1;
-    const pat = this.pattern();
+    const pat = this.pattern() || sg.patterns[0];
     if (this.mode === 'pattern') {
       if (brk >= 0) row = brk;
       else if (row >= pat.rows) row = 0;
@@ -358,8 +358,8 @@ class Engine {
         if (fxp > 0) { if (fxp < 0x20) this.speed = fxp; else this.bpm = Math.min(255, fxp); }
         break;
       case 72:                                            // H echo
-        c.dlyX = x; c.dlyY = y;
-        if (x > 0) { c.dlyOn = true; c.dw = x / 15 * 0.8; c.dIn = 1; }
+        c.dlyX = x; c.dlyY = y || 4;                      // time 0 falls back to 200 ms
+        if (x > 0) { c.dlyOn = true; c.dw = 0.9 * Math.sqrt(x / 15); c.dIn = 1; }
         else c.dIn = 0;
         break;
       case 73:                                            // I cutoff

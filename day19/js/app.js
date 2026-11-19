@@ -76,6 +76,7 @@ function setZoom(d) {
 function moveRow(d) {
   const p = curPat();
   state.row = clamp(state.row + d, 0, p.rows - 1);   // stop at first/last row, no wrapping
+  if (engine && engine.playing) state.hold = performance.now() + 1500;   // keep the view on the cursor for a moment
 }
 
 function ensureChVisible() {
@@ -98,7 +99,7 @@ function moveChannel(d) {
 }
 
 function advanceAfterEntry() {
-  if (!engine.playing) moveRow(state.step);
+  moveRow(state.step);
 }
 
 function clearCell(p, i) {
@@ -216,6 +217,89 @@ function typeFxCmd(ch) {
   state.field = 6;
 }
 
+// ---- tabs ----
+function setTab(id) {
+  state.tab = id;
+  if (id === 'orders') state.osel = clamp(state.ord, 0, song.orders.length - 1);
+}
+
+// ---- order list editing (ORDERS tab); all functions work on a slot index ----
+function orderInsert(i) {
+  if (song.orders.length >= MAX_ORDERS) return toast('ORDER LIST FULL');
+  song.orders.splice(i, 0, song.orders[i]);          // new slot is a copy of the selected one
+  state.osel = i;
+}
+
+function orderDelete(i) {
+  if (song.orders.length <= 1) return toast('AT LEAST ONE ORDER IS NEEDED');
+  song.orders.splice(i, 1);
+  state.osel = clamp(i, 0, song.orders.length - 1);
+  if (engine.playing && engine.ord >= song.orders.length) engine.jump(0, 0);
+}
+
+// Inserts a new pattern slot after slot i (empty, or a copy of the selected pattern).
+function orderAddPattern(i, clone) {
+  if (song.patterns.length >= 255 || song.orders.length >= MAX_ORDERS) return toast('LIMIT REACHED');
+  const src = song.patterns[song.orders[i]] || song.patterns[0];
+  song.patterns.push(clone ? clonePattern(src) : newPattern(src.rows));
+  song.orders.splice(i + 1, 0, song.patterns.length - 1);
+  state.osel = i + 1;
+}
+
+function orderMove(i, d) {
+  const j = i + d;
+  if (j < 0 || j >= song.orders.length) return;
+  const t = song.orders[i]; song.orders[i] = song.orders[j]; song.orders[j] = t;
+  state.osel = j;
+}
+
+function orderSetPattern(i, v) {
+  song.orders[i] = clamp(v, 0, song.patterns.length - 1);
+}
+
+function orderSelect(i) {
+  state.osel = clamp(i, 0, song.orders.length - 1);
+  state.ordBuf = '';
+  if (!engine.playing) state.ord = state.osel;       // the PATTERN tab shows the selected order
+}
+
+// Typing hex digits sets the pattern number of the selected slot. Typing the number right
+// after the last existing pattern creates a new empty pattern.
+function orderType(d) {
+  const i = state.osel, now = performance.now();
+  let buf = now < (state.ordBufT || 0) ? (state.ordBuf || '') : '';
+  const ok = s => {
+    const v = parseInt(s, 16);
+    if (v < song.patterns.length) { song.orders[i] = v; return true; }
+    if (v === song.patterns.length && v < 255) { song.patterns.push(newPattern(64)); song.orders[i] = v; return true; }
+    return false;
+  };
+  buf = (buf + d.toString(16)).slice(-2);
+  if (!ok(buf)) { buf = d.toString(16); if (!ok(buf)) { toast('PATTERN ' + hex2(parseInt(buf, 16)) + ' DOES NOT EXIST'); buf = ''; } }
+  state.ordBuf = buf; state.ordBufT = now + 1200;
+}
+
+function ordersKey(e) {
+  const k = e.key, n = song.orders.length;
+  let ok = true;
+  if (k === ' ') { if (engine.playing) stopPlay(); else playSong(); }
+  else if (k === 'Escape' || k === 'F8') stopPlay();
+  else if (k === 'F6') playPattern();
+  else if (k === 'F1') state.help = true;
+  else if (k === 'ArrowUp') orderSelect(state.osel - 1);
+  else if (k === 'ArrowDown') orderSelect(state.osel + 1);
+  else if (k === 'PageUp') orderSelect(state.osel - 16);
+  else if (k === 'PageDown') orderSelect(state.osel + 16);
+  else if (k === 'Home') orderSelect(0);
+  else if (k === 'End') orderSelect(n - 1);
+  else if (k === 'Insert') orderInsert(state.osel);
+  else if (k === 'Delete' || k === 'Backspace') orderDelete(state.osel);
+  else if (k === 'Enter') { if (engine.playing) engine.jump(state.osel, 0); else { state.ord = state.osel; setTab('pattern'); } }
+  else if (k.length === 1 && /^[0-9a-fA-F]$/.test(k) && !e.ctrlKey && !e.metaKey) orderType(parseInt(k, 16));
+  else ok = false;
+  if (ok) e.preventDefault();
+}
+
 // ---- order / pattern management ----
 function setOrder(o) {
   state.ord = clamp(o, 0, song.orders.length - 1);
@@ -230,17 +314,6 @@ function addPattern(clone) {
   state.ord++;
 }
 
-function insertOrder() {
-  if (song.orders.length >= MAX_ORDERS) return;
-  song.orders.splice(state.ord, 0, song.orders[state.ord]);
-}
-
-function deleteOrder() {
-  if (song.orders.length <= 1) return;
-  song.orders.splice(state.ord, 1);
-  state.ord = clamp(state.ord, 0, song.orders.length - 1);
-  if (engine.playing && engine.ord >= song.orders.length) engine.jump(0, 0);
-}
 
 function clearPattern() {
   const p = curPat();
@@ -382,6 +455,7 @@ async function openEntry(e) {
   else {
     try {
       const file = await e.handle.getFile();
+      state.lastFiles = f;          // remembered so Backspace inside a module returns to this folder
       state.files = null;
       handleFile(file);
     } catch (err) { toast('CANNOT READ FILE'); }
@@ -417,6 +491,16 @@ function filesKey(e) {
   else if (e.key === 'Escape') state.files = null;
   else return;
   e.preventDefault();
+}
+
+// Replaces the whole song (patterns, orders, samples, title) with a completely empty one.
+function zapSong() {
+  engine.stop(); engine.previewStop();
+  song = newSong();
+  engine.song = song;
+  state.ord = 0; state.row = 0; state.ch = 0; state.field = 0; state.chScroll = 0;
+  state.smp = 1; state.smpScroll = 0; state.osel = 0; state.oscroll = 0; state.sel = null;
+  toast('SONG CLEARED');
 }
 
 function loadSongText(text) {
@@ -495,6 +579,11 @@ function exportWav() {
 function onKey(e) {
   if (e.key === 'Backspace') e.preventDefault();   // never let the browser act on Backspace
   if (state.screen === 'splash') { startApp(); e.preventDefault(); return; }
+  if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {   // Ctrl+S: save the song (works everywhere)
+    e.preventDefault();
+    if (!e.repeat) saveSong();
+    return;
+  }
   if (UI.fieldKey(e)) return;
   if (state.files) return filesKey(e);
   if (state.browser) return browserKey(e);
@@ -527,8 +616,22 @@ function onKey(e) {
     if (k === 'Delete' && state.sel) { clearSelection(); state.sel = null; e.preventDefault(); return; }
     if (k !== 'Shift' && k !== 'Control' && k !== 'Alt' && k !== 'Meta') state.sel = null;
   }
-  if (k === 'F2') { state.tab = 'pattern'; e.preventDefault(); return; }
-  if (k === 'F3') { state.tab = 'samples'; e.preventDefault(); return; }
+  if (k === 'F2') { setTab('pattern'); e.preventDefault(); return; }
+  if (k === 'F3') { setTab('samples'); e.preventDefault(); return; }
+  if (k === 'F4') { setTab('orders'); e.preventDefault(); return; }
+  if (k === 'F7') { setTab('file'); e.preventDefault(); return; }
+  if (state.tab === 'orders') { ordersKey(e); return; }
+  if (state.tab === 'file') {
+    // File tab: transport keys only
+    let ok = true;
+    if (k === ' ') { if (engine.playing) stopPlay(); else playSong(); }
+    else if (k === 'Escape' || k === 'F8') stopPlay();
+    else if (k === 'F6') playPattern();
+    else if (k === 'F1') state.help = true;
+    else ok = false;
+    if (ok) e.preventDefault();
+    return;
+  }
   if (state.tab === 'samples') {
     // Samples tab: transport, sample selection and piano preview only.
     let ok = true;
@@ -536,6 +639,7 @@ function onKey(e) {
     else if (k === 'Escape' || k === 'F8') stopPlay();
     else if (k === 'F6') playPattern();
     else if (k === 'F1') state.help = true;
+    else if (k === 'Enter') openSampleLoader();
     else if (k === 'ArrowUp' || k === '[') selectSample(state.smp - 1);
     else if (k === 'ArrowDown' || k === ']') selectSample(state.smp + 1);
     else if (!e.repeat && PIANO[e.code] !== undefined && !e.shiftKey) {
@@ -561,14 +665,17 @@ function onKey(e) {
     case 'F6': playPattern(); break;
     case 'F8': stopPlay(); break;
     case 'F1': state.help = true; break;
-    case 'Delete': clearField(e.shiftKey); break;
+    case 'Delete': clearField(e.shiftKey); moveRow(1); break;   // clear, then step down one row (stops at the last row)
     case 'Backspace': deleteCellAbove(); break;
     case 'Insert': insertCell(); break;
     case '[': selectSample(state.smp - 1); break;
     case ']': selectSample(state.smp + 1); break;
     default: handled = false;
   }
-  if (handled) { e.preventDefault(); ensureChVisible(); return; }
+  if (handled) {
+    if (engine.playing) state.hold = performance.now() + 1500;   // keep the view on the cursor for a moment
+    e.preventDefault(); ensureChVisible(); return;
+  }
   const f = state.field;
   if (f === 0) {
     if (e.code === 'Digit1') { const p = curPat(); p.note[cellIdx()] = NOTE_OFF; advanceAfterEntry(); e.preventDefault(); return; }
@@ -581,19 +688,50 @@ function onKey(e) {
   }
 }
 
+// Closes the module sample browser but remembers it, so Enter in the SAMPLES tab can go back inside.
+function closeModuleBrowser() {
+  if (state.browser) state.lastModule = state.browser;
+  state.browser = null;
+  engine.previewStop();
+}
+
+// Backspace inside a module: back to the file browser, in the folder the module was opened from.
+function backToFileBrowser() {
+  if (state.lastFiles) { state.lastFiles.busy = false; state.files = state.lastFiles; }
+  else openFileBrowser();
+}
+
+// Enter in the SAMPLES tab: back into the last opened module, or the file browser if there is none.
+function openSampleLoader() {
+  if (state.browser || state.files) return;
+  if (state.lastModule) state.browser = state.lastModule;
+  else openFileBrowser();
+}
+
 function browserKey(e) {
   const b = state.browser;
   const sel = n => {
     b.sel = clamp(n, 0, b.samples.length - 1);
-    engine.preview(b.samples[b.sel], 49);
+    engine.previewStop();   // moving with the keys does not auto-play; use PLAY or the piano keys
   };
   if (e.key === 'ArrowUp') sel(b.sel - 1);
   else if (e.key === 'ArrowDown') sel(b.sel + 1);
   else if (e.key === 'PageUp') sel(b.sel - 8);
   else if (e.key === 'PageDown') sel(b.sel + 8);
-  else if (e.key === 'Enter') { importSample(state.smp - 1, b.samples[b.sel]); toast('SAMPLE IMPORTED'); }
-  else if (e.key === 'Escape') { state.browser = null; engine.previewStop(); }
-  else return;
+  else if (e.key === 'Enter') {
+    // import into the current slot and go back to the sample list (the module is remembered)
+    importSample(state.smp - 1, b.samples[b.sel]);
+    toast('SAMPLE IMPORTED TO SLOT ' + hex2(state.smp));
+    closeModuleBrowser();
+    setTab('samples');
+  }
+  else if (e.key === 'Escape') closeModuleBrowser();
+  else if (e.key === 'Backspace') { closeModuleBrowser(); backToFileBrowser(); }
+  else if (e.code === 'NumpadDivide' || e.code === 'NumpadMultiply') state.oct = clamp(state.oct + (e.code === 'NumpadMultiply' ? 1 : -1), 0, 7);
+  else if (!e.repeat && !e.ctrlKey && !e.metaKey && !e.shiftKey && PIANO[e.code] !== undefined) {
+    // piano keys play the selected sample at the scale pitches (C-4 = sample's original pitch)
+    engine.preview(b.samples[b.sel], clamp(state.oct * 12 + PIANO[e.code] + 1, 1, 96));
+  } else return;
   e.preventDefault();
 }
 
@@ -633,7 +771,7 @@ function boot() {
     e.preventDefault();
     if (state.screen === 'main' && e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
   });
-  window.addEventListener('keydown', onKey);
+  window.addEventListener('keydown', onKey, true);   // capture phase: runs before anything else can act on the key
   window.addEventListener('resize', () => UI.resize(state.screen === 'splash' ? 1 : chooseScale()));
   requestAnimationFrame(frame);
 }

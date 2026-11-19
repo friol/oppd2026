@@ -5,7 +5,7 @@ const logoImg = new Image();
 logoImg.src = 'img/logo.jpg';
 
 const HDR_H = 62, TAB_Y = 64, TAB_H = 13, CH_Y = 80, CH_H = 34, GRID_Y = 119;
-const TABS = [['pattern', 'PATTERN F2'], ['samples', 'SAMPLES F3']];
+const TABS = [['pattern', 'PATTERN F2'], ['samples', 'SAMPLES F3'], ['orders', 'ORDERS F4'], ['file', 'FILE F7']];
 const BANDS = [60, 120, 240, 480, 960, 1900, 3800, 7600];
 const LOOP_NAMES = ['OFF', 'FWD', 'PING'];
 
@@ -80,15 +80,18 @@ function vizFor(ci) {
 function drawMain() {
   const W = UI.W, H = UI.H;
   UI.rect(0, 0, W, H, COL.bg);
-  if (engine.playing) {
-    state.ord = Math.min(engine.ord, song.orders.length - 1);
-    state.row = engine.row;
-  }
+  // While playing, the pattern view follows the play position but the edit cursor stays
+  // where the user put it. Moving the cursor holds the view on it for a moment.
+  if (engine.playing) state.ord = Math.min(engine.ord, song.orders.length - 1);
   state.ord = clamp(state.ord, 0, song.orders.length - 1);
   const pat = curPat();
   state.row = clamp(state.row, 0, pat.rows - 1);
+  const held = performance.now() < (state.hold || 0);
+  state.viewRow = engine.playing && !held ? clamp(engine.row, 0, pat.rows - 1) : state.row;
   state.fit = clamp(Math.floor((W - GX - 14) / CHW), 1, MAX_CH);
-  if (song.channels < Math.min(MAX_CH, state.fit)) song.channels = Math.min(MAX_CH, state.fit);
+  // at least 16 tracks; more when the window is wide enough to show them
+  const minCh = Math.min(MAX_CH, Math.max(16, state.fit));
+  if (song.channels < minCh) song.channels = minCh;
   state.ch = Math.min(state.ch, song.channels - 1);
   ensureChVisible();
 
@@ -97,7 +100,14 @@ function drawMain() {
   drawTabs();
   if (state.tab === 'pattern') {
     drawChannelHeaders();
-    drawGrid(GRID_Y, Math.max(ROWH * 3, H - GRID_Y - 6));
+    const hs = song.channels > state.fit ? 10 : 0;   // room for the horizontal scrollbar
+    const gh = Math.max(ROWH * 3, H - GRID_Y - 6 - hs);
+    drawGrid(GRID_Y, gh);
+    if (hs) drawHScroll(GRID_Y + gh + 4);
+  } else if (state.tab === 'orders') {
+    drawOrdersTab(TAB_Y + TAB_H + 2);
+  } else if (state.tab === 'file') {
+    drawFileTab(TAB_Y + TAB_H + 2);
   } else {
     const sy = TAB_Y + TAB_H + 2;
     drawSamplePanel(sy, Math.max(100, H - sy - 2));
@@ -130,10 +140,6 @@ function drawHeader() {
   hb('PAT', () => playPattern(), { on: engine.playing && engine.mode === 'pattern' });
   hb('STOP', () => stopPlay());
   x += 6;
-  hb('OPEN', () => pickFile('.json,.wtk', f => handleFile(f)));
-  hb('SAVE', () => saveSong());
-  hb('WAV', () => exportWav());
-  x += 6;
   hb('HELP', () => { state.help = true; });
   // row A2: tempo / edit settings
   x = 112;
@@ -156,11 +162,9 @@ function drawHeader() {
     song.patterns[i] = resizePattern(song.patterns[i], clamp(song.patterns[i].rows + d * m, 1, MAX_ROWS));
     state.row = Math.min(state.row, song.patterns[i].rows - 1);
   }, 22);
-  UI.text((engine.playing ? 'PLAYING ' : 'STOPPED ') + 'ROW ' + hex2(state.row) + '/' + hex2(pat0().rows - 1), x + 6, 36, engine.playing ? COL.vol : COL.dim);
+  UI.text((engine.playing ? 'PLAYING ' : 'STOPPED ') + 'ROW ' + hex2(engine.playing ? engine.row : state.row) + '/' + hex2(pat0().rows - 1), x + 6, 36, engine.playing ? COL.vol : COL.dim);
   // row C: order / pattern buttons + title
   x = 6;
-  hb('INS ORD', () => insertOrder(), null, 48);
-  hb('DEL ORD', () => deleteOrder(), null, 48);
   hb('NEW PAT', () => addPattern(false), null, 48);
   hb('CLONE', () => addPattern(true), null, 48);
   hb('CLEAR', () => clearPattern(), null, 48);
@@ -179,6 +183,112 @@ function drawHeader() {
 
 function pat0() { return curPat(); }
 
+// ---- ORDERS tab: the song's pattern order list, one column of pattern numbers ----
+function drawOrdersTab(top) {
+  const W = UI.W, H = UI.H, n = song.orders.length, LH = 11;
+  const ph = H - top - 2;
+  UI.panel(2, top, W - 4, ph);
+  UI.icicles(4, top + 2, W - 8, 77);
+  state.osel = clamp(state.osel || 0, 0, n - 1);
+  const lx = 8, ly = top + 24, lw = 92, rows = Math.max(3, Math.floor((ph - 32) / LH));
+  state.orows = rows;
+  if (state.osel < (state.oscroll || 0)) state.oscroll = state.osel;
+  if (state.osel >= (state.oscroll || 0) + rows) state.oscroll = state.osel - rows + 1;
+  state.oscroll = clamp(state.oscroll || 0, 0, Math.max(0, n - rows));
+  UI.text('ORD  PAT', lx + 14, top + 13, COL.dim);
+  UI.inset(lx, ly, lw, rows * LH + 3);
+  for (let r = 0; r < rows; r++) {
+    const i = state.oscroll + r;
+    if (i >= n) break;
+    const y = ly + 2 + r * LH, selected = i === state.osel, playing = engine.playing && engine.ord === i;
+    if (selected) UI.rect(lx + 1, y - 2, lw - 2, LH, COL.play);
+    if (playing) UI.text('>', lx + 4, y, COL.vol);
+    UI.text(hex2(i), lx + 14, y, selected ? COL.bright : COL.dim);
+    const typing = selected && performance.now() < (state.ordBufT || 0) && (UI.frame >> 4) % 2;
+    UI.text(hex2(song.orders[i]), lx + 50, y, selected ? COL.note : COL.text);
+    if (typing) UI.rect(lx + 50 + (state.ordBuf.length >= 2 ? 12 : 6), y, 5, 7, COL.cursor);
+  }
+  UI.hit(lx, ly, lw, rows * LH + 3, {
+    onDown: (e, rx, ry) => {
+      const i = state.oscroll + clamp(Math.floor((ry - 2) / LH), 0, rows - 1);
+      if (i >= n) return;
+      const now = performance.now(), dbl = state.olast === i && now - (state.olastT || 0) < 450;
+      state.olast = i; state.olastT = now;
+      orderSelect(i);
+      if (dbl && engine.playing) engine.jump(i, 0);
+    },
+    onWheel: dy => { state.oscroll = clamp(state.oscroll + (dy > 0 ? 3 : -3), 0, Math.max(0, n - rows)); }
+  });
+  if (n > rows) {
+    const sx = lx + lw + 2, th = Math.max(6, Math.floor((rows * LH + 3) * rows / n));
+    UI.inset(sx, ly, 6, rows * LH + 3, '#03101a');
+    UI.rect(sx + 1, ly + 1 + Math.round((rows * LH + 1 - th) * state.oscroll / Math.max(1, n - rows)), 4, th, COL.edgeHi);
+  }
+  // right side: actions for the selected slot
+  const cx = lx + lw + 22, i = state.osel, pi = song.orders[i], p = song.patterns[pi];
+  UI.text('SLOT ' + hex2(i) + '  PATTERN ' + hex2(pi) + '  ROWS ' + p.rows, cx, top + 13, COL.bright);
+  UI.text(n + ' SLOTS - ' + song.patterns.length + ' PATTERNS', cx, top + 24, COL.dim);
+  UI.spinner(cx, top + 36, 'PATTERN', hex2(pi), (d, m) => orderSetPattern(i, pi + d * m), 20);
+  let y = top + 54;
+  const b = (label, fn) => { UI.button(cx, y, 150, 12, label, fn); y += 15; };
+  b('INSERT SLOT (INS)', () => orderInsert(i));
+  b('DELETE SLOT (DEL)', () => orderDelete(i));
+  b('NEW EMPTY PATTERN AFTER', () => orderAddPattern(i, false));
+  b('CLONE PATTERN AFTER', () => orderAddPattern(i, true));
+  b('MOVE SLOT UP', () => orderMove(i, -1));
+  b('MOVE SLOT DOWN', () => orderMove(i, 1));
+  b(engine.playing ? 'PLAY FROM THIS SLOT' : 'EDIT THIS PATTERN (ENTER)', () => {
+    if (engine.playing) engine.jump(i, 0); else { state.ord = i; setTab('pattern'); }
+  });
+  const hx = cx + 170;
+  UI.text('TYPE HEX DIGITS TO SET THE PATTERN NUMBER.', hx, top + 36, COL.dim);
+  UI.text('THE NUMBER AFTER THE LAST PATTERN', hx, top + 47, COL.dim);
+  UI.text('CREATES A NEW EMPTY PATTERN.', hx, top + 58, COL.dim);
+  UI.text('UP/DOWN SELECT - INS / DEL SLOTS', hx, top + 76, COL.dim);
+  UI.text('DOUBLE CLICK WHILE PLAYING: JUMP', hx, top + 87, COL.dim);
+}
+
+// ---- FILE tab: open / save / export / zap ----
+function drawFileTab(top) {
+  const W = UI.W, H = UI.H;
+  UI.panel(2, top, W - 4, H - top - 2);
+  UI.icicles(4, top + 2, W - 8, 55);
+  const bx = 14, bw = 120, bh = 16, dx = bx + bw + 14;
+  let y = top + 16;
+  const row = (label, desc1, desc2, fn, opt) => {
+    UI.button(bx, y, bw, bh, label, fn, opt);
+    UI.text(desc1, dx, y, COL.text);
+    UI.text(desc2, dx, y + 10, COL.dim);
+    y += bh + 12;
+  };
+  row('OPEN SONG', 'LOAD A SONG FILE (.WTK.JSON) FROM DISK.', 'YOU CAN ALSO DROP THE FILE ON THE WINDOW.',
+    () => pickFile('.json,.wtk', f => handleFile(f)));
+  row('SAVE SONG', 'DOWNLOAD THE SONG AS .WTK.JSON (PATTERNS, ORDERS, SAMPLES).',
+    'THE LAST SAVE IS ALSO KEPT IN THE BROWSER AND RELOADED AT STARTUP.', () => saveSong());
+  row('EXPORT WAV', 'RENDER THE WHOLE SONG TO A STEREO 16 BIT WAV FILE.', 'IT PLAYS THE SONG ONCE, PLUS A SHORT TAIL.', () => exportWav());
+  const armed = performance.now() < (state.zapUntil || 0);
+  row(armed ? 'SURE? CLICK AGAIN' : 'ZAP', 'DELETE EVERYTHING: PATTERNS, ORDERS AND ALL SAMPLES.',
+    armed ? 'THIS CANNOT BE UNDONE (A SAVED COPY IS NOT TOUCHED).' : 'YOU WILL BE ASKED TO CONFIRM WITH A SECOND CLICK.',
+    () => {
+      if (performance.now() < (state.zapUntil || 0)) { state.zapUntil = 0; zapSong(); } else state.zapUntil = performance.now() + 3000;
+    }, { color: COL.hot, on: armed });
+  UI.text('SONG: ' + (song.title || '(UNTITLED)') + ' - ' + song.orders.length + ' ORDERS, ' + song.patterns.length + ' PATTERNS', bx, y + 6, COL.dim);
+}
+
+// Horizontal scrollbar for the tracks that do not fit the window width.
+function drawHScroll(y) {
+  const x = GX, w = UI.W - GX - 14, n = song.channels, fit = state.fit;
+  UI.inset(x, y, w, 7, '#03101a');
+  const tw = Math.max(12, Math.floor((w - 2) * fit / n));
+  const range = Math.max(1, n - fit);
+  const tx = x + 1 + Math.round((w - 2 - tw) * state.chScroll / range);
+  UI.rect(tx, y + 1, tw, 5, COL.edgeHi);
+  const set = (e, rx) => {
+    state.chScroll = clamp(Math.round((rx - tw / 2) / Math.max(1, w - tw) * range), 0, range);
+  };
+  UI.hit(x, y, w, 7, { onDown: set, onDrag: set });
+}
+
 // Tab bar below the header.
 function drawTabs() {
   let x = 6;
@@ -188,7 +298,7 @@ function drawTabs() {
     UI.rect(x + 1, TAB_Y + 1, w - 2, TAB_H - 1, on ? '#1b8aa6' : (UI.hover(x, TAB_Y, w, TAB_H) ? '#164b60' : COL.panel2));
     UI.rect(x + 1, TAB_Y + 1, w - 2, 1, on ? COL.ice : COL.edgeHi);
     UI.text(label, x + w / 2, TAB_Y + 3, on ? COL.bright : COL.text, 1, 'center');
-    UI.hit(x, TAB_Y, w, TAB_H, { onDown: () => { state.tab = id; } });
+    UI.hit(x, TAB_Y, w, TAB_H, { onDown: () => setTab(id) });
     x += w + 3;
   }
   // current sample (Ctrl+Up / Ctrl+Down to change)
@@ -248,15 +358,19 @@ function drawGrid(gy, gh) {
   UI.inset(2, gy - 2, W - 4, gh + 3);
   const rowsVis = Math.max(1, Math.floor(gh / ROWH)), center = rowsVis >> 1;
   const vis = Math.min(state.fit, song.channels - state.chScroll);
-  const cy = gy + center * ROWH;
-  UI.rect(3, cy - 1, W - 6, ROWH, COL.play);
-  UI.rect(3, cy - 1, W - 6, 1, COL.edgeHi);
-  UI.rect(3, cy + ROWH - 2, W - 6, 1, COL.edgeHi);
+  const vr = state.viewRow;
+  // highlighted line: the play position while playing, otherwise the cursor row
+  const hiRow = engine.playing ? engine.row : state.row;
   const sel = selRect();
   for (let r = 0; r < rowsVis; r++) {
-    const pr = state.row - center + r;
+    const pr = vr - center + r;
     if (pr < 0 || pr >= p.rows) continue;
-    const y = gy + r * ROWH, cur = r === center;
+    const y = gy + r * ROWH, cur = pr === hiRow;
+    if (cur) {
+      UI.rect(3, y - 1, W - 6, ROWH, COL.play);
+      UI.rect(3, y - 1, W - 6, 1, COL.edgeHi);
+      UI.rect(3, y + ROWH - 2, W - 6, 1, COL.edgeHi);
+    }
     if (sel && pr >= sel.r0 && pr <= sel.r1) {
       for (let i = 0; i < vis; i++) {
         const ci = state.chScroll + i;
@@ -276,8 +390,9 @@ function drawGrid(gy, gh) {
   }
   for (let i = 0; i < vis; i++) UI.rect(GX + i * CHW - 3, gy - 1, 1, gh, '#0f3a4c');
   // cursor
-  if (!engine.playing && state.ch >= state.chScroll && state.ch < state.chScroll + vis) {
-    const f = state.field, x = GX + (state.ch - state.chScroll) * CHW + FIELD_X[f];
+  const crow = state.row - vr + center;     // cursor position on screen (may be off-screen while playing)
+  if (crow >= 0 && crow < rowsVis && state.ch >= state.chScroll && state.ch < state.chScroll + vis) {
+    const f = state.field, x = GX + (state.ch - state.chScroll) * CHW + FIELD_X[f], cy = gy + crow * ROWH;
     if ((UI.frame >> 5) & 1) UI.rect(x - 1, cy - 1, FIELD_W[f] + 1, ROWH, COL.cursor);
     else UI.rect(x - 1, cy - 1, FIELD_W[f] + 1, ROWH, '#1b8aa6');
     UI.text(fieldStr(p, cellIdx(), f), x, cy, COL.bg);
@@ -291,21 +406,21 @@ function drawGrid(gy, gh) {
       let f = 0;
       for (let k = 7; k >= 0; k--) if (FIELD_X[k] <= px) { f = k; break; }
       state.ch = ci; state.field = f;
-      if (!engine.playing) state.row = clamp(state.row - center + Math.floor(ry / ROWH), 0, p.rows - 1);
+      state.row = clamp(vr - center + Math.floor(ry / ROWH), 0, p.rows - 1);
+      if (engine.playing) state.hold = performance.now() + 1500;
     }
   });
   // vertical scrollbar
   const sx = W - 10;
   UI.inset(sx, gy, 6, gh, '#03101a');
   const th = Math.max(6, Math.floor(gh / Math.max(1, p.rows)));
-  const ty = gy + Math.round((gh - th) * state.row / Math.max(1, p.rows - 1));
+  const ty = gy + Math.round((gh - th) * vr / Math.max(1, p.rows - 1));
   UI.rect(sx + 1, ty, 4, th, COL.edgeHi);
-  const setRow = (e, rx, ry) => { if (!engine.playing) state.row = clamp(Math.round(ry / gh * (p.rows - 1)), 0, p.rows - 1); };
+  const setRow = (e, rx, ry) => {
+    state.row = clamp(Math.round(ry / gh * (p.rows - 1)), 0, p.rows - 1);
+    if (engine.playing) state.hold = performance.now() + 1500;
+  };
   UI.hit(sx, gy, 6, gh, { onDown: setRow, onDrag: setRow });
-  // horizontal scroll hint when the song has more channels than fit
-  if (song.channels > state.fit) {
-    UI.text('< > SHIFT+WHEEL: TRACKS ' + (state.chScroll + 1) + '-' + (state.chScroll + vis) + '/' + song.channels, W - 14, gy + gh - 8, COL.dim, 1, 'right');
-  }
 }
 
 // ---- samples ----
@@ -429,7 +544,7 @@ function drawBrowser() {
   UI.panel(bx, by, bw, bh);
   UI.icicles(bx + 2, by + 2, bw - 4, 33);
   UI.text(b.type + ' MODULE: ' + (b.title || '(UNTITLED)'), bx + 8, by + 14, COL.bright);
-  UI.text('FILE ' + b.file + ' - ' + b.samples.length + ' SAMPLES - CLICK TO PREVIEW, IMPORT INTO SLOT ' + hex2(state.smp), bx + 8, by + 24, COL.dim);
+  UI.text('FILE ' + b.file + ' - ' + b.samples.length + ' SAMPLES - CLICK TO PREVIEW, Z-M Q-P PLAY PITCHES, OCT ' + state.oct + ' - IMPORT INTO SLOT ' + hex2(state.smp), bx + 8, by + 24, COL.dim);
   const ly = by + 38, wh = 56, wy = by + bh - 20 - wh - 4;
   const rowsVis = Math.max(1, Math.floor((wy - ly - 4) / ROWH));
   if (b.sel < b.scroll) b.scroll = b.sel;
@@ -465,7 +580,7 @@ function drawBrowser() {
   });
   bt('PLAY', () => engine.preview(b.samples[b.sel], 49));
   bt('STOP', () => engine.previewStop());
-  bt('CLOSE', () => { state.browser = null; engine.previewStop(); });
+  bt('CLOSE', () => closeModuleBrowser());
 }
 
 // ---- in-GUI file browser ----
@@ -548,7 +663,7 @@ function drawHelp() {
     ['A-Z', 'EFFECT COMMAND (IN FX FIELD)'], ['SPACE', 'PLAY / STOP SONG'], ['ENTER', 'PLAY / STOP PATTERN'],
     ['F6 F8', 'PLAY PATTERN / STOP'], ['DEL', 'CLEAR FIELD (SHIFT: CELL)'],
     ['INS', 'INSERT CELL'], ['BKSP', 'DELETE CELL ABOVE'], ['CTRL+LEFT/RIGHT', 'PREV / NEXT ORDER'],
-    ['CTRL+UP/DOWN', 'PREV / NEXT SAMPLE'], ['NUM / NUM *', 'OCTAVE DOWN / UP'], ['[ ]', 'PREV / NEXT SAMPLE'], ['SHIFT+ARROWS', 'SELECT CELLS'], ['CTRL+C X V', 'COPY / CUT / PASTE'], ['F2 F3', 'PATTERN / SAMPLES TAB'], ['CLICK HEADER', 'MUTE TRACK'],
+    ['CTRL+UP/DOWN', 'PREV / NEXT SAMPLE'], ['NUM / NUM *', 'OCTAVE DOWN / UP'], ['[ ]', 'PREV / NEXT SAMPLE'], ['CTRL+S', 'SAVE SONG'], ['SHIFT+ARROWS', 'SELECT CELLS'], ['CTRL+C X V', 'COPY / CUT / PASTE'], ['F2 F3 F4 F7', 'PATTERN / SAMPLES / ORDERS / FILE'], ['CLICK HEADER', 'MUTE TRACK'],
     ['RIGHT CLICK', 'SOLO TRACK'], ['SHIFT+WHEEL', 'SCROLL TRACKS'], ['DROP FILE', 'LOAD SAMPLE / MODULE / SONG']
   ];
   keys.forEach((k, i) => {
