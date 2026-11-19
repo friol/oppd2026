@@ -1,0 +1,2 @@
+html, body { margin: 0; padding: 0; height: 100%; background: #03101a; overflow: hidden; }
+canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; cursor: default; }
