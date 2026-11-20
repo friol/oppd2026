@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skyward — Flight Simulator</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app"></div>
+<canvas id="hud"></canvas>
+
+<div id="loading">
+  <div class="box">
+    <h1>SKYWARD</h1>
+    <p class="sub">A fighter jet over a living island</p>
+    <div class="track"><div id="bar"></div></div>
+    <p id="status">Starting…</p>
+  </div>
+</div>
+
+<div id="menu"></div>
+<div id="results"></div>
+
+<div id="help">
+  <h2>Flight controls</h2>
+  <table>
+    <tr><td>Mouse (click to capture)</td><td>Virtual stick: left/right roll, up/down pitch</td></tr>
+    <tr><td>W / S &nbsp;·&nbsp; ↑ / ↓</td><td>Nose down / nose up</td></tr>
+    <tr><td>A / D &nbsp;·&nbsp; ← / →</td><td>Roll left / right</td></tr>
+    <tr><td>Q / E</td><td>Yaw (rudder)</td></tr>
+    <tr><td>R / F &nbsp;·&nbsp; mouse wheel</td><td>Throttle up / down</td></tr>
+    <tr><td>Shift or Space (hold)</td><td>Boost</td></tr>
+    <tr><td>Right mouse drag</td><td>Look around</td></tr>
+    <tr><td>C</td><td>Camera: chase · cockpit · cinematic</td></tr>
+    <tr><td>T</td><td>Advance the clock by one hour</td></tr>
+    <tr><td>[ &nbsp;/&nbsp; ]</td><td>Slower / faster day-night cycle</td></tr>
+    <tr><td>L</td><td>Weather: clear · scattered · broken · overcast</td></tr>
+    <tr><td>G</td><td>Graphics quality (render scale and cloud detail)</td></tr>
+    <tr><td>I</td><td>Invert mouse pitch</td></tr>
+    <tr><td>P</td><td>Pause screen (resume, restart, menu)</td></tr>
+    <tr><td>N</td><td>Background music on / off</td></tr>
+    <tr><td>M</td><td>Game menu: free flight, Ring Run (Easy · Normal · Hard), achievements</td></tr>
+    <tr><td>H</td><td>Show / hide this help</td></tr>
+    <tr><td>Esc</td><td>Release the mouse</td></tr>
+  </table>
+  <p class="credits">Fighter jet: “Sukhoi Su-35 - Fighter Jet - Free” by bohmerang (sketchfab.com/bohmerang), CC-BY-NC-SA-4.0.
+    Airliner: “Airbus A345” by Stan (sketchfab.com/Stas_SayHallo), CC-BY-4.0. Terrain, sky, clouds and water are procedural.</p>
+</div>
+
+<script src="js/three.min.js"></script>
+<script src="js/GLTFLoader.js"></script>
+<script src="js/modelsdata.js"></script>
+<script src="js/noise.js"></script>
+<script src="js/world.js"></script>
+<script src="js/shaders.js"></script>
+<script src="js/atmosphere.js"></script>
+<script src="js/terrain.js"></script>
+<script src="js/water.js"></script>
+<script src="js/vegetation.js"></script>
+<script src="js/towns.js"></script>
+<script src="js/life.js"></script>
+<script src="js/ship.js"></script>
+<script src="js/hud.js"></script>
+<script src="js/post.js"></script>
+<script src="js/online.js"></script>
+<script src="js/fx.js"></script>
+<script src="js/game.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
