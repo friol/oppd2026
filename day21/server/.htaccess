@@ -1,0 +1,5 @@
+# Only the API is reachable from the web: the configuration and the SQL stay private.
+<FilesMatch "^(config\.php|config\.sample\.php|schema\.sql|README\.md)$">
+  Require all denied
+</FilesMatch>
+Options -Indexes

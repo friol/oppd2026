@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Riemann's Rollercoaster</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app"></div>
+<canvas id="hud"></canvas>
+
+<div id="loading">
+  <div class="box">
+    <img class="logo" src="img/logo.png" alt="Riemann's Rollercoaster">
+    <div class="track"><div id="bar"></div></div>
+    <p id="status">Starting…</p>
+  </div>
+</div>
+
+<div id="touch">
+  <div class="tcol">
+    <button id="tCam" aria-label="Change camera">CAM</button>
+    <button id="tPause" aria-label="Pause">II</button>
+    <button id="tRestart" class="tt" aria-label="Restart time trial">&#8635;</button>
+    <button id="tDispatch" class="rd" aria-label="Dispatch the train">GO</button>
+    <button id="tSound" aria-label="Sound on or off">&#9835;</button>
+    <button id="tFull" aria-label="Full screen">&#9974;</button>
+  </div>
+  <button id="tBrake" class="pedal tt">BRAKE</button>
+  <button id="tGas" class="pedal tt">GAS</button>
+</div>
+<div id="rotate">Rotate your device to landscape</div>
+
+<div id="menu"></div>
+<div id="results"></div>
+
+<div id="help">
+  <h2>Riemann's Rollercoaster</h2>
+  <table>
+    <tr><td>W / ↑</td><td>Accelerate with the linear motors (time trial)</td></tr>
+    <tr><td>S / ↓</td><td>Brake (time trial)</td></tr>
+    <tr><td>C · 1–6</td><td>Camera: front seat, back seat, chase, side, trackside, orbit</td></tr>
+    <tr><td>Mouse drag</td><td>Look around in the seats, orbit around the train</td></tr>
+    <tr><td>Double click</td><td>Reset the view</td></tr>
+    <tr><td>Wheel</td><td>Zoom (orbit and chase)</td></tr>
+    <tr><td>Space</td><td>Dispatch the train from the station (free ride)</td></tr>
+    <tr><td>R</td><td>Restart the time trial</td></tr>
+    <tr><td>Esc · P</td><td>Pause menu</td></tr>
+    <tr><td>N</td><td>Sound on / off</td></tr>
+  </table>
+  <p>Time trial: the gauge shows the <b>safe speed</b> for the track ahead. Above it the riders get more than
+    6 g in the valleys, less than −1 g over the hills or more than 2 g sideways, and the train derails (+5 s).</p>
+  <p class="dim">Press H or any key to close.</p>
+</div>
+
+<script src="js/three.min.js"></script>
+<script src="js/util.js"></script>
+<script src="js/track.js"></script>
+<script src="js/scenery.js"></script>
+<script src="js/trackmesh.js"></script>
+<script src="js/train.js"></script>
+<script src="js/post.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/online.js"></script>
+<script src="js/game.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

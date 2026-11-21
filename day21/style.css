@@ -1,0 +1,111 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #0c0e2a; color: #fff;
+  font-family: "Bahnschrift", "Segoe UI", system-ui, sans-serif; user-select: none; }
+#app canvas { display: block; position: fixed; inset: 0; width: 100%; height: 100%; }
+#hud { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+#loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 50;
+  background: radial-gradient(ellipse at 50% 30%, #5a5fe0 0%, #2a2c90 55%, #0c0e2a 100%); transition: opacity 0.8s; }
+#loading.done { opacity: 0; pointer-events: none; }
+#loading .box { width: min(720px, 90vw); text-align: center; }
+#loading .logo { width: 100%; filter: drop-shadow(0 8px 24px rgba(0,0,0,0.5)); }
+#loading .track { height: 10px; border-radius: 5px; background: rgba(255,255,255,0.15); margin: 24px auto 10px; width: 70%; overflow: hidden; }
+#bar { height: 100%; width: 0; background: linear-gradient(90deg, #ffb020, #ff5a2a); transition: width 0.25s; }
+#status { opacity: 0.8; font-size: 15px; letter-spacing: 0.04em; }
+
+/* Title / pause / results screens */
+#menu, #results { position: fixed; inset: 0; display: none; z-index: 20; padding: 5vh 6vw;
+  background: linear-gradient(90deg, rgba(14,16,60,0.82) 0%, rgba(14,16,60,0.55) 45%, rgba(14,16,60,0.15) 100%);
+  align-items: center; gap: 4vw; }
+#menu.show, #results.show { display: flex; animation: fadeIn 0.4s ease-out; }
+#menu.title { background: linear-gradient(90deg, rgba(14,16,60,0.70) 0%, rgba(14,16,60,0.35) 50%, rgba(14,16,60,0.0) 100%); }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.mv-left { flex: 0 0 auto; width: min(620px, 52vw); display: flex; flex-direction: column; }
+.mv-left .logo { width: 100%; filter: drop-shadow(0 10px 22px rgba(0,0,0,0.55)); animation: logoIn 0.7s cubic-bezier(.2,1.4,.4,1); }
+@keyframes logoIn { from { transform: translateY(-30px) scale(0.92); opacity: 0; } to { transform: none; opacity: 1; } }
+.tag { margin: 4px 0 22px 8px; font-size: 17px; letter-spacing: 0.3em; text-transform: uppercase; color: #ffd27a;
+  text-shadow: 0 2px 6px rgba(0,0,0,0.6); }
+.ptitle { font-size: 54px; font-weight: 900; font-style: italic; letter-spacing: 0.04em; margin: 8px 0 14px;
+  background: linear-gradient(180deg, #ffe66a, #ff8a1e); -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 3px 0 #3a1a60); }
+.items { display: flex; flex-direction: column; gap: 4px; margin-left: 8px; }
+.item { font-size: 34px; font-weight: 800; font-style: italic; letter-spacing: 0.03em; color: rgba(255,255,255,0.72);
+  padding: 4px 18px; border-left: 4px solid transparent; cursor: pointer; transition: all 0.15s; width: fit-content;
+  text-shadow: 0 3px 8px rgba(0,0,0,0.5); }
+.item.sel { color: #fff; border-left-color: #ffb020; transform: translateX(10px);
+  background: linear-gradient(90deg, rgba(255,140,30,0.35), rgba(255,140,30,0)); }
+.item.sel::after { content: " \203A"; color: #ffb020; }
+.hint { margin: 22px 0 0 26px; font-size: 13px; opacity: 0.6; letter-spacing: 0.06em; }
+.mv-info { flex: 0 1 420px; align-self: center; margin-left: auto; margin-right: 2vw;background: rgba(10,12,40,0.62); border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 14px; padding: 22px 26px; font-size: 15px; line-height: 1.5; backdrop-filter: blur(6px); min-height: 120px; max-height: 88vh; overflow-y: auto; scrollbar-width: thin; }
+.mv-info h3 { margin: 0 0 8px; font-size: 22px; font-style: italic; color: #ffd27a; }
+.mv-info p { margin: 6px 0; color: rgba(255,255,255,0.85); }
+table.keys { border-collapse: collapse; width: 100%; }
+table.keys td { padding: 4px 6px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+table.keys td:first-child { color: #ffd27a; white-space: nowrap; width: 40%; }
+.medals { display: flex; gap: 16px; margin-top: 10px; font-weight: 700; }
+.md.gold { color: #ffd23a; } .md.silver { color: #d8e0ea; } .md.bronze { color: #e0904a; }
+.best { opacity: 0.85; }
+.bigtime { font-size: 72px; font-weight: 900; font-style: italic; text-shadow: 0 4px 14px rgba(0,0,0,0.6); margin-left: 8px; }
+.medal { font-size: 26px; font-weight: 900; font-style: italic; margin: 4px 0 6px 8px; }
+.medal.gold { color: #ffd23a; } .medal.silver { color: #d8e0ea; } .medal.bronze { color: #e0904a; } .medal.none { color: rgba(255,255,255,0.5); }
+.sum { margin: 0 0 18px 8px; font-size: 18px; }
+.nb { color: #7dff6a; }
+
+#help { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 40; display: none;
+  background: rgba(10,12,40,0.9); border: 1px solid rgba(255,255,255,0.18); border-radius: 14px; padding: 22px 30px; width: min(640px, 92vw); }
+#help.show { display: block; }
+#help h2 { margin: 0 0 12px; color: #ffd27a; font-style: italic; }
+#help td { padding: 3px 10px 3px 0; }
+#help td:first-child { color: #ffd27a; white-space: nowrap; }
+#help p { line-height: 1.45; }
+.dim { opacity: 0.6; font-size: 13px; }
+
+@media (max-width: 900px) {
+  #menu, #results { flex-direction: column; justify-content: center; overflow-y: auto; }
+  .mv-left { width: 90vw; }
+  .item { font-size: 26px; }
+  .mv-info { margin: 0; }
+}
+
+/* online leaderboard */
+.mv-info .board { width: 100%; border-collapse: collapse; margin: 4px 0 10px; }
+.mv-info .board td { padding: 5px 0; font-size: 14px; color: rgba(255,255,255,0.85); border-bottom: 1px solid rgba(255,255,255,0.08); vertical-align: top; }
+.mv-info .board td:first-child { width: 28px; color: #ffd27a; }
+.mv-info .board td:last-child { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.mv-info .board td i { display: block; font-style: normal; font-size: 11px; opacity: 0.6; }
+.mv-info .board tr.me td { color: #fff; }
+.mv-info .board tr.me td:first-child { color: #7dff6a; }
+.mv-info .online { margin-top: 16px; padding-top: 12px; border-top: 1px solid rgba(255,210,122,0.3); }
+.mv-info .online h3 { font-size: 18px; }
+.mv-info .send { display: flex; gap: 8px; margin: 6px 0; }
+.mv-info .send input { flex: 1; min-width: 0; padding: 7px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.25);
+  background: rgba(0,0,0,0.35); color: #fff; font: inherit; user-select: text; outline: none; }
+.mv-info .send input:focus { border-color: #ffb020; }
+.mv-info .send button { padding: 7px 16px; border-radius: 8px; border: 0; background: linear-gradient(180deg, #ffd23a, #ff8a1e);
+  color: #2a1040; font: inherit; font-weight: 800; cursor: pointer; }
+.mv-info .send button:disabled { opacity: 0.45; cursor: default; }
+.mv-info .online b { color: #7dff6a; }
+
+/* Touch controls: shown only on touch devices (body.touch) while driving or riding */
+#app canvas { touch-action: none; }
+#touch, #rotate { display: none; }
+body.touch #touch { display: block; position: fixed; inset: 0; z-index: 10; pointer-events: none; }
+body.touch #touch button { pointer-events: auto; touch-action: none; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none;
+  font: 800 15px "Bahnschrift", "Segoe UI", system-ui, sans-serif; letter-spacing: 0.04em; color: #fff; cursor: pointer; display: none;
+  background: rgba(14,16,60,0.55); border: 2px solid rgba(255,255,255,0.35); backdrop-filter: blur(4px); }
+.tcol { position: absolute; left: max(10px, env(safe-area-inset-left)); top: 34px; flex-direction: row; gap: 8px; display: none; }
+body.touch[data-tm="ride"] #touch .tcol, body.touch[data-tm="trial"] #touch .tcol { display: flex; }
+body.touch #touch .tcol button { display: block; width: 40px; height: 40px; border-radius: 50%; font-size: 13px; }
+body.touch[data-tm="ride"] #touch .tcol .tt, body.touch[data-tm="trial"] #touch .tcol .rd { display: none; }
+body.touch #touch button:active, body.touch #touch button.down { background: rgba(255,176,32,0.65); border-color: #ffd27a; }
+body.touch #touch .pedal { position: absolute; width: 22vw; max-width: 170px; min-width: 96px; height: 84px; border-radius: 22px; font-size: 20px; }
+body.touch[data-tm="trial"] #touch .pedal { display: block; }
+#tGas { right: max(16px, env(safe-area-inset-right)); bottom: 196px; background: rgba(40,160,60,0.5) !important; }
+#tBrake { left: max(16px, env(safe-area-inset-left)); bottom: 196px; background: rgba(200,40,40,0.5) !important; }
+body.touch #tGas.down { background: rgba(80,230,100,0.75) !important; }
+body.touch #tBrake.down { background: rgba(255,80,70,0.8) !important; }
+@media (orientation: portrait) {
+  body.touch #rotate { display: flex; position: fixed; inset: 0; z-index: 60; align-items: center; justify-content: center; text-align: center; padding: 30px;
+    background: rgba(12,14,42,0.92); font-size: 22px; font-weight: 800; font-style: italic; color: #ffd27a; }
+}
