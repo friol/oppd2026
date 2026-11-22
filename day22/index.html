@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Super Portal Guy</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="favicon.svg">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="stage">
+    <canvas id="game" width="960" height="540"></canvas>
+
+    <div id="loading"><span>LOADING</span><div class="bar"><i id="loadbar"></i></div></div>
+
+    <div id="menu" class="hidden"></div>
+    <div id="victory" class="hidden"></div>
+
+    <div id="edbar" class="hidden">
+      <button data-lvl="0">World 1</button><button data-lvl="1">World 2</button><button data-lvl="2">World 3</button>
+      <span class="sep"></span>
+      <button id="edPlay" class="hot" title="Test from the start of the level">▶ Test</button>
+      <button id="edPlayHere" class="hot" title="Test from the mouse position (or the middle of the view) - key T">▶ Test here</button>
+      <button id="edSave">Save</button>
+      <button id="edRevert" title="Delete the custom version">Revert</button>
+      <span class="sep"></span>
+      <label>Seed <input id="edseed" type="number" min="1"></label>
+      <button id="edRegen" title="Generate the level from this seed">Generate</button>
+      <button id="edRandom" title="Generate with a random seed">🎲</button>
+      <span class="sep"></span>
+      <button id="edNarrower" title="10 columns less">−W</button><button id="edWider" title="10 columns more">+W</button>
+      <button id="edExport">Export</button><button id="edImport">Import</button>
+      <input id="edFile" type="file" accept=".json,application/json" hidden>
+      <span class="sep"></span>
+      <button id="edClose">Menu</button>
+    </div>
+    <div id="edpal" class="hidden"></div>
+    <div id="edstatus" class="hidden"></div>
+  </div>
+
+  <script src="js/util.js"></script>
+  <script src="js/level.js"></script>
+  <script src="js/gen.js"></script>
+  <script src="js/atlas.js"></script>
+  <script src="js/assets.js"></script>
+  <script src="js/world.js"></script>
+  <script src="js/entities.js"></script>
+  <script src="js/pixelfont.js"></script>
+  <script src="js/ambient.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/sfx.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/editor.js"></script>
+  <script src="js/menu.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
