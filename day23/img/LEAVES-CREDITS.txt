@@ -1,0 +1,8 @@
+img/leaves.png (and the same atlas embedded in js/leafatlas.js)
+
+Autumn maple leaves from ambientCG (https://ambientcg.com):
+  - LeafSet027 (https://ambientcg.com/view?id=LeafSet027)
+  - LeafSet028 (https://ambientcg.com/view?id=LeafSet028)
+License: CC0 1.0 Universal (public domain dedication).
+
+Cut out, turned and packed into an atlas by tools/leaves.py.

@@ -1,0 +1,9 @@
+img/petals.png (and the same atlas embedded in js/petalatlas.js)
+
+Red rose petals cut out from the photo "Rose Petals" on StockSnap:
+  https://stocksnap.io/photo/rose-petals-BYUXDXPT0I
+  (960 px version: https://cdn.stocksnap.io/img-thumbs/960w/BYUXDXPT0I.jpg)
+License: CC0 1.0 Universal (public domain dedication), as listed by
+StockSnap and by Openverse (api.openverse.org).
+
+Cut out by colour and packed into an atlas by tools/petals.py.
