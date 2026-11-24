@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Two face-down cards behind the Joker -->
+  <rect x="6" y="12" width="28" height="40" rx="4" fill="#8e1b22" stroke="#fbf6ea" stroke-width="2.5" transform="rotate(-14 20 32)"/>
+  <rect x="30" y="12" width="28" height="40" rx="4" fill="#8e1b22" stroke="#fbf6ea" stroke-width="2.5" transform="rotate(14 44 32)"/>
+  <rect x="17" y="8" width="30" height="44" rx="4" fill="#fffdf6" stroke="#c9962f" stroke-width="1.5"/>
+  <!-- Jester hat -->
+  <path d="M24 38 C22 30 19 26 19 20 C25 22 29 28 30 37 Z" fill="#c4262e"/>
+  <path d="M28 37 C29 28 31 20 32 14 C33 20 35 28 36 37 Z" fill="#e3b955"/>
+  <path d="M40 38 C42 30 45 26 45 20 C39 22 35 28 34 37 Z" fill="#5b2a86"/>
+  <rect x="22" y="36" width="20" height="5" rx="2" fill="#2b2b2b"/>
+  <circle cx="19" cy="19.5" r="2.4" fill="#e3b955"/>
+  <circle cx="32" cy="13.5" r="2.4" fill="#c4262e"/>
+  <circle cx="45" cy="19.5" r="2.4" fill="#e3b955"/>
+</svg>
