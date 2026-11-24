@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Find the Joker</title>
+  <title>Find the *</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
 </head>
@@ -23,6 +23,7 @@
 
     <section class="table" id="table" aria-label="Card table">
       <p class="message" id="message" aria-live="polite">Place your bet and deal.</p>
+      <div class="aids" id="aids" aria-label="Helpers"></div>
     </section>
 
     <section class="controls">
@@ -41,9 +42,10 @@
     </section>
 
     <footer class="foot">
-      <span class="keys">Keys: <kbd>Space</kbd> deal · <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> pick · <kbd>M</kbd> sound · <kbd>N</kbd> music</span>
+      <span class="keys">Keys: <kbd>Space</kbd> deal · <kbd>1</kbd>–<kbd>4</kbd> pick · <kbd>M</kbd> sound · <kbd>N</kbd> music · <kbd>T</kbd> timer</span>
       <span class="toggles">
-        <button class="mute" id="saloon" type="button" aria-label="Tables and records">Tables &amp; records</button>
+        <button class="mute" id="saloon" type="button" aria-label="Tables, medals and records">Tables &amp; records</button>
+        <button class="mute" id="timer" type="button" aria-label="Toggle the pick time limit">Timer on</button>
         <button class="mute" id="music" type="button" aria-label="Toggle music">Music on</button>
         <button class="mute" id="mute" type="button" aria-label="Toggle sound effects">Sound on</button>
       </span>
@@ -61,9 +63,14 @@
 
   <script src="js/sound.js"></script>
   <script src="js/music.js"></script>
+  <script src="js/medals.js"></script>
   <script src="js/saloon.js"></script>
+  <script src="js/beats.js"></script>
   <script src="js/scene.js"></script>
+  <script src="js/fx.js"></script>
   <script src="js/dealer.js"></script>
+  <script src="js/events.js"></script>
+  <script src="js/season.js"></script>
   <script src="js/game.js"></script>
 </body>
 </html>

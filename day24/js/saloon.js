@@ -64,15 +64,25 @@ const SALOON = (function () {
 
   // ---------- Toast ----------
 
-  let toastEl, toastTimer = 0;
+  // Toasts are queued, so a medal and a table unlock never cover each other.
+  let toastEl, toastTimer = 0, toastBusy = false;
+  const toastQueue = [];
   function toast(text) {
+    toastQueue.push(text);
+    if (!toastBusy) nextToast();
+  }
+
+  function nextToast() {
+    const text = toastQueue.shift();
+    if (text === undefined) { toastBusy = false; toastEl.hidden = true; return; }
+    toastBusy = true;
     toastEl.textContent = text;
     toastEl.hidden = false;
     toastEl.classList.remove('pop');
     void toastEl.offsetWidth;
     toastEl.classList.add('pop');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { toastEl.hidden = true; }, 3400);
+    toastTimer = setTimeout(nextToast, 3000);
   }
 
   // ---------- Tables and records panel ----------
@@ -86,6 +96,8 @@ const SALOON = (function () {
       '<div class="panel wide" role="dialog" aria-label="Tables and records">' +
       '<h2>The Saloon</h2>' +
       '<h3>Tables</h3><div class="themes"></div>' +
+      '<h3>Season</h3><div class="seasons"></div>' +
+      '<h3>Medals <span class="mcount"></span></h3><div class="medals"></div>' +
       '<h3>Records</h3><div class="records"></div>' +
       '<button class="deal" type="button">Close</button></div>';
     document.body.appendChild(panel);
@@ -110,6 +122,10 @@ const SALOON = (function () {
       b.addEventListener('click', () => { apply(t.id); SOUND.chip(); renderPanel(); });
       box.appendChild(b);
     }
+
+    if (typeof SEASON !== 'undefined') SEASON.render(panel.querySelector('.seasons'));
+    MEDALS.render(panel.querySelector('.medals'));
+    panel.querySelector('.mcount').textContent = MEDALS.count + ' / ' + MEDALS.list.length;
 
     const rec = panel.querySelector('.records');
     if (!records.length) {

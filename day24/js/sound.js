@@ -38,13 +38,22 @@ const SOUND = (function () {
   catAudio.preload = 'auto';
   catAudio.preservesPitch = false;
 
+  // Recorded crowd boo (soundfx/boo.wav), played when the player loses a round.
+  const BOO_VOL = 0.7;
+  const booAudio = new Audio('soundfx/boo.wav');
+  booAudio.preload = 'auto';
+
+  // Fade out the cheer and the boo, so a new round does not cut them off abruptly.
   function stopCheers() {
     clearInterval(cheerFade);
-    if (cheerAudio.paused) return;
-    // Quick fade out so a new round does not cut the sample abruptly.
+    if (cheerAudio.paused && booAudio.paused) return;
     cheerFade = setInterval(() => {
-      cheerAudio.volume = Math.max(0, cheerAudio.volume - 0.1);
-      if (cheerAudio.volume <= 0) { clearInterval(cheerFade); cheerAudio.pause(); }
+      for (const a of [cheerAudio, booAudio]) {
+        if (a.paused) continue;
+        a.volume = Math.max(0, a.volume - 0.1);
+        if (a.volume <= 0) a.pause();
+      }
+      if (cheerAudio.paused && booAudio.paused) clearInterval(cheerFade);
     }, 40);
   }
 
@@ -83,6 +92,13 @@ const SOUND = (function () {
     osc.stop(t + o.dur + 0.05);
   }
 
+  // One honky-tonk piano note: two slightly detuned triangles plus a soft hammer click.
+  function piano(freq, at, dur, gain) {
+    for (const d of [-1, 1]) tone({ freq: freq * (1 + d * 0.004), type: 'triangle', gain: gain * 0.6, dur, attack: 0.004, at });
+    tone({ freq: freq * 2, type: 'sine', gain: gain * 0.15, dur: dur * 0.5, attack: 0.003, at });
+    hiss({ freq: 2500, q: 1, gain: gain * 0.3, dur: 0.03, at });
+  }
+
   return {
     init,
 
@@ -92,7 +108,7 @@ const SOUND = (function () {
       muted = !muted;
       try { localStorage.setItem('day24.mute', muted ? '1' : '0'); } catch (e) { }
       if (master) master.gain.setTargetAtTime(muted ? 0 : 0.8, ctx.currentTime, 0.02);
-      if (muted) { clearInterval(cheerFade); cheerAudio.pause(); catAudio.pause(); }
+      if (muted) { clearInterval(cheerFade); cheerAudio.pause(); catAudio.pause(); booAudio.pause(); }
       return muted;
     },
 
@@ -112,6 +128,15 @@ const SOUND = (function () {
       cheerAudio.currentTime = 0;
       cheerAudio.volume = CHEER_VOL;
       cheerAudio.play().catch(() => this.applause(1.8));
+    },
+
+    // The crowd boos: the recording, or the synthesized laughter if it cannot play.
+    boo() {
+      if (muted || !ctx) return;
+      clearInterval(cheerFade);
+      booAudio.currentTime = 0;
+      booAudio.volume = BOO_VOL;
+      booAudio.play().catch(() => this.laugh());
     },
 
     stopCheers,
@@ -298,6 +323,94 @@ const SOUND = (function () {
       osc.start(t);
       osc.stop(t + 0.95);
       hiss({ type: 'highpass', freq: 3000, gain: 0.025, dur: 0.6, attack: 0.1 });
+    },
+
+    // Pick timer: a dry tick per second, higher and sharper in the last seconds.
+    tick(urgent) {
+      if (!ready()) return;
+      tone({ freq: urgent ? 1900 : 1300, type: 'square', gain: urgent ? 0.07 : 0.04, dur: 0.04, attack: 0.002 });
+    },
+
+    // Snare roll that swells and speeds up over `sec` seconds.
+    drumroll(sec) {
+      if (!ready()) return;
+      let t = 0, i = 0;
+      while (t < sec) {
+        const p = t / sec;
+        hiss({ freq: 1800, q: 0.7, gain: 0.04 + 0.1 * p, dur: 0.05, at: t, attack: 0.002 });
+        if (i % 2 === 0) tone({ freq: 190, freqEnd: 150, gain: 0.03 + 0.05 * p, dur: 0.05, at: t });
+        t += 0.1 - 0.065 * p;
+        i++;
+      }
+    },
+
+    // Accent at the end of the roll: cymbal and kick.
+    hit() {
+      if (!ready()) return;
+      hiss({ type: 'highpass', freq: 5000, q: 0.5, gain: 0.18, dur: 0.7 });
+      tone({ freq: 110, freqEnd: 55, gain: 0.25, dur: 0.25 });
+    },
+
+    // The table shakes: a low thud.
+    thud() {
+      if (!ready()) return;
+      tone({ freq: 90, freqEnd: 40, gain: 0.35, dur: 0.35 });
+      hiss({ type: 'lowpass', freq: 300, gain: 0.3, dur: 0.3 });
+    },
+
+    // A shower of coins hitting the felt.
+    coins(n) {
+      if (!ready()) return;
+      for (let i = 0; i < n; i++) {
+        const at = Math.random() * 1.5;
+        tone({ freq: 1900 + Math.random() * 2200, type: 'triangle', gain: 0.035, dur: 0.16, at });
+      }
+    },
+
+    // Honky-tonk piano: ragtime run up for a win...
+    flourish() {
+      if (!ready()) return;
+      [523.25, 587.33, 659.25, 783.99, 1046.5, 783.99, 1046.5].forEach((f, i) => piano(f, i * 0.075, 0.45, 0.07));
+      [261.63, 329.63, 392, 523.25].forEach(f => piano(f, 0.6, 0.9, 0.06));
+    },
+
+    // ...and a sad descending phrase for a bust.
+    sadPiano() {
+      if (!ready()) return;
+      [392, 370, 349.23, 329.63].forEach((f, i) => piano(f, i * 0.3, 0.7, 0.07));
+      [196, 164.81].forEach((f, i) => piano(f, 0.9 + i * 0.05, 1.3, 0.06));
+    },
+
+    // Duel: wind before the draw, a stinger on DRAW, a gunshot at the end.
+    wind() {
+      if (!ready()) return;
+      hiss({ type: 'bandpass', freq: 350, freqEnd: 700, q: 0.6, gain: 0.07, dur: 3, attack: 1 });
+    },
+
+    draw() {
+      if (!ready()) return;
+      tone({ freq: 880, type: 'square', gain: 0.1, dur: 0.14, attack: 0.002 });
+      tone({ freq: 1320, type: 'square', gain: 0.07, dur: 0.1, attack: 0.002, at: 0.05 });
+    },
+
+    gunshot() {
+      if (!ready()) return;
+      hiss({ type: 'highpass', freq: 1200, gain: 0.5, dur: 0.18, attack: 0.001 });
+      hiss({ type: 'lowpass', freq: 500, freqEnd: 120, gain: 0.35, dur: 0.6, attack: 0.002 });
+      tone({ freq: 160, freqEnd: 40, gain: 0.45, dur: 0.35, attack: 0.002 });
+    },
+
+    // A hand sneaking in: a quiet rustle.
+    sneak() {
+      if (!ready()) return;
+      hiss({ type: 'bandpass', freq: 900, freqEnd: 2200, q: 1.2, gain: 0.08, dur: 1.6, attack: 0.4 });
+    },
+
+    // Slap on the thief's hand.
+    slap() {
+      if (!ready()) return;
+      hiss({ freq: 2600, q: 0.8, gain: 0.4, dur: 0.07, attack: 0.002 });
+      tone({ freq: 220, freqEnd: 110, gain: 0.22, dur: 0.12 });
     },
 
     // New table unlocked: a bright little fanfare.

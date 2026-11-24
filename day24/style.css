@@ -198,7 +198,7 @@ h1 em {
 .toast {
   position: absolute;
   left: 50%;
-  top: 40px;
+  bottom: 15%;
   z-index: 9;
   transform: translateX(-50%);
   padding: 8px 18px;
@@ -374,14 +374,55 @@ h1 em {
   position: absolute;
   inset: 0;
   transform-style: preserve-3d;
+  /* Always the same three functions in the same order, so flips interpolate cleanly. */
+  transform: translateY(var(--ty, 0px)) scale(var(--sc, 1)) rotateY(var(--ry, 0deg));
   transition: transform .42s cubic-bezier(.3, .7, .3, 1);
 }
 
-.card.down .inner { transform: rotateY(180deg); }
+.card.down .inner { --ry: 180deg; }
 
 .table.picking .card { cursor: pointer; }
 .table.picking .card:hover .inner,
-.table.picking .card:focus-visible .inner { transform: rotateY(180deg) translateY(-10px); }
+.table.picking .card:focus-visible .inner { --ty: -10px; }
+
+/* The card the player picked rises and grows while the drum rolls. */
+.card.chosen .inner { --ty: -14px; --sc: 1.1; }
+.card.chosen .face { box-shadow: 0 0 0 3px var(--gold), 0 0 28px 4px rgba(227, 185, 85, .55); }
+
+/* A fourth card only exists on Pro; an eliminated card cannot be picked. */
+.card.gone { display: none; }
+.card.out { cursor: default; pointer-events: none; }
+
+/* Surprise cards. */
+.front.gold {
+  background: linear-gradient(160deg, #fff4c2, #ecc65d 55%, #c9962f);
+  color: #6b4a0c;
+  font-family: Georgia, serif;
+}
+
+.front.gold .pip span { font-size: calc(var(--cw) * .5); color: #b8860b; text-shadow: 0 1px 0 rgba(255, 255, 255, .6); }
+.front.gold .pip small { font-size: calc(var(--cw) * .13); letter-spacing: .12em; color: #6b4a0c; margin-top: 2%; }
+
+.front.skull {
+  background: linear-gradient(160deg, #2a1a32, #120a18);
+  color: #c4262e;
+  font-family: Georgia, serif;
+}
+
+.front.skull .corner { font-size: calc(var(--cw) * .085); color: #c4262e; }
+.front.skull .corner span { display: block; }
+.front.skull .hat { position: absolute; left: 18%; right: 18%; top: 20%; width: 64%; }
+.front.skull .title {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 18%;
+  text-align: center;
+  font-size: calc(var(--cw) * .1);
+  letter-spacing: .12em;
+  font-weight: 700;
+  color: #e8e0f0;
+}
 
 .face {
   position: absolute;
@@ -874,7 +915,7 @@ kbd {
 }
 
 .patron.cheer { animation: cheer 1.5s ease-out; }
-.patron.laugh { animation: laugh 1.5s linear; }
+.patron.laugh, .patron.boo { animation: laugh 1.5s linear; }
 .patron.gasp { animation: gasp 1.4s ease-out; }
 .patron.hush { animation: hush 1.7s ease-in-out; }
 
@@ -1045,3 +1086,533 @@ kbd {
 @media (max-width: 1000px), (max-height: 520px) {
   .scene { display: none; }
 }
+
+/* ---------- Helpers, pot, coin rain, timer, shake ---------- */
+
+.aids {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 9;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: stretch;
+}
+
+.aid {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: baseline;
+  min-width: 118px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(227, 185, 85, .55);
+  background: rgba(20, 12, 7, .72);
+  color: var(--gold-soft);
+  font: 600 13px Georgia, serif;
+  cursor: pointer;
+  transition: background .15s, transform .12s;
+}
+
+.aid small { font: 600 12px "Segoe UI", system-ui, sans-serif; color: var(--muted); }
+.aid:hover:not(:disabled) { background: rgba(227, 185, 85, .22); transform: translateX(-2px); }
+.aid:disabled { opacity: .38; cursor: default; }
+.aid.on { background: var(--gold); color: #2a1a08; border-color: var(--gold); }
+.aid.on small { color: #5a3d12; }
+.aid.on:disabled { opacity: .85; }
+
+/* The bet, as chips on the felt, bottom right. */
+.pot {
+  position: absolute;
+  right: 5%;
+  bottom: 12%;
+  z-index: 3;
+  width: 56px;
+  height: 90px;
+  pointer-events: none;
+}
+
+.pot .stack { position: absolute; left: 0; bottom: 18px; width: 40px; height: 60px; }
+.pot .stack.extra { left: -46px; }
+
+.pchip {
+  position: absolute;
+  width: 38px;
+  height: 18px;
+  border-radius: 50%;
+  border: 3px dashed rgba(255, 255, 255, .8);
+  box-shadow: 0 2px 3px rgba(0, 0, 0, .6);
+  animation: chipIn .45s cubic-bezier(.3, 1.2, .5, 1) backwards;
+}
+
+.pchip.c5 { background: #b8322f; }
+.pchip.c10 { background: #2860a8; }
+.pchip.c25 { background: #2a8a4a; }
+.pchip.c50 { background: #222; }
+.pchip.c100 { background: #7a3ea8; }
+
+.pot .sum {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 40px;
+  text-align: center;
+  font: 700 13px Georgia, serif;
+  color: var(--gold-soft);
+  text-shadow: 0 1px 4px #000;
+}
+
+@keyframes chipIn {
+  from { transform: translateY(260px) scale(.7); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+.pot.up { animation: potUp .9s ease-in forwards; }
+.pot.lost { animation: potLost .8s ease-in forwards; }
+
+@keyframes potUp {
+  to { transform: translate(-30px, -360px) scale(.8); opacity: 0; }
+}
+
+@keyframes potLost {
+  to { transform: translate(10px, -330px) rotate(12deg) scale(.8); opacity: 0; }
+}
+
+/* Coin rain: gold coins tumble down the table when you win. */
+.rcoin {
+  position: absolute;
+  top: -40px;
+  z-index: 7;
+  width: var(--sz, 22px);
+  height: var(--sz, 22px);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fff3b8, #e3b955 45%, #8a6420);
+  border: 2px solid #f3dc9b;
+  box-shadow: 0 3px 5px rgba(0, 0, 0, .5);
+  pointer-events: none;
+  animation: rain var(--dur, 1.5s) cubic-bezier(.5, 0, .9, .6) var(--delay, 0s) both, coinSpin .45s linear var(--delay, 0s) infinite;
+}
+
+@keyframes rain {
+  from { top: -40px; }
+  to { top: 104%; }
+}
+
+@keyframes coinSpin {
+  0%, 100% { transform: scaleX(1); }
+  50% { transform: scaleX(.15); }
+}
+
+/* Table shake when you lose (stronger for the Skull). */
+.table.shake { animation: shake .45s linear; }
+.table.shake2 { animation: shake .7s linear; --amp: 11px; }
+
+@keyframes shake {
+  0%, 100% { transform: none; }
+  10% { transform: translate(calc(var(--amp, 6px) * -1), 2px) rotate(-.3deg); }
+  25% { transform: translate(var(--amp, 6px), -2px) rotate(.3deg); }
+  40% { transform: translate(calc(var(--amp, 6px) * -.8), 1px); }
+  55% { transform: translate(calc(var(--amp, 6px) * .6), -1px); }
+  70% { transform: translate(calc(var(--amp, 6px) * -.4), 0); }
+  85% { transform: translate(calc(var(--amp, 6px) * .2), 0); }
+}
+
+/* Pick timer: a bar along the bottom of the table that shrinks. */
+.timer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 6px;
+  z-index: 9;
+  background: rgba(0, 0, 0, .35);
+}
+
+.timer[hidden] { display: none; }
+.timer .fill { display: block; height: 100%; background: linear-gradient(90deg, #8a6420, var(--gold)); }
+.timer.hot .fill { background: linear-gradient(90deg, #8a1a1a, #ff5a4a); }
+
+.timer .num {
+  position: absolute;
+  left: 14px;
+  bottom: 10px;
+  font: 700 14px Georgia, serif;
+  color: var(--gold-soft);
+  text-shadow: 0 1px 4px #000;
+}
+
+.timer.hot .num { color: #ff9a8a; animation: pulse .5s ease-in-out infinite alternate; }
+
+@keyframes pulse { to { transform: scale(1.25); } }
+
+/* ---------- Pianist ---------- */
+
+.pianist {
+  position: absolute;
+  left: 8px;
+  top: calc(var(--bar) - var(--ph) * .8 + 10px);
+  height: calc(var(--ph) * .8);
+  width: calc(var(--ph) * .8 * 140 / 110);
+}
+
+.pianist svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  fill: #0d0805;
+  stroke: rgba(255, 196, 120, .24);
+  stroke-width: 1;
+}
+
+.pianist .phead, .pianist .pbody, .pianist .hand, .pianist .fng, .pianist .key {
+  transform-box: fill-box;
+}
+
+.pianist .key { fill: #e8dcc0; fill-opacity: .85; }
+.pianist .pbody, .pianist .phead { transform-origin: 50% 100%; }
+.pianist .hand { transform-origin: 0 50%; }
+.pianist .parm { transform-origin: 48px 72px; }
+.pianist .fng { transform-origin: 50% 0; }
+
+/* Without music (or on a win / bust with no beat to follow) he plays a fast flourish.
+   With music, scene.js drives every part from the beat grid instead. */
+.pianist.playing { --arm: 11deg; --armT: .38s; --fing: .13s; --bob: .34s; --nod: .5s; --lean: 3deg; }
+
+.pianist.playing .pbody { animation: playBody var(--bob) ease-in-out infinite alternate; }
+.pianist.playing .phead { animation: nod var(--nod) ease-in-out infinite alternate; }
+.pianist.playing .a1 { animation: armSwing var(--armT) ease-in-out infinite alternate; }
+.pianist.playing .a2 { animation: armSwing var(--armT) ease-in-out -.5s infinite alternate-reverse; }
+.pianist.playing .fng { animation: press var(--fing) ease-in-out infinite alternate; }
+.pianist.playing .f2 { animation-delay: -.11s; }
+.pianist.playing .f3 { animation-delay: -.2s; }
+.pianist.playing .a2 .f1 { animation-delay: -.06s; }
+.pianist.playing .key { animation: keyDown .21s ease-in-out infinite alternate; }
+.pianist.playing .k1 { animation-duration: .27s; animation-delay: -.1s; }
+.pianist.playing .k2 { animation-duration: .19s; animation-delay: -.05s; }
+.pianist.playing .k3 { animation-duration: .33s; animation-delay: -.2s; }
+.pianist.playing .k4 { animation-duration: .23s; animation-delay: -.12s; }
+.pianist.playing .k5 { animation-duration: .29s; animation-delay: -.02s; }
+.pianist.playing .k6 { animation-duration: .17s; animation-delay: -.15s; }
+.pianist.playing .k7 { animation-duration: .25s; animation-delay: -.08s; }
+
+@keyframes playBody { to { transform: rotate(var(--lean)) translateX(1px); } }
+@keyframes nod { to { transform: rotate(-7deg); } }
+@keyframes armSwing { from { transform: rotate(calc(var(--arm) * -1)); } to { transform: rotate(var(--arm)); } }
+@keyframes press { to { transform: translateY(2.5px) scaleY(.8); } }
+@keyframes keyDown { to { transform: translateY(1.3px); fill-opacity: .45; } }
+
+/* ---------- Medals in the panel ---------- */
+
+.medals {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  text-align: left;
+}
+
+.medal {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 9px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, .1);
+  background: rgba(255, 255, 255, .03);
+  opacity: .5;
+}
+
+.medal.on { opacity: 1; border-color: rgba(227, 185, 85, .55); background: rgba(227, 185, 85, .08); }
+
+.mico {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, .25);
+  color: var(--muted);
+  font: 700 14px Georgia, serif;
+}
+
+.medal.on .mico {
+  border-color: var(--gold);
+  background: radial-gradient(circle at 35% 30%, #fff3b8, #e3b955 55%, #8a6420);
+  color: #4a3208;
+}
+
+.mtext b { display: block; font: 600 13px Georgia, serif; color: var(--ink); }
+.mtext small { display: block; font-size: 11px; line-height: 1.3; color: var(--muted); }
+.mcount { color: var(--gold-soft); letter-spacing: .04em; }
+
+.toggles { flex-wrap: wrap; justify-content: flex-end; }
+
+@media (max-width: 560px) {
+  .aids { top: 6px; right: 6px; gap: 3px; }
+  .aid { min-width: 0; padding: 3px 8px; font-size: 11px; gap: 6px; }
+  .aid small { font-size: 10px; }
+  .pot { right: 3%; bottom: 14%; transform: scale(.8); transform-origin: 100% 100%; }
+  .medals { grid-template-columns: 1fr; }
+  .foot .toggles { justify-content: center; }
+}
+
+.pot .stack { width: 46px; }
+.pchip { width: 44px; height: 21px; }
+.pot .sum { width: 46px; }
+.panel.wide { scrollbar-color: #8a6420 #1c120b; scrollbar-width: thin; }
+
+/* ---------- Dealer's temper, sheriff, thief, cat on the table ---------- */
+
+.dealer .pcol { flex: none; display: flex; flex-direction: column; gap: 5px; }
+.dealer .pcol .portrait { align-self: center; }
+
+.dealer .heat {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, .5);
+  border: 1px solid rgba(255, 255, 255, .18);
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+.dealer .heat i {
+  display: block;
+  height: 100%;
+  width: 3%;
+  background: hsl(var(--h, 120) 70% 45%);
+  transition: width .5s, background .5s;
+}
+
+/* Face: calm -> edgy -> angry (brows) -> furious (frown, shaking, red glow). */
+.dealer .brow1, .dealer .mouth1 { display: none; }
+.dealer.m2 .brow0 { display: none; }
+.dealer.m2 .brow1 { display: inline; }
+.dealer.m3 .mouth0 { display: none; }
+.dealer.m3 .mouth1 { display: inline; }
+.dealer.m1 .portrait { border-color: #e3b955; }
+.dealer.m2 .portrait { border-color: #d8742c; box-shadow: 0 0 10px 2px rgba(216, 116, 44, .55); }
+.dealer.m3 .portrait { border-color: #e0392e; box-shadow: 0 0 16px 4px rgba(255, 60, 40, .75); animation: fume .14s linear infinite alternate; }
+
+@keyframes fume {
+  from { transform: translate(-1px, .5px) rotate(-1.2deg); }
+  to { transform: translate(1px, -.5px) rotate(1.2deg); }
+}
+
+.sheriff {
+  position: absolute;
+  top: calc(var(--bar) - var(--ph) * 1.08 + 10px);
+  height: calc(var(--ph) * 1.08);
+  width: calc(var(--ph) * 1.08 * .5333);
+}
+
+.sheriff svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  fill: #0d0805;
+  stroke: rgba(255, 196, 120, .24);
+  stroke-width: 1;
+}
+
+.sheriff .star { fill: #e3b955; stroke: none; filter: drop-shadow(0 0 3px rgba(255, 214, 120, .85)); }
+.sheriff.enter { animation: sheriffIn 1.3s ease-out both; }
+.sheriff.leave { animation: sheriffOut 1.2s ease-in both; }
+
+@keyframes sheriffIn {
+  from { transform: translateX(150px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+@keyframes sheriffOut {
+  from { transform: none; opacity: 1; }
+  to { transform: translateX(150px); opacity: 0; }
+}
+
+/* The chip thief: a hand creeping in from the right edge. */
+.thief {
+  position: absolute;
+  z-index: 9;
+  width: 230px;
+  height: 64px;
+  bottom: calc(12% + 6px);
+  cursor: pointer;
+  filter: drop-shadow(0 0 8px rgba(255, 70, 50, .85)) drop-shadow(0 6px 5px rgba(0, 0, 0, .5));
+  transition: left 1.9s cubic-bezier(.3, .55, .4, 1);
+}
+
+.thief svg { display: block; width: 100%; height: 100%; }
+.thief.back { transition: left .8s ease-in; }
+.thief.flee { transition: left .45s ease-in; cursor: default; }
+.thief.caught { animation: caught .45s ease-out; }
+.thief .tchip { position: absolute; left: 26px; top: 24px; bottom: auto; animation: none; }
+
+@keyframes caught {
+  0%, 100% { transform: none; }
+  30% { transform: translateY(-8px) rotate(-6deg); }
+  60% { transform: translateY(3px) rotate(4deg); }
+}
+
+/* The cat that strolls over the felt and sits under a card. */
+.tcat {
+  top: auto;
+  bottom: 10%;
+  z-index: 6;
+  pointer-events: none;
+  cursor: default;
+  transform: scale(1.35);
+  transform-origin: 0 100%;
+}
+
+@media (max-width: 560px) {
+  .dealer .heat { height: 4px; }
+  .thief { width: 170px; height: 47px; }
+}
+
+/* ---------- Wanted posters ---------- */
+
+.posters { position: absolute; inset: 0; pointer-events: none; }
+
+.poster {
+  position: absolute;
+  top: 14vh;
+  width: var(--pw, 94px);
+  padding: 9px 6px 12px;
+  text-align: center;
+  color: #4a3418;
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(255, 255, 255, .35), transparent 60%),
+    linear-gradient(180deg, #ecdcb2, #d8c18a);
+  clip-path: polygon(0 0, 100% 0, 100% 94%, 92% 98%, 82% 94%, 70% 99%, 58% 95%, 46% 99%, 34% 94%, 22% 99%, 10% 95%, 0 98%);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, .5);
+  transform: rotate(var(--rot, 0deg));
+  font-family: Georgia, serif;
+}
+
+.poster[hidden] { display: none; }
+
+.poster .pin {
+  position: absolute;
+  left: 50%;
+  top: 3px;
+  width: 7px;
+  height: 7px;
+  margin-left: -3px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ff8a7a, #a8201a);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .6);
+}
+
+.poster .ph { display: block; margin-top: 6px; font-size: calc(var(--pw, 94px) * .15); letter-spacing: .08em; }
+.poster .pface { margin: 3px auto 2px; width: 48%; aspect-ratio: 64 / 90; overflow: hidden; }
+.poster .pface svg { display: block; width: 100%; height: 100%; fill: #3b2a18; stroke: none; }
+.poster .pface.lou { width: 62%; aspect-ratio: 1; border-radius: 50%; border: 2px solid #4a3418; }
+.poster .pq { margin: 4px 0 2px; font-size: calc(var(--pw, 94px) * .33); font-weight: 700; line-height: 1; }
+.poster .pamt { display: block; font-size: calc(var(--pw, 94px) * .17); font-weight: 700; color: #7a2a14; }
+.poster small { display: block; font-size: calc(var(--pw, 94px) * .105); line-height: 1.25; }
+
+/* ---------- Duel ---------- */
+
+.duel {
+  position: fixed;
+  inset: 0;
+  z-index: 11;
+  overflow: hidden;
+  cursor: crosshair;
+  color: #fbf6ea;
+  font-family: Georgia, serif;
+  animation: duelIn .35s ease-out;
+}
+
+.duel.out { animation: duelOut .35s ease-in forwards; }
+@keyframes duelIn { from { opacity: 0; } }
+@keyframes duelOut { to { opacity: 0; } }
+
+.dsky { position: absolute; inset: 0; background: linear-gradient(180deg, #1a0a2e 0%, #6b2a3a 42%, #e0782c 66%, #f4c26a 74%); }
+.dsun { position: absolute; left: 50%; bottom: 25%; width: min(22vw, 210px); aspect-ratio: 1; margin-left: calc(min(22vw, 210px) / -2); border-radius: 50%; background: radial-gradient(circle, #fff6c8, #ffd36a 60%, rgba(255, 180, 80, 0)); }
+.dground { position: absolute; left: 0; right: 0; bottom: 0; height: 28%; background: linear-gradient(180deg, #3a1d0e, #160a05); box-shadow: 0 -4px 20px rgba(0, 0, 0, .5); }
+
+.tumble {
+  position: absolute;
+  left: -60px;
+  bottom: 27.5%;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 3px dashed #4a2a10;
+  animation: tumble 9s linear infinite;
+}
+
+@keyframes tumble { to { left: calc(100% + 60px); transform: rotate(1440deg); } }
+
+.dtitle { position: absolute; left: 0; right: 0; top: 7vh; margin: 0; text-align: center; font-weight: 400; font-size: clamp(30px, 6vw, 56px); letter-spacing: .12em; text-shadow: 0 3px 12px rgba(0, 0, 0, .7); }
+.dmsg { position: absolute; left: 0; right: 0; top: 22vh; text-align: center; font-weight: 700; font-size: clamp(34px, 8vw, 84px); letter-spacing: .06em; text-shadow: 0 4px 16px rgba(0, 0, 0, .8); }
+.dmsg.draw { color: #ff4a3d; animation: drawPop .25s ease-out; }
+.dmsg.good { color: #9dffb0; animation: none; }
+.dmsg.bad { color: #ffb0a8; animation: none; }
+@keyframes drawPop { from { transform: scale(1.7); opacity: 0; } }
+.dsub { position: absolute; left: 0; right: 0; top: 40vh; padding: 0 6vw; text-align: center; font-size: clamp(13px, 2vw, 17px); color: #f6dcb0; text-shadow: 0 2px 6px #000; }
+
+.duelist { position: absolute; bottom: 26%; height: 36vh; aspect-ratio: 100 / 170; transform-origin: 50% 100%; transition: transform .7s ease-in; }
+.duelist svg { display: block; width: 100%; height: 100%; overflow: visible; fill: #0c0605; }
+.duelist.you { left: 20%; }
+.duelist.sheriff { right: 20%; transform: scaleX(-1); }
+.duelist .star { fill: #e3b955; }
+.duelist .darm { transform-origin: 68px 52px; transition: transform .06s linear; }
+.duelist .flash { fill: #fff2a8; opacity: 0; }
+
+.duel.youfire .you .darm, .duel.sheriffire .sheriff .darm { transform: rotate(-90deg); }
+.duel.youfire .you .flash, .duel.sheriffire .sheriff .flash { animation: muzzle .25s ease-out; }
+@keyframes muzzle { 0% { opacity: 1; } 100% { opacity: 0; } }
+.duel.youfire .sheriff { transform: scaleX(-1) rotate(-84deg) translateY(4%); }
+.duel.sheriffire .you { transform: rotate(-84deg) translateY(4%); }
+
+.dres { position: absolute; left: 0; right: 0; bottom: 5vh; text-align: center; font-size: clamp(14px, 2.2vw, 20px); line-height: 1.7; text-shadow: 0 2px 6px #000; cursor: default; }
+.dres .deal { margin-top: 10px; }
+.dskip { position: absolute; right: 18px; bottom: 16px; padding: 7px 14px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, .35); background: rgba(0, 0, 0, .35); color: #f6dcb0; font: 13px Georgia, serif; cursor: pointer; }
+.dskip[hidden] { display: none; }
+
+/* ---------- Seasons ---------- */
+
+.seasons { display: flex; flex-wrap: wrap; gap: 6px; }
+.seasonbtn { padding: 6px 12px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, .25); background: transparent; color: var(--ink); font: 13px Georgia, serif; cursor: pointer; }
+.seasonbtn.on { background: var(--gold); border-color: var(--gold); color: #2a1a08; }
+
+.seasoncv { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.season-decor { position: absolute; inset: 0; pointer-events: none; }
+
+/* Dealer hats. */
+.dealer .sh { display: none; }
+.dealer.s-christmas .santa, .dealer.s-halloween .witch { display: inline; }
+.dealer.s-christmas .bowler, .dealer.s-halloween .bowler { display: none; }
+
+/* Christmas: festoons of fairy lights. */
+.xlights { position: absolute; left: 0; right: 0; top: 0; height: 80px; }
+.xlights svg { position: absolute; left: 0; top: 0; }
+.xlights i {
+  position: absolute;
+  width: 9px;
+  height: 13px;
+  margin-left: -4px;
+  border-radius: 50% 50% 55% 55%;
+  background: var(--c);
+  box-shadow: 0 0 10px 3px var(--c);
+  animation: twinkle 2.2s ease-in-out infinite;
+}
+
+@keyframes twinkle { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+
+/* Halloween: carved pumpkins on the bar; a purple haze. */
+.pumpkin { position: absolute; top: calc(var(--bar) - 40px); width: 62px; z-index: 2; }
+.pumpkin[hidden] { display: none; }
+.pumpkin svg { display: block; width: 100%; filter: drop-shadow(0 3px 4px rgba(0, 0, 0, .6)); }
+.pumpkin .face { filter: drop-shadow(0 0 5px #ffb43a); animation: flicker 1.7s ease-in-out infinite; }
+.pumpkin.plain .face { display: none; }
+@keyframes flicker { 0%, 100% { opacity: 1; } 40% { opacity: .75; } 60% { opacity: 1; } 80% { opacity: .85; } }
+.scene.s-halloween::after { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 0%, rgba(140, 60, 200, .14), rgba(60, 20, 90, .18)); pointer-events: none; }
+
+
+.duel.youfire .dsub, .duel.sheriffire .dsub { display: none; }

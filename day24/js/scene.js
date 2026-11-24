@@ -6,11 +6,12 @@
 const SCENE = (function () {
   const BAR = 0.63;                         // bar top as a fraction of the viewport height (CSS --bar)
   const PH = () => Math.max(90, Math.min(150, innerHeight * 0.19));   // base patron height (CSS --ph)
-  const ALL = ['cheer', 'laugh', 'gasp', 'hush', 'up'];
+  const ALL = ['cheer', 'laugh', 'boo', 'gasp', 'hush', 'up'];
 
   const WORDS = {
     cheer: ['Yeehaw!', 'Bravo!', 'Atta boy!', 'Woo-hoo!', 'Hooray!', 'Nice one!'],
     laugh: ['Ha ha!', 'Hee hee!', 'Haw haw!', 'Oh boy!', 'Ha!', 'Poor fella!'],
+    boo: ['Boo!', 'Booo!', 'Shame!', 'Bah!', 'Terrible!', 'Boo-hoo!'],
     gasp: ['Ooh!', 'Whoa!', 'Oh!', 'Well now…', 'Hmm?'],
     hush: ['Oh no…', 'Ouch.', 'Poor soul.', 'Tough luck.']
   };
@@ -54,7 +55,56 @@ const SCENE = (function () {
     '<circle class="eye" cx="47.5" cy="10" r="1.2"/><circle class="eye" cx="51.5" cy="10" r="1.2"/>' +
     '</svg>';
 
-  let root, tableEl, doorsEl, catEl, catBox;
+  // Sheriff: tall hat, broad shoulders and a gold star. He walks in through the
+  // doors when the dealer has been pushed too far.
+  const starPoints = (cx, cy, ro, ri) => Array.from({ length: 10 }, (_, i) => {
+    const a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? ri : ro;
+    return (cx + r * Math.cos(a)).toFixed(1) + ',' + (cy + r * Math.sin(a)).toFixed(1);
+  }).join(' ');
+
+  const SHERIFF_SVG =
+    '<svg viewBox="0 0 64 120" aria-hidden="true">' +
+    '<path d="M2 120 C2 92 12 80 26 76 L38 76 C52 80 62 92 62 120 Z"/>' +
+    '<rect x="27" y="62" width="10" height="16"/>' +
+    '<ellipse cx="32" cy="48" rx="13" ry="15"/>' +
+    '<ellipse cx="32" cy="35" rx="29" ry="5"/>' +
+    '<path d="M18 35 C16 14 24 8 32 12 C40 8 48 14 46 35 Z"/>' +
+    '<polygon class="star" points="' + starPoints(21, 94, 8, 3.6) + '"/></svg>';
+
+  // Pianist in profile (left) at an upright piano (right); the arm and head
+  // move while he plays.
+  const PIANIST_SVG =
+    '<svg viewBox="0 0 140 110" aria-hidden="true">' +
+    '<g class="pbody"><path d="M8 110 C8 82 20 66 34 62 L50 64 C54 74 54 92 54 110 Z"/>' +
+    '<g class="phead"><circle cx="40" cy="48" r="11"/><ellipse cx="40" cy="39" rx="16" ry="3.5"/>' +
+    '<path d="M28 39 C28 23 52 23 52 39 Z"/></g></g>' +
+    '<rect x="60" y="30" width="80" height="9" rx="2"/><rect x="64" y="38" width="72" height="72" rx="3"/>' +
+    '<rect x="68" y="44" width="30" height="20" rx="1" fill="#e8dcc0" fill-opacity=".35" stroke="none"/>' +
+    '<rect x="64" y="72" width="44" height="5" rx="1"/>' +
+    '<rect x="64" y="66" width="44" height="7" fill="#0d0805" stroke="none"/>' +
+    '<rect class="key k0" x="66.0" y="68" width="4" height="5" stroke="none"/>' +
+    '<rect class="key k1" x="70.8" y="68" width="4" height="5" stroke="none"/>' +
+    '<rect class="key k2" x="75.6" y="68" width="4" height="5" stroke="none"/>' +
+    '<rect class="key k3" x="80.4" y="68" width="4" height="5" stroke="none"/>' +
+    '<rect class="key k4" x="85.2" y="68" width="4" height="5" stroke="none"/>' +
+    '<rect class="key k5" x="90.0" y="68" width="4" height="5" stroke="none"/>' +
+    '<rect class="key k6" x="94.8" y="68" width="4" height="5" stroke="none"/>' +
+    '<rect class="key k7" x="99.6" y="68" width="4" height="5" stroke="none"/>' +
+    // Two arms, out of phase: each swings from the shoulder and presses the keys with its fingers.
+    '<g class="parm a1"><path d="M46 70 L70 67 L72 73 L48 79 Z"/>' +
+    '<g class="hand"><path d="M70 65 L84 66 L84 72 L70 73 Z"/>' +
+    '<rect class="fng f1" x="78" y="69" width="3" height="5" rx="1.2"/>' +
+    '<rect class="fng f2" x="81.5" y="69" width="3" height="5" rx="1.2"/>' +
+    '<rect class="fng f3" x="85" y="69" width="3" height="5" rx="1.2"/></g></g>' +
+    '<g class="parm a2"><path d="M46 72 L74 68 L76 74 L48 81 Z"/>' +
+    '<g class="hand"><path d="M74 66 L90 67 L90 73 L74 74 Z"/>' +
+    '<rect class="fng f1" x="87" y="70" width="3" height="5" rx="1.2"/>' +
+    '<rect class="fng f2" x="90.5" y="70" width="3" height="5" rx="1.2"/></g></g></svg>';
+
+  let root, tableEl, doorsEl, catEl, catBox, pianoEl, sheriffEl, postersEl;
+  let posterEls = { left: [], right: [] };
+  let sheriffHere = false, sheriffShown = false;   // wanted / currently drawn
+  const hooks = {};                         // hooks.cat(): called when the cat is clicked
   const patrons = [];
   let margins = { left: 0, right: 0 };
 
@@ -68,11 +118,21 @@ const SCENE = (function () {
     root.className = 'scene';
     root.setAttribute('aria-hidden', 'true');
 
+    // Wanted posters pinned to the back wall.
+    postersEl = document.createElement('div');
+    postersEl.className = 'posters';
+    root.appendChild(postersEl);
+
     // Back wall doors first, so patrons stand in front of them.
     doorsEl = document.createElement('div');
     doorsEl.className = 'doors';
     doorsEl.innerHTML = '<i class="glow"></i><i class="leaf l"></i><i class="leaf r"></i><i class="post"></i>';
     root.appendChild(doorsEl);
+
+    pianoEl = document.createElement('div');
+    pianoEl.className = 'pianist';
+    pianoEl.innerHTML = PIANIST_SVG;
+    root.appendChild(pianoEl);
 
     [['left', LEFT], ['right', RIGHT]].forEach(([side, list]) => {
       list.forEach(([type, sc], i) => {
@@ -86,6 +146,12 @@ const SCENE = (function () {
       });
     });
 
+    sheriffEl = document.createElement('div');
+    sheriffEl.className = 'sheriff';
+    sheriffEl.hidden = true;
+    sheriffEl.innerHTML = SHERIFF_SVG;
+    root.appendChild(sheriffEl);
+
     const counter = document.createElement('div');
     counter.className = 'counter';
     root.appendChild(counter);
@@ -97,6 +163,7 @@ const SCENE = (function () {
     catBox = catEl.firstChild;
     catEl.addEventListener('click', () => {
       SOUND.meow();
+      if (hooks.cat) hooks.cat();
       catBox.classList.remove('hop');
       void catBox.offsetWidth;
       catBox.classList.add('hop');
@@ -114,9 +181,32 @@ const SCENE = (function () {
     const doorsOn = margins.right >= 120;
     doorsEl.hidden = !doorsOn;
 
+    // The pianist takes the far left of the bar when there is room for him.
+    const pianoW = ph * 0.8 * 140 / 110;
+    const pianistOn = margins.left >= 230;
+    pianoEl.hidden = !pianistOn;
+
+    // Posters: as many as fit in each margin, high up on the wall.
+    const pw = Math.round(ph * 0.66);
+    postersEl.style.setProperty('--pw', pw + 'px');
+    for (const side of ['left', 'right']) {
+      posterEls[side].forEach((el, k) => {
+        const x = 14 + k * (pw + 12);
+        const fits = x + pw <= margins[side] - 10;
+        el.hidden = !fits;
+        if (fits) el.style[side] = x + 'px';
+      });
+    }
+
+    // The sheriff stands in the doorway (or at the right end of the bar without doors).
+    const sheriffW = ph * 1.08 * 64 / 120;
+    const sheriffOn = sheriffShown && margins.right >= 90;
+    sheriffEl.hidden = !sheriffOn;
+    sheriffEl.style.right = (doorsOn ? 8 : 12) + 'px';
+
     for (const side of ['left', 'right']) {
       const m = margins[side];
-      let x = side === 'right' && doorsOn ? 96 : 12;
+      let x = side === 'right' ? (doorsOn ? 96 : (sheriffOn ? 12 + sheriffW + 4 : 12)) : (pianistOn ? 8 + pianoW + 6 : 12);
       for (const p of patrons.filter(q => q.side === side)) {
         const w = ph * p.sc * 64 / 120;
         const fits = x + w <= m - 8;
@@ -138,12 +228,16 @@ const SCENE = (function () {
     p.say.classList.add('show');
   }
 
-  // kind: cheer | laugh | gasp | hush; power > 1 for a bigger reaction (win streaks).
+  // kind: cheer | laugh | boo | gasp | hush; power > 1 for a bigger reaction (win streaks).
   function react(kind, power) {
     power = power || 1;
-    if (kind === 'cheer') SOUND.cheers();
+    if (kind === 'cheer') { SOUND.cheers(); SOUND.flourish(); play(1900); }
     else if (kind === 'laugh') SOUND.laugh();
-    else SOUND.ooh(kind === 'hush');
+    else if (kind === 'boo') SOUND.boo();
+    else {
+      SOUND.ooh(kind === 'hush');
+      if (kind === 'hush') { SOUND.sadPiano(); play(2300); }
+    }
 
     const vis = patrons.filter(p => !p.el.hidden).sort(() => Math.random() - 0.5);
     vis.forEach((p, i) => {
@@ -157,6 +251,154 @@ const SCENE = (function () {
         p.timer = setTimeout(() => p.el.classList.remove(...ALL), 1700);
       }, Math.random() * (kind === 'hush' ? 120 : 400));
     });
+  }
+
+  // ---------- Pianist in time with the music ----------
+  // While the soundtrack plays, the pianist follows its beat grid (js/beats.js,
+  // made by tools/beats.py): the left hand hits on the beat and the right one on
+  // the off-beat, the head nods and the body leans on every beat, and everything
+  // is scaled by how loud the music is at that moment.
+  const LAG = 0.06;                  // s: sound is heard a bit after the audio clock says so
+  let synced = false, boostUntil = 0, parts = null;
+
+  // Sharp hit right on the beat that dies away, with a small anticipation just before the next one.
+  const hit = p => { const k = Math.exp(-p * 6); return p > 0.9 ? Math.max(k, (p - 0.9) * 5) : k; };
+  const wrap = p => ((p % 1) + 1) % 1;
+
+  // Index of the last beat at or before time t (-1 before the first one).
+  function beatAt(t) {
+    let lo = 0, hi = STOMP_BEATS.length - 1, r = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (STOMP_BEATS[mid] <= t) { r = mid; lo = mid + 1; } else hi = mid - 1;
+    }
+    return r;
+  }
+
+  function clearPiano() {
+    if (!parts) return;
+    for (const el of [parts.body, parts.head, parts.a1, parts.a2, ...parts.f1, ...parts.f2, ...parts.keys]) {
+      el.style.transform = '';
+      el.style.fillOpacity = '';
+    }
+  }
+
+  function updatePiano() {
+    if (pianoEl.hidden) return;
+    const on = typeof STOMP_BEATS !== 'undefined' && typeof MUSIC !== 'undefined' && MUSIC.enabled && !MUSIC.audio.paused;
+    if (!on) {
+      if (synced) { synced = false; clearPiano(); }
+      return;
+    }
+    if (!parts) {
+      const q = sel => [...pianoEl.querySelectorAll(sel)];
+      parts = {
+        body: pianoEl.querySelector('.pbody'), head: pianoEl.querySelector('.phead'),
+        a1: pianoEl.querySelector('.a1'), a2: pianoEl.querySelector('.a2'),
+        f1: q('.a1 .fng'), f2: q('.a2 .fng'), keys: q('.key')
+      };
+    }
+    if (!synced) { synced = true; pianoEl.classList.remove('playing'); }
+
+    const t = MUSIC.audio.currentTime - LAG;
+    const i = beatAt(t);
+    const n = STOMP_BEATS.length;
+    let p = 0.5, e = 0.3;                                   // before the first beat: barely moving
+    if (i >= 0) {
+      const b0 = STOMP_BEATS[i];
+      const b1 = i + 1 < n ? STOMP_BEATS[i + 1] : b0 + 0.565;
+      p = Math.min(1, (t - b0) / (b1 - b0));
+      const e1 = i + 1 < n ? STOMP_ENERGY[i + 1] : STOMP_ENERGY[i];
+      e = STOMP_ENERGY[i] + (e1 - STOMP_ENERGY[i]) * p;
+    }
+    const amp = (0.45 + 0.55 * e) * (performance.now() < boostUntil ? 1.7 : 1);
+    const hb = hit(p), hl = hb, hr = hit(wrap(p + 0.5));   // beat, left hand, right hand (off-beat)
+    const A = 9 * amp;
+
+    parts.body.style.transform = 'rotate(' + (2.4 * amp * hb).toFixed(2) + 'deg)';
+    parts.head.style.transform = 'rotate(' + (-6.5 * amp * hb).toFixed(2) + 'deg)';
+    parts.a1.style.transform = 'rotate(' + (-A + 2 * A * hl).toFixed(2) + 'deg)';
+    parts.a2.style.transform = 'rotate(' + (-A + 2 * A * hr).toFixed(2) + 'deg)';
+    // Fingers press one after the other; keys go down under them.
+    parts.f1.forEach((el, j) => {
+      const h = hit(wrap(p - 0.05 * j)) * amp;
+      el.style.transform = 'translateY(' + (2.6 * h).toFixed(2) + 'px) scaleY(' + (1 - 0.2 * h).toFixed(2) + ')';
+    });
+    parts.f2.forEach((el, j) => {
+      const h = hit(wrap(p + 0.5 - 0.05 * j)) * amp;
+      el.style.transform = 'translateY(' + (2.6 * h).toFixed(2) + 'px) scaleY(' + (1 - 0.2 * h).toFixed(2) + ')';
+    });
+    parts.keys.forEach((el, j) => {
+      const h = hit(wrap(p + (j < 4 ? 0 : 0.5) - 0.06 * (j % 4))) * Math.min(1, amp);
+      el.style.transform = 'translateY(' + (1.4 * h).toFixed(2) + 'px)';
+      el.style.fillOpacity = (0.85 - 0.4 * h).toFixed(2);
+    });
+  }
+
+  // On wins and busts he plays harder for `ms`: a bigger swing with the music,
+  // or a fast keyboard flourish when there is no music to follow.
+  let playTimer = 0;
+  function play(ms) {
+    boostUntil = performance.now() + ms;
+    if (synced) return;
+    pianoEl.classList.add('playing');
+    clearTimeout(playTimer);
+    playTimer = setTimeout(() => pianoEl.classList.remove('playing'), ms);
+  }
+
+  // ---------- Wanted posters ----------
+  // Left margin: your best runs. Right margin: the dealer (wanted for cheating)
+  // and the medals. Redrawn when a run ends or a medal is earned.
+
+  const HAT_BY_LEVEL = { Easy: 'bowler', Medium: 'cowboy', Hard: 'tophat', Pro: 'feather' };
+  const TILTS = [-2.5, 1.8, -1.2, 2.6, -1.8];
+
+  function poster(html, i) {
+    const el = document.createElement('div');
+    el.className = 'poster';
+    el.style.setProperty('--rot', TILTS[i % TILTS.length] + 'deg');
+    el.innerHTML = '<i class="pin"></i>' + html;
+    postersEl.appendChild(el);
+    return el;
+  }
+
+  function refreshPosters() {
+    if (!postersEl) return;
+    postersEl.innerHTML = '';
+    const recs = (typeof SALOON !== 'undefined' && SALOON.records) || [];
+    const left = recs.length
+      ? recs.slice(0, 3).map((r, i) => poster(
+        '<b class="ph">WANTED</b><div class="pface">' + patronSVG(HAT_BY_LEVEL[r.level] || 'bowler') + '</div>' +
+        '<span class="pamt">$' + r.peak + '</span><small>#' + (i + 1) + ' · ' + r.level + '</small><small>' + r.date + '</small>', i))
+      : [poster('<b class="ph">WANTED</b><div class="pq">YOU</div><span class="pamt">$?</span><small>Bust or cash out</small><small>to get on the wall</small>', 0)];
+    const lou = poster('<b class="ph">WANTED</b><div class="pface lou">' +
+      (typeof DEALER !== 'undefined' ? DEALER.FACE_SVG : '') + '</div><span class="pamt">Lucky Lou</span><small>for cheating at cards</small>', 3);
+    const medals = poster('<b class="ph">HALL OF FAME</b><div class="pq">★</div><span class="pamt">' +
+      (typeof MEDALS !== 'undefined' ? MEDALS.count + '/' + MEDALS.list.length : '') + '</span><small>medals earned</small>', 4);
+    posterEls = { left, right: [lou, medals] };
+    if (tableEl) layout();
+  }
+
+  // ---------- Sheriff ----------
+
+  // He walks in (on = true) or leaves (false); `visible` says if there is room to draw him.
+  function sheriff(on) {
+    sheriffHere = on;
+    if (on) {
+      sheriffShown = true;
+      layout();
+      sheriffEl.classList.remove('leave');
+      void sheriffEl.offsetWidth;
+      sheriffEl.classList.add('enter');
+      swing();
+      react('gasp', 1);
+      [0, 260, 520].forEach(t => setTimeout(() => SOUND.clink(), t));   // spurs
+    } else {
+      sheriffEl.classList.remove('enter');
+      sheriffEl.classList.add('leave');
+      swing();
+      setTimeout(() => { if (!sheriffHere) { sheriffShown = false; layout(); } }, 1300);
+    }
   }
 
   // A random patron takes a sip of beer.
@@ -216,6 +458,7 @@ const SCENE = (function () {
   function loop(now) {
     const dt = Math.min(0.05, last ? (now - last) / 1000 : 0);
     last = now;
+    updatePiano();
     if (cat.on) {
       if (cat.state === 'walk') {
         cat.x += cat.dir * 95 * dt;
@@ -264,6 +507,7 @@ const SCENE = (function () {
   function init(table) {
     tableEl = table;
     build();
+    refreshPosters();
     layout();
     window.addEventListener('resize', layout);
     requestAnimationFrame(loop);
@@ -272,5 +516,9 @@ const SCENE = (function () {
     catTimer = setTimeout(() => { startCat(); if (!cat.on) schedule(); }, 9000);
   }
 
-  return { init, react, swing, startCat, layout, patrons, cat };
+  return {
+    init, react, swing, startCat, layout, patrons, cat, hooks, play, sheriff, CAT_SVG,
+    refreshPosters,
+    get root() { return root; }, get sheriffHere() { return sheriffHere; }
+  };
 })();

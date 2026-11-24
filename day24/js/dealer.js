@@ -5,7 +5,7 @@
 
 const DEALER = (function () {
   let table, cards, geom;               // geom() -> { spacing, cardW, cardH }
-  let bubble, bubbleText, hideTimer = 0, dealerEl;
+  let bubble, bubbleText, hideTimer = 0, dealerEl, heatFill;
   const hands = [];
 
   // Hand seen from above, fingers pointing at the player, with shirt cuff and
@@ -35,15 +35,23 @@ const DEALER = (function () {
     '<ellipse cx="47" cy="38" rx="3" ry="5" fill="#d6a47c"/>' +
     // Hair under the hat, so he can tip it.
     '<path d="M19 27 C19 21 45 21 45 27 L45 31 C41 26 23 26 19 31 Z" fill="#3b2415"/>' +
-    '<g class="hat"><ellipse cx="32" cy="24" rx="22" ry="4.5" fill="#151515"/>' +
+    '<g class="hat bowler"><ellipse cx="32" cy="24" rx="22" ry="4.5" fill="#151515"/>' +
     '<path d="M19 24 C19 8 45 8 45 24 Z" fill="#1f1f1f"/>' +
     '<rect x="19" y="19" width="26" height="4" fill="#7a1d22"/></g>' +
-    '<path d="M24 33 l6 -1.5 M34 31.5 l6 1.5" stroke="#2b1a12" stroke-width="2" stroke-linecap="round"/>' +
+    // Seasonal hats (shown by setSeason).
+    '<g class="hat sh santa"><ellipse cx="32" cy="24" rx="22" ry="5" fill="#f4f1e8"/>' +
+    '<path d="M14 24 C16 9 30 3 47 6 C50 8 51 12 49 15 C41 12 37 17 50 24 Z" fill="#c4262e"/>' +
+    '<circle cx="50" cy="13" r="4.5" fill="#f4f1e8"/></g>' +
+    '<g class="hat sh witch"><ellipse cx="32" cy="24" rx="24" ry="4.5" fill="#2a1538"/>' +
+    '<path d="M21 24 L35 3 L43 24 Z" fill="#2a1538"/><rect x="21" y="19" width="22" height="4" fill="#8a4cc0"/></g>' +
+    '<path class="brow0" d="M24 33 l6 -1.5 M34 31.5 l6 1.5" stroke="#2b1a12" stroke-width="2" stroke-linecap="round"/>' +
+    '<path class="brow1" d="M23 31 L31 34.5 M41 34.5 L49 31" stroke="#2b1a12" stroke-width="2.6" stroke-linecap="round"/>' +
     '<circle class="eye" cx="27" cy="36" r="1.8" fill="#2b1a12"/>' +
     '<circle class="eye" cx="37" cy="36" r="1.8" fill="#2b1a12"/>' +
     '<path d="M32 38 l-2 6 h3" stroke="#b07f5c" stroke-width="1.4" fill="none"/>' +
     '<path d="M21 46 C26 42 30 45 32 45 C34 45 38 42 43 46 C40 47 36 48 32 47 C28 48 24 47 21 46 Z" fill="#2b1a12"/>' +
-    '<path d="M28 50 Q33 53 37 49" stroke="#8a3a2a" stroke-width="1.6" fill="none" stroke-linecap="round"/>' +
+    '<path class="mouth0" d="M28 50 Q33 53 37 49" stroke="#8a3a2a" stroke-width="1.6" fill="none" stroke-linecap="round"/>' +
+    '<path class="mouth1" d="M27 52 Q32 48 38 52" stroke="#8a3a2a" stroke-width="1.8" fill="none" stroke-linecap="round"/>' +
     '</svg>';
 
   const LINES = {
@@ -61,10 +69,35 @@ const DEALER = (function () {
     hard: ['Hard, eh? I like a challenge.'],
     easy: ['Starting slow? Smart.'],
     cheat: ['Hey, is that a gold coin over there?', 'Whoa, look at that!', 'Did you drop something, partner?'],
+    aid: ['Buying a little help, partner?', 'Money well spent… maybe.', 'Is that cheating? I call it shopping.', 'Pay the man, get the hint.'],
+    surprise: ['Ah, a little surprise tonight.', 'Something special in the deck, friend.'],
+    ace: ["Golden Ace… you're too smart for me.", 'A safe little prize. How sensible.'],
+    skull: ['Ha! The Skull claims another soul.', 'Ooh, that one bites, partner.'],
+    timeup: ['Too slow, partner!', "Time's up! Snooze you lose.", 'The clock does not wait.'],
+    win1: ['Again? You are on a roll.', "Beginner's luck is wearing thin, partner."],
+    win2: ['Are you counting cards?', "That's once too often, friend."],
+    win3: ["Now you're pushing it!", "I'm watching you, partner. Closely."],
+    lose1: ['Ah, so you ARE mortal.', 'Mine again. Feels better already.'],
+    lose2: ["Ha! Now we're even.", 'Serves you right.'],
+    lose3: ["Hah! That's for all the others!", 'Pay up, partner. Pay up.'],
+    shuffle1: ["Try to keep up this time.", 'Quicker now, partner.'],
+    shuffle2: ["Let's see you follow THIS.", 'Hup! Try and catch it!'],
+    shuffle3: ['No more Mr. Nice Lou!', 'Eyes on the cards, you rascal!'],
+    pick2: ["Well? Don't just sit there.", 'Go on, guess.'],
+    pick3: ["Pick one! I dare you.", 'Choose, and choose badly.'],
+    sheriff: ['Oh! Sheriff. Evening. Just a friendly game!', "Nothing to see here, Sheriff, honest."],
+    sheriffGone: ['Phew. Now, where were we?', 'Finally. Shall we continue?'],
+    cat: ["Don't trust that cat, partner.", 'That cat knows nothing.', 'Cats lie, friend. Always.'],
+    thief: ['Hey! Hands off the chips!', 'Somebody is quick with their fingers!'],
+    thiefCaught: ['Good catch, partner!', "Ha! Caught him red-handed."],
+    thiefWin: ['Easy pickings. Thank you kindly!', 'Quick hands, that one.'],
+    duelWin: ['Blast! Fastest gun in the county...', "Fine, fine. Take your reward."],
+    duelLose: ['Ha! Even the sheriff beats you.', 'Pay the fine, partner.'],
     wait: ["Tick tock, partner.", "Don't be shy now.", "I haven't got all day…", 'Well? Cat got your tongue?', "I'm waiting, friend."],
     idle: ['Another round, partner?', 'The cards are getting restless.', 'Come on, the Joker misses you.', "Don't leave a lady waiting."]
   };
   const lastLine = {};
+  let mood = 0;                         // 0 calm .. 3 furious, from the heat (see setHeat)
 
   function pickLine(kind) {
     const list = LINES[kind];
@@ -89,12 +122,14 @@ const DEALER = (function () {
 
     const dealer = document.createElement('div');
     dealer.className = 'dealer';
-    dealer.innerHTML = '<div class="portrait">' + FACE_SVG + '</div>' +
+    dealer.innerHTML = '<div class="pcol"><div class="portrait">' + FACE_SVG + '</div>' +
+      '<div class="heat" title="Dealer&#39;s patience: the more you win, the angrier he gets"><i></i></div></div>' +
       '<div class="bubble" hidden><span class="who">Lucky Lou</span><span class="text"></span></div>';
     table.appendChild(dealer);
     dealerEl = dealer;
     bubble = dealer.querySelector('.bubble');
     bubbleText = dealer.querySelector('.text');
+    heatFill = dealer.querySelector('.heat i');
 
     requestAnimationFrame(loop);
   }
@@ -159,7 +194,8 @@ const DEALER = (function () {
 
   function say(kind, chance) {
     if (chance !== undefined && Math.random() > chance) return;
-    const text = LINES[kind] ? pickLine(kind) : kind;
+    const key = mood > 0 && LINES[kind + mood] ? kind + mood : kind;
+    const text = LINES[key] ? pickLine(key) : kind;
     bubbleText.textContent = text;
     bubble.hidden = false;
     bubble.classList.remove('pop');
@@ -204,5 +240,20 @@ const DEALER = (function () {
     say(mood || 'wait');
   }
 
-  return { init, hold, release, say, distract, fidget };
+  // How irritated he is (0..100): drives the meter, the face and the lines he picks.
+  function setHeat(h) {
+    mood = h < 25 ? 0 : h < 50 ? 1 : h < 75 ? 2 : 3;
+    if (!dealerEl) return;
+    for (let m = 1; m <= 3; m++) dealerEl.classList.toggle('m' + m, mood >= m);
+    heatFill.style.width = Math.max(3, h) + '%';
+    heatFill.style.setProperty('--h', Math.round(120 - 1.2 * h));
+  }
+
+  // Seasonal hat: 'christmas' (Santa hat) or 'halloween' (witch hat); anything else keeps the bowler.
+  function setSeason(id) {
+    if (!dealerEl) return;
+    for (const s of ['christmas', 'halloween', 'autumn']) dealerEl.classList.toggle('s-' + s, id === s);
+  }
+
+  return { init, hold, release, say, distract, fidget, setHeat, setSeason, FACE_SVG, get mood() { return mood; } };
 })();
