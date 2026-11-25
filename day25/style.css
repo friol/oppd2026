@@ -390,22 +390,16 @@ kbd {
   font: inherit;
   font-size: 13px;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 
-/* Narrow windows: the controls go back under the table, in rows. */
-@media (max-width: 760px) {
-  .mid { display: flex; flex-direction: column; gap: 8px; }
-  .mid .table { order: 0; flex: 1 1 auto; }
-  .side { padding: 0; flex-direction: row; align-items: center; gap: 8px; }
-  .side.left { order: 1; justify-content: center; }
-  .side.left .label, .keys { display: none; }
-  .side.right { order: 2; }
-  .seg { flex-direction: row; border-radius: 999px; }
-  .seg button { flex: 1; padding: 6px 12px; font-size: 14px; }
-  .seg button + button { border-top: 0; border-left: 1px solid rgba(227, 185, 85, .3); }
-  .deal { flex: 1; padding: 10px 20px; }
-  .toggles { flex-direction: row; }
-}
+.mute .ico { width: 15px; height: 15px; flex: none; }
+.mute .ico .x { display: none; }
+.mute.off { color: rgba(183, 201, 189, .6); }
+.mute.off .ico .x { display: inline; }
 
 /* ---------- Game over ---------- */
 
@@ -413,7 +407,8 @@ kbd {
   position: fixed;
   inset: 0;
   display: grid;
-  place-items: center;
+  place-items: safe center;
+  overflow-y: auto;          /* very short screens: the panel scrolls instead of being cut */
   background: rgba(0, 0, 0, .66);
   backdrop-filter: blur(3px);
   padding: 16px;
@@ -1001,30 +996,34 @@ kbd {
 .front .corner.tl { left: 7%; top: 5%; }
 .front .corner.br { right: 7%; bottom: 5%; transform: rotate(180deg); }
 
+/* Back: white card border around the SVG design of js/cardback.js. */
 .back {
   transform: rotateY(180deg);
-  background:
-    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, .16) 0 18%, transparent 19%),
-    repeating-linear-gradient(45deg, var(--back-line) 0 2px, transparent 2px 9px),
-    repeating-linear-gradient(-45deg, var(--back-line) 0 2px, transparent 2px 9px),
-    linear-gradient(160deg, var(--back-a), var(--back-b));
+  background: var(--back-b);
   border: calc(var(--cw) * .055) solid #fbf6ea;
-  display: grid;
-  place-items: center;
+  overflow: hidden;
 }
 
-.back .seal {
-  font: italic 700 calc(var(--cw) * .2) Georgia, serif;
-  color: var(--gold-soft);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, .6);
-  letter-spacing: -.04em;
+.back .backart {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: calc(var(--cw) * .035);
 }
 
-/* Playing: face-down cards lift a little under the pointer or keyboard focus. */
+/* Playing: face-down cards lift a little under the pointer or keyboard focus.
+   Hover only where there is a real pointer, so a tap on a touch screen does
+   not leave a card stuck in the hover state. */
 .table.playing .card.down { cursor: pointer; }
-.table.playing .card.down:hover .face,
 .card:focus-visible .face { box-shadow: 0 0 0 3px var(--gold), var(--shx, 0px) 10px 16px rgba(0, 0, 0, .5); }
-.table.playing .card.down:hover { translate: 0 -3px; }
+
+@media (hover: hover) {
+  .table.playing .card.down:hover .face { box-shadow: 0 0 0 3px var(--gold), var(--shx, 0px) 10px 16px rgba(0, 0, 0, .5); }
+  .table.playing .card.down:hover { translate: 0 -3px; }
+}
+
+/* No double-tap zoom on cards and buttons: fast taps must flip cards. */
+.card, button { touch-action: manipulation; }
 
 /* A pair found: gold rim, a pulse of light and sparks. */
 .card.matched .front {
@@ -1140,10 +1139,6 @@ kbd {
   .chances i { width: 7px; height: 12px; }
 }
 
-/* Wide windows: the HUD lines up with the table. */
-@media (min-width: 761px) {
-  .hud { margin-inline: calc(132px + clamp(10px, 1.6vw, 20px)); }
-}
 
 /* ---------- Quitting and picking another table ---------- */
 
@@ -1178,4 +1173,322 @@ kbd {
 
 @media (max-width: 760px) {
   .quit { padding: 9px 12px; font-size: 13px; }
+}
+
+/* ---------- Medals ---------- */
+
+.panel.wide {
+  max-width: 640px;
+  width: 100%;
+}
+
+.mcount { color: var(--gold-soft) !important; letter-spacing: .04em; margin: 0 0 12px; }
+
+.medals {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  margin-bottom: 16px;
+  text-align: left;
+}
+
+.medal {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 9px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, .1);
+  background: rgba(255, 255, 255, .03);
+  opacity: .5;
+}
+
+.medal.on { opacity: 1; border-color: rgba(227, 185, 85, .55); background: rgba(227, 185, 85, .08); }
+
+/* Medal: a round coin with the symbol on it (grey and dim until earned). */
+.mico {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, .25);
+  background: rgba(255, 255, 255, .05);
+}
+
+.mico svg { width: 62%; height: 62%; filter: grayscale(1) brightness(1.4); opacity: .55; }
+.mico.mcat svg { width: 74%; fill: #2a1a0c; stroke: none; }
+
+.medal.on .mico {
+  border-color: var(--gold);
+  background: radial-gradient(circle at 35% 30%, #fff8dc, #f0d58c 55%, #b8862a);
+}
+
+.medal.on .mico svg { filter: none; opacity: 1; }
+
+.mtext b { display: block; font: 600 13px Georgia, serif; color: var(--ink); }
+.mtext small { display: block; font-size: 11px; line-height: 1.3; color: var(--muted); }
+
+/* "Medal earned" toast, at the top of the screen above every panel. */
+.mtoast {
+  position: fixed;
+  left: 50%;
+  top: 14px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 18px 8px 8px;
+  border-radius: 999px;
+  background: rgba(28, 18, 11, .95);
+  border: 1px solid var(--gold);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .6), 0 0 18px rgba(227, 185, 85, .3);
+  color: var(--gold-soft);
+  transform: translateX(-50%);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.mtoast[hidden] { display: none; }
+.mtoast .mico { width: 40px; height: 40px; border-color: var(--gold); background: radial-gradient(circle at 35% 30%, #fff8dc, #f0d58c 55%, #b8862a); }
+.mtoast .mico svg { filter: none; opacity: 1; }
+.mtoast small { display: block; font: 600 10px "Segoe UI", system-ui, sans-serif; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.mtoast b { display: block; font: 600 17px Georgia, serif; }
+.mtoast.pop { animation: medalIn .5s cubic-bezier(.3, 1.5, .5, 1); }
+
+@keyframes medalIn {
+  from { opacity: 0; transform: translate(-50%, -30px) scale(.7); }
+  to { opacity: 1; transform: translateX(-50%); }
+}
+
+/* The cat on the felt (phones and tablets), along the bottom edge below the cards. */
+.cat.feltcat {
+  top: auto;
+  bottom: 4px;
+  width: 52px;
+  height: 31px;
+  z-index: 7;
+}
+
+.cat.feltcat[hidden] { display: none; }
+.cat.feltcat svg { fill: #120a05; stroke: rgba(255, 220, 160, .35); }
+
+/* A heart floats up when you pet the cat. */
+.cat .pet {
+  position: absolute;
+  left: 50%;
+  top: -6px;
+  font: normal 18px Georgia, serif;
+  color: #ff7a8a;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, .6);
+  pointer-events: none;
+  animation: petUp 1.2s ease-out forwards;
+}
+
+@keyframes petUp {
+  0% { opacity: 0; transform: translate(-50%, 6px) scale(.6); }
+  20% { opacity: 1; transform: translate(-50%, -6px) scale(1.2); }
+  100% { opacity: 0; transform: translate(-50%, -34px) scale(1); }
+}
+
+@media (max-width: 560px) {
+  .medals { grid-template-columns: 1fr; }
+  .mtoast b { font-size: 15px; }
+}
+
+/* ---------- Duel ---------- */
+
+.duel {
+  position: fixed;
+  inset: 0;
+  z-index: 11;
+  overflow: hidden;
+  cursor: crosshair;
+  color: #fbf6ea;
+  font-family: Georgia, serif;
+  animation: duelIn .35s ease-out;
+}
+
+.duel.out { animation: duelOut .35s ease-in forwards; }
+@keyframes duelIn { from { opacity: 0; } }
+@keyframes duelOut { to { opacity: 0; } }
+
+.dsky { position: absolute; inset: 0; background: linear-gradient(180deg, #1a0a2e 0%, #6b2a3a 42%, #e0782c 66%, #f4c26a 74%); }
+.dsun { position: absolute; left: 50%; bottom: 25%; width: min(22vw, 210px); aspect-ratio: 1; margin-left: calc(min(22vw, 210px) / -2); border-radius: 50%; background: radial-gradient(circle, #fff6c8, #ffd36a 60%, rgba(255, 180, 80, 0)); }
+.dground { position: absolute; left: 0; right: 0; bottom: 0; height: 28%; background: linear-gradient(180deg, #3a1d0e, #160a05); box-shadow: 0 -4px 20px rgba(0, 0, 0, .5); }
+
+.tumble {
+  position: absolute;
+  left: -60px;
+  bottom: 27.5%;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 3px dashed #4a2a10;
+  animation: tumble 9s linear infinite;
+}
+
+@keyframes tumble { to { left: calc(100% + 60px); transform: rotate(1440deg); } }
+
+.dtitle { position: absolute; left: 0; right: 0; top: 7vh; margin: 0; text-align: center; font-weight: 400; font-size: clamp(30px, 6vw, 56px); letter-spacing: .12em; text-shadow: 0 3px 12px rgba(0, 0, 0, .7); }
+.dmsg { position: absolute; left: 0; right: 0; top: 22vh; text-align: center; font-weight: 700; font-size: clamp(34px, 8vw, 84px); letter-spacing: .06em; text-shadow: 0 4px 16px rgba(0, 0, 0, .8); }
+.dmsg.draw { color: #ff4a3d; animation: drawPop .25s ease-out; }
+.dmsg.good { color: #9dffb0; animation: none; }
+.dmsg.bad { color: #ffb0a8; animation: none; }
+@keyframes drawPop { from { transform: scale(1.7); opacity: 0; } }
+.dsub { position: absolute; left: 0; right: 0; top: 40vh; padding: 0 6vw; text-align: center; font-size: clamp(13px, 2vw, 17px); color: #f6dcb0; text-shadow: 0 2px 6px #000; }
+
+.duelist { position: absolute; bottom: 26%; height: 36vh; aspect-ratio: 100 / 170; transform-origin: 50% 100%; transition: transform .7s ease-in; }
+.duelist svg { display: block; width: 100%; height: 100%; overflow: visible; fill: #0c0605; }
+.duelist.you { left: 20%; }
+.duelist.sheriff { right: 20%; transform: scaleX(-1); }
+.duelist .star { fill: #e3b955; }
+.duelist .darm { transform-origin: 68px 52px; transition: transform .06s linear; }
+.duelist .flash { fill: #fff2a8; opacity: 0; }
+
+.duel.youfire .you .darm, .duel.sheriffire .sheriff .darm { transform: rotate(-90deg); }
+.duel.youfire .you .flash, .duel.sheriffire .sheriff .flash { animation: muzzle .25s ease-out; }
+@keyframes muzzle { 0% { opacity: 1; } 100% { opacity: 0; } }
+.duel.youfire .sheriff { transform: scaleX(-1) rotate(-84deg) translateY(4%); }
+.duel.sheriffire .you { transform: rotate(-84deg) translateY(4%); }
+
+.dres { position: absolute; left: 0; right: 0; bottom: 5vh; text-align: center; font-size: clamp(14px, 2.2vw, 20px); line-height: 1.7; text-shadow: 0 2px 6px #000; cursor: default; }
+.dres .deal { margin-top: 10px; }
+.dskip { position: absolute; right: 18px; bottom: 16px; padding: 7px 14px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, .35); background: rgba(0, 0, 0, .35); color: #f6dcb0; font: 13px Georgia, serif; cursor: pointer; }
+.dskip[hidden] { display: none; }
+
+/* ---------- Seasons ---------- */
+
+.seasons { display: flex; flex-wrap: wrap; gap: 6px; }
+.seasonbtn { padding: 6px 12px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, .25); background: transparent; color: var(--ink); font: 13px Georgia, serif; cursor: pointer; }
+.seasonbtn.on { background: var(--gold); border-color: var(--gold); color: #2a1a08; }
+
+/* Season layer: behind the app (like the saloon background), shown on every screen. */
+.seasonfx { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.seasoncv { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.season-decor { position: absolute; inset: 0; pointer-events: none; }
+
+/* Dealer hats. */
+.dealer .sh { display: none; }
+.dealer.s-christmas .santa, .dealer.s-halloween .witch { display: inline; }
+.dealer.s-christmas .bowler, .dealer.s-halloween .bowler { display: none; }
+
+/* Christmas: festoons of fairy lights. */
+.xlights { position: absolute; left: 0; right: 0; top: 0; height: 80px; }
+.xlights svg { position: absolute; left: 0; top: 0; }
+.xlights i {
+  position: absolute;
+  width: 9px;
+  height: 13px;
+  margin-left: -4px;
+  border-radius: 50% 50% 55% 55%;
+  background: var(--c);
+  box-shadow: 0 0 10px 3px var(--c);
+  animation: twinkle 2.2s ease-in-out infinite;
+}
+
+@keyframes twinkle { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+
+/* Halloween: carved pumpkins on the bar; a purple haze. */
+.pumpkin { position: absolute; top: calc(var(--bar) - 40px); width: 62px; z-index: 2; }
+.pumpkin[hidden] { display: none; }
+.pumpkin svg { display: block; width: 100%; filter: drop-shadow(0 3px 4px rgba(0, 0, 0, .6)); }
+.pumpkin .face { filter: drop-shadow(0 0 5px #ffb43a); animation: flicker 1.7s ease-in-out infinite; }
+.pumpkin.plain .face { display: none; }
+@keyframes flicker { 0%, 100% { opacity: 1; } 40% { opacity: .75; } 60% { opacity: 1; } 80% { opacity: .85; } }
+.scene.s-halloween::after { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 0%, rgba(140, 60, 200, .14), rgba(60, 20, 90, .18)); pointer-events: none; }
+
+
+.duel.youfire .dsub, .duel.sheriffire .dsub { display: none; }
+
+/* Tall, narrow screens (phones held upright): smaller gunslingers, further apart. */
+@media (max-aspect-ratio: 3 / 4) {
+  .duelist { height: min(34vh, 56vw); }
+  .duelist.you { left: 7%; }
+  .duelist.sheriff { right: 7%; }
+  .dsub { top: 33vh; }
+}
+
+/* Memorize countdown bar (a CSS animation, so it pauses with the game). */
+@keyframes memoBar { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+.panel h3 {
+  margin: 4px 0 8px;
+  font: 600 12px "Segoe UI", system-ui, sans-serif;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: left;
+}
+
+.seasons { margin-bottom: 16px; }
+
+/* ---------- Layout per screen (kept last so it wins over the rules above) ---------- */
+
+/* The HUD lines up with the table between the two side columns. */
+.hud { margin-inline: calc(132px + clamp(10px, 1.6vw, 20px)); }
+
+/* Phones and tablets held upright, and narrow windows: the table takes the
+   whole width and the controls go under it, in rows. (Phones held sideways
+   keep the side columns: see "Short landscape screens" below.) */
+@media (orientation: portrait) and (max-width: 1100px), (max-width: 760px) and (min-height: 501px) {
+  .hud { margin-inline: 0; }
+  .mid { display: flex; flex-direction: column; gap: 8px; }
+  .mid .table { order: 0; flex: 1 1 auto; }
+  .side { padding: 0; flex-direction: row; align-items: center; gap: 8px; }
+  .side.left { order: 1; justify-content: center; }
+  .side.left .label, .keys { display: none; }
+  .side.right { order: 2; justify-content: center; }
+  .side.left .group { flex: 1; max-width: 560px; }
+  .seg { flex-direction: row; border-radius: 999px; }
+  .seg button { flex: 1; padding: 6px 12px; font-size: 14px; }
+  .seg button + button { border-top: 0; border-left: 1px solid rgba(227, 185, 85, .3); }
+  .deal { flex: 1; max-width: 320px; padding: 10px 20px; }
+  .toggles { flex-direction: row; }
+}
+
+/* Short landscape screens (phones held sideways): no title, a slim HUD and
+   slim side columns, so the felt keeps as much height as possible. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .app { padding: 6px 10px; gap: 6px; }
+  .top { display: none; }
+  .hud { gap: 6px; margin-inline: calc(104px + 10px); }
+  .stat { padding: 2px 6px; border-radius: 8px; }
+  .label { font-size: 9px; letter-spacing: .08em; }
+  .value { font-size: 15px; }
+  .value.chances { min-height: 18px; gap: 2px; }
+  .chances i { width: 7px; height: 11px; }
+  .mid { grid-template-columns: 104px minmax(0, 1fr) 104px; gap: 10px; }
+  .table { border-width: 7px; border-radius: 16px; min-height: 0; }
+  .side { padding: 2px 0; gap: 6px; }
+  .side.left .label, .keys { display: none; }
+  .seg { border-radius: 12px; }
+  .seg button { padding: 4px 6px; font-size: 13px; }
+  .seg button small { font-size: 10px; }
+  .deal { padding: 8px 10px; font-size: 15px; }
+  .quit { padding: 6px 8px; font-size: 12px; }
+  .mute { padding: 3px 8px; font-size: 12px; }
+  .bubble { font-size: 13px; }
+  .dealer .portrait { width: 40px; height: 40px; }
+  .message { font-size: 14px; }
+  .memo { font-size: 14px; padding: 3px 12px; }
+  .overlay { padding: 8px; }
+  .panel { max-width: 440px; padding: 12px 18px; }
+  .panel h2 { font-size: 24px; margin-bottom: 2px; }
+  .panel p { margin: 6px 0; font-size: 13px; line-height: 1.35; }
+  .panel .big { font-size: 24px; margin-top: 2px; }
+  .panel .rank { font-size: 15px; }
+  .panel .deal { padding: 7px 22px; font-size: 15px; }
+  .panel .label.pick { margin: 8px 0 4px; }
+  .panel .leave { margin-top: 8px; }
+}
+
+/* Small phones: icon-only sound toggles and a short "Quit", so the bottom row fits on one line. */
+@media (max-width: 480px) {
+  .toggles .txt, .quit .long { display: none; }
+  .toggles .mute { padding: 9px 11px; }
+  .toggles .ico { width: 18px; height: 18px; }
+  .quit { padding: 9px 12px; }
+  .value.chances { gap: 2px; }
 }

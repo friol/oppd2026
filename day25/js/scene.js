@@ -139,16 +139,25 @@ const SCENE = (function () {
     catEl.hidden = true;
     catEl.innerHTML = '<div class="catbox">' + CAT_SVG + '</div>';
     catBox = catEl.firstChild;
-    catEl.addEventListener('click', () => {
-      SOUND.meow();
-      if (hooks.cat) hooks.cat();
-      catBox.classList.remove('hop');
-      void catBox.offsetWidth;
-      catBox.classList.add('hop');
-    });
+    catEl.addEventListener('click', () => pet(catEl, catBox));
     root.appendChild(catEl);
 
     document.body.insertBefore(root, document.body.firstChild);
+  }
+
+  // Petting a cat (the one on the bar, or the one on the felt): it hops and
+  // meows, a heart floats up, and hooks.cat() counts it.
+  function pet(el, box) {
+    SOUND.meow();
+    if (hooks.cat) hooks.cat();
+    box.classList.remove('hop');
+    void box.offsetWidth;
+    box.classList.add('hop');
+    const h = document.createElement('i');
+    h.className = 'pet';
+    h.textContent = '♥';
+    el.appendChild(h);
+    setTimeout(() => h.remove(), 1200);
   }
 
   // Show as many patrons as fit in the margins left and right of the table.
@@ -350,8 +359,9 @@ const SCENE = (function () {
       : [poster('<b class="ph">WANTED</b><div class="pq">YOU</div><span class="pamt">???</span><small>Clear a table</small><small>to get on the wall</small>', 0)];
     const lou = poster('<b class="ph">WANTED</b><div class="pface lou">' +
       (typeof DEALER !== 'undefined' ? DEALER.FACE_SVG : '') + '</div><span class="pamt">Lucky Lou</span><small>for marking the cards</small>', 3);
+    const medals = hooks.medals ? hooks.medals() : { got: 0, total: 0 };
     const wins = poster('<b class="ph">HALL OF FAME</b><div class="pq">★</div><span class="pamt">' +
-      stats.wins + '/' + stats.games + '</span><small>tables cleared</small>', 4);
+      medals.got + '/' + medals.total + '</span><small>medals earned</small><small>' + stats.wins + '/' + stats.games + ' tables cleared</small>', 4);
     posterEls = { left, right: [lou, wins] };
     if (tableEl) layout();
   }
@@ -472,7 +482,7 @@ const SCENE = (function () {
   }
 
   return {
-    init, react, swing, startCat, layout, patrons, cat, hooks, play, CAT_SVG,
+    init, react, swing, startCat, layout, patrons, cat, hooks, play, pet, CAT_SVG,
     refreshPosters,
     get root() { return root; }
   };

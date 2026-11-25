@@ -18,7 +18,7 @@ const MUSIC = (function () {
   audio.volume = 0;
   audio.src = encodeURI(FILE);
 
-  let unlocked = false, target = 0, last = 0, raf = 0;
+  let unlocked = false, suspended = false, target = 0, last = 0, raf = 0;
 
   // Move the volume toward the target, pausing when fully faded out.
   function fade(now) {
@@ -37,7 +37,7 @@ const MUSIC = (function () {
   }
 
   function apply() {
-    target = enabled && unlocked ? VOLUME : 0;
+    target = enabled && unlocked && !suspended ? VOLUME : 0;
     if (target > 0 && audio.paused) audio.play().catch(() => { });
     if (!raf) raf = requestAnimationFrame(fade);
   }
@@ -49,9 +49,18 @@ const MUSIC = (function () {
     apply();
   }
 
+  // Paused game (page in the background): fade out, and back in afterwards.
+  // Background tabs may not run animation frames, so stop at once when hiding.
+  function suspend(on) {
+    suspended = on;
+    if (on) { cancelAnimationFrame(raf); raf = 0; last = 0; audio.volume = 0; audio.pause(); target = 0; return; }
+    apply();
+  }
+
   return {
     audio,  // exposed for tests
     unlock,
+    suspend,
     get enabled() { return enabled; },
     toggle() {
       enabled = !enabled;

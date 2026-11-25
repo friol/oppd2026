@@ -39,7 +39,10 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     if (d.method === 'Log.entryAdded') log('[log]', d.params.entry.text.slice(0, 500));
   };
   await send('Runtime.enable'); await send('Log.enable'); await send('Page.enable');
-  await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
+  // SHOT_MOBILE=1 emulates a phone or tablet: mobile viewport and touch events.
+  const mobile = !!process.env.SHOT_MOBILE;
+  await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile });
+  if (mobile) await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
   await send('Page.navigate', { url });
   const t0 = Date.now();
   await sleep(wait * 1000);

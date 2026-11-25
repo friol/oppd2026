@@ -45,10 +45,11 @@
 
       <aside class="side right">
         <button class="deal" id="deal" type="button">Deal</button>
-        <button class="quit" id="quit" type="button" title="Leave this game and pick a table (Esc)" hidden>Quit game</button>
+        <button class="quit" id="quit" type="button" title="Leave this game and pick a table (Esc)" hidden>Quit<span class="long"> game</span></button>
         <span class="toggles">
-          <button class="mute" id="music" type="button" aria-label="Toggle music">Music on</button>
-          <button class="mute" id="mute" type="button" aria-label="Toggle sound effects">Sound on</button>
+          <button class="mute" id="medalsBtn" type="button" aria-label="Medals">Medals</button>
+          <button class="mute" id="music" type="button" aria-label="Music">Music on</button>
+          <button class="mute" id="mute" type="button" aria-label="Sound effects">Sound on</button>
         </span>
       </aside>
     </div>
@@ -66,6 +67,17 @@
     </div>
   </div>
 
+  <div class="overlay" id="medals" hidden>
+    <div class="panel wide" role="dialog" aria-labelledby="medalsTitle">
+      <h2 id="medalsTitle">Medals</h2>
+      <p class="mcount" id="medalsCount"></p>
+      <div class="medals" id="medalsList"></div>
+      <h3>Season</h3>
+      <div class="seasons" id="seasons"></div>
+      <button class="deal" id="medalsClose" type="button">Close</button>
+    </div>
+  </div>
+
   <div class="overlay" id="confirm" hidden>
     <div class="panel" role="alertdialog" aria-labelledby="confirmTitle">
       <h2 id="confirmTitle">Leave this game?</h2>
@@ -80,9 +92,14 @@
   <script src="js/sound.js"></script>
   <script src="js/music.js"></script>
   <script src="js/symbols.js"></script>
+  <script src="js/cardback.js"></script>
   <script src="js/beats.js"></script>
   <script src="js/scene.js"></script>
+  <script src="js/medals.js"></script>
+  <script src="js/feltcat.js"></script>
   <script src="js/dealer.js"></script>
+  <script src="js/season.js"></script>
+  <script src="js/duel.js"></script>
   <script src="js/game.js"></script>
 </body>
 </html>

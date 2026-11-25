@@ -37,7 +37,8 @@
     found: 0, mistakes: 0, streak: 0, bestStreak: 0, score: 0,
     t0: 0, elapsed: 0,
     focus: 0,
-    game: 0                     // bumps on every new deal, to cancel stale async steps
+    game: 0,                    // bumps on every new deal, to cancel stale async steps
+    paused: false, pausedAt: 0  // the page is in the background (see setPaused)
   };
 
   const best = load('day25.best', {});           // best score per table
@@ -156,7 +157,7 @@
 
   // ---------- Cards ----------
 
-  const BACK = '<div class="face back"><i class="seal">DV</i></div>';
+  const BACK = '<div class="face back">' + CARDBACK.SVG + '</div>';
 
   function makeCard(sym, i) {
     const el = document.createElement('div');
@@ -238,7 +239,7 @@
     overEl.hidden = true;
     confirmEl.hidden = true;
     const game = ++state.game;
-    Object.assign(state, { phase: 'dealing', open: [], lock: true, found: 0, mistakes: 0, streak: 0, bestStreak: 0, score: 0, elapsed: 0, focus: 0 });
+    Object.assign(state, { phase: 'dealing', open: [], lock: true, found: 0, mistakes: 0, streak: 0, bestStreak: 0, score: 0, elapsed: 0, focus: 0, tries: 0 });
     tableEl.classList.remove('playing', 'won', 'lost');
     memoEl.hidden = true;
     updateButtons();
@@ -296,6 +297,7 @@
     hud();
     state.cards[0].el.tabIndex = 0;
     tickTimer = setInterval(() => {
+      if (state.paused) return;
       state.elapsed = (performance.now() - state.t0) / 1000;
       timeEl.textContent = fmtTime(state.elapsed);
     }, 250);
@@ -308,17 +310,22 @@
     const total = L().show;
     memoEl.hidden = false;
     message('');
-    memoBar.style.transition = 'none';
-    memoBar.style.transform = 'scaleX(1)';
+    // The bar is a CSS animation, so it can be paused with the game.
+    memoBar.style.animation = 'none';
     void memoBar.offsetWidth;
-    memoBar.style.transition = 'transform ' + total + 's linear';
-    memoBar.style.transform = 'scaleX(0)';
+    memoBar.style.animation = 'memoBar ' + total + 's linear forwards';
+    memoBar.style.animationPlayState = state.paused ? 'paused' : 'running';
     for (let s = total; s > 0; s--) {
       if (game !== state.game) return;
       memoText.textContent = 'Memorize! ' + s;
       memoEl.classList.toggle('urgent', s <= 3);
       SOUND.tock(s <= 3);
-      await sleep(1000);
+      // One second of unpaused time.
+      for (let t = 0; t < 1000;) {
+        await sleep(100);
+        if (game !== state.game) return;
+        if (!state.paused) t += 100;
+      }
     }
     memoEl.hidden = true;
   }
@@ -333,6 +340,7 @@
     if (state.open.length < 2) return;
 
     state.lock = true;
+    state.tries++;
     const [a, b] = state.open;
     state.open = [];
     const game = state.game;
@@ -359,6 +367,9 @@
     if (state.streak >= 3) { DEALER.say('streak', 0.7); SCENE.react('cheer', 1, true); }
     else DEALER.say('match', 0.35);
     message(SYMBOLS.name(a.sym) + '! ' + (state.streak > 1 ? state.streak + ' in a row.' : 'A pair.'), 'good');
+    if (state.tries === 1) MEDALS.award('lucky');
+    if (state.streak >= 5) MEDALS.award('streak5');
+    if (state.streak >= 10) MEDALS.award('streak10');
     hud();
     state.lock = false;
     if (state.found === pairs()) win();
@@ -409,6 +420,25 @@
     return records.findIndex(r => r.score === score && r.level === L().id) + 1;
   }
 
+  // Medals for a cleared table.
+  function winMedals(left) {
+    const id = L().id;
+    MEDALS.award('first');
+    if (state.mistakes === 0) MEDALS.award('perfect');
+    if (left === 0) MEDALS.award('whisker');
+    if (id === 'Easy' && state.elapsed < 20) MEDALS.award('quick');
+    if (id === 'Medium') MEDALS.award('medium');
+    if (id === 'Hard') MEDALS.award('hard');
+    if (id === 'Pro') MEDALS.award('pro');
+    if (id === 'Pro' && state.mistakes === 0) MEDALS.award('ghost');
+    if (state.score >= 5000) MEDALS.award('score');
+    gamesMedal();
+  }
+
+  function gamesMedal() {
+    if (stats.games >= 10) MEDALS.award('regular');
+  }
+
   async function win() {
     finish();
     const game = state.game;
@@ -417,12 +447,9 @@
     const timeBonus = Math.max(0, Math.round((pairs() * 6 - state.elapsed) * 10));
     const perfect = state.mistakes === 0 ? 500 : 0;
     state.score += chanceBonus + timeBonus + perfect;
-    const isBest = !best[L().id] || state.score > best[L().id];
-    if (isBest) { best[L().id] = state.score; save('day25.best', best); }
     stats.wins++;
     stats.games++;
     save('day25.stats', stats);
-    const rank = addRecord(state.score);
     hud();
     flash(scoreEl, true);
 
@@ -439,23 +466,61 @@
       void card.el.offsetWidth;
       card.el.classList.add('hooray');
     }, (Math.floor(card.i / c) + card.i % c) * 70));
-    SCENE.refreshPosters();
 
     await sleep(2600);
     if (game !== state.game) return;
+
+    // A perfect game (on any table) is too good to be honest: the sheriff
+    // comes in for a duel. Win it for a bounty, lose it (or give up) for a fine.
+    let duelLine = '';
+    if (perfect) {
+      DEALER.say('sheriff');
+      await sleep(1800);
+      if (game !== state.game) return;
+      const bounty = Math.max(250, Math.round(state.score * 0.25));
+      const fine = Math.max(100, Math.round(state.score * 0.1));
+      const r = await new Promise(res => DUEL.duel({ bounty, fine }, res));
+      if (game !== state.game) return;
+      if (r.won) {
+        state.score += bounty;
+        duelLine = '<br>Sheriff’s bounty: +' + bounty + ' (drew in ' + r.ms + ' ms)';
+        MEDALS.award('duel');
+        if (r.ms < 250) MEDALS.award('lightning');
+        coinRain(25);
+        DEALER.say('duelWin');
+      } else {
+        state.score = Math.max(0, state.score - fine);
+        duelLine = '<br>Sheriff’s fine: −' + fine + (r.surrendered ? ' (surrendered)' : '');
+        DEALER.say('duelLose');
+      }
+      hud();
+      flash(scoreEl, r.won);
+      await sleep(900);
+      if (game !== state.game) return;
+    }
+
+    const isBest = !best[L().id] || state.score > best[L().id];
+    if (isBest) { best[L().id] = state.score; save('day25.best', best); }
+    const rank = addRecord(state.score);
+    winMedals(left);
+    hud();
+    SCENE.refreshPosters();
     showOver(perfect ? 'Perfect!' : 'Table cleared!',
       'Pairs: ' + pairs() + ' · Mistakes: ' + state.mistakes + '/' + L().chances + ' · Time: ' + fmtTime(state.elapsed) +
       '<br>Best streak: ' + state.bestStreak +
       '<br>Chances bonus: +' + chanceBonus + ' · Time bonus: +' + timeBonus + (perfect ? ' · Perfect: +500' : '') +
+      duelLine +
       '<br><b class="big">' + state.score + '</b> points',
       isBest ? 'New best on the ' + L().id + ' table!' : (rank ? 'Hall of fame: #' + rank : ''));
   }
+
 
   async function lose(a, b) {
     finish();
     const game = state.game;
     stats.games++;
     save('day25.stats', stats);
+    gamesMedal();
     tableEl.classList.add('lost');
     message('Out of chances!', 'bad');
     DEALER.say('lose');
@@ -544,6 +609,8 @@
     if (state.phase !== 'play') return;
     stats.games++;
     save('day25.stats', stats);
+    if (state.found > 0) MEDALS.award('quitter');
+    gamesMedal();
     SCENE.refreshPosters();
   }
 
@@ -557,7 +624,7 @@
     overEl.hidden = true;
     confirmEl.hidden = true;
     tableEl.classList.remove('playing', 'won', 'lost');
-    Object.assign(state, { phase: 'idle', open: [], lock: true, found: 0, mistakes: 0, streak: 0, bestStreak: 0, score: 0, elapsed: 0, focus: 0 });
+    Object.assign(state, { phase: 'idle', open: [], lock: true, found: 0, mistakes: 0, streak: 0, bestStreak: 0, score: 0, elapsed: 0, focus: 0, tries: 0 });
     layoutPreview();
     message('Pick a table and deal the cards.');
     DEALER.say('quit', 0.8);
@@ -597,11 +664,48 @@
   $('back').addEventListener('click', () => { overEl.hidden = true; levelsEl.querySelector('.on').focus(); });
   overEl.addEventListener('click', e => { if (e.target === overEl) { overEl.hidden = true; } });
 
-  const muteBtn = $('mute'), musicBtn = $('music');
+  const muteBtn = $('mute'), musicBtn = $('music'), medalsBtn = $('medalsBtn'), medalsEl = $('medals');
+  // Each toggle has an icon (alone on narrow phones, crossed out when off) and a label.
+  const ICON_MUSIC = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l11-2v13" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>' +
+    '<circle cx="6.5" cy="18" r="2.6" fill="currentColor"/><circle cx="17.5" cy="16" r="2.6" fill="currentColor"/><path class="x" d="M3 3 L21 21" stroke="currentColor" stroke-width="2.2"/></svg>';
+  const ICON_SOUND = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/>' +
+    '<path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path class="x" d="M3 3 L21 21" stroke="currentColor" stroke-width="2.2"/></svg>';
+  const ICON_MEDAL = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h4l2 6H9zM13 2h4l-2 6h-4z" fill="currentColor" opacity=".7"/>' +
+    '<circle cx="12" cy="15" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 11.5l1.1 2.2 2.4.3-1.8 1.6.5 2.4-2.2-1.2-2.2 1.2.5-2.4-1.8-1.6 2.4-.3z" fill="currentColor"/></svg>';
   const syncToggles = () => {
-    muteBtn.textContent = SOUND.muted ? 'Sound off' : 'Sound on';
-    musicBtn.textContent = MUSIC.enabled ? 'Music on' : 'Music off';
+    const on = { music: MUSIC.enabled, sound: !SOUND.muted };
+    muteBtn.innerHTML = ICON_SOUND + '<span class="txt">Sound ' + (on.sound ? 'on' : 'off') + '</span>';
+    musicBtn.innerHTML = ICON_MUSIC + '<span class="txt">Music ' + (on.music ? 'on' : 'off') + '</span>';
+    medalsBtn.innerHTML = ICON_MEDAL + '<span class="txt">Medals ' + MEDALS.count + '/' + MEDALS.list.length + '</span>';
+    muteBtn.classList.toggle('off', !on.sound);
+    musicBtn.classList.toggle('off', !on.music);
+    muteBtn.setAttribute('aria-pressed', on.sound);
+    musicBtn.setAttribute('aria-pressed', on.music);
   };
+  // ---------- Medals panel ----------
+
+  function openMedals() {
+    MEDALS.render($('medalsList'));
+    SEASON.render($('seasons'));
+    $('medalsCount').textContent = MEDALS.count + ' of ' + MEDALS.list.length + ' earned';
+    medalsEl.hidden = false;
+    $('medalsClose').focus({ preventScroll: true });
+    medalsEl.scrollTop = 0;
+  }
+
+  function closeMedals() { medalsEl.hidden = true; }
+
+  medalsBtn.addEventListener('click', openMedals);
+  $('medalsClose').addEventListener('click', closeMedals);
+  medalsEl.addEventListener('click', e => { if (e.target === medalsEl) closeMedals(); });
+  MEDALS.onAward(() => { syncToggles(); SCENE.refreshPosters(); if (!medalsEl.hidden) openMedals(); });
+
+  // Petting the cat (on the bar or on the felt): three pats earn a medal.
+  SCENE.hooks.cat = () => {
+    const n = MEDALS.bump('cat', 3);
+    if (n <= 3) DEALER.say(n < 3 ? 'That cat likes you.' : "Well, I'll be. He never lets ME do that.");
+  };
+
   muteBtn.addEventListener('click', () => { SOUND.init(); SOUND.toggleMute(); syncToggles(); });
   musicBtn.addEventListener('click', () => { MUSIC.toggle(); syncToggles(); });
 
@@ -622,15 +726,21 @@
   document.addEventListener('keydown', e => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     const k = e.key;
+    // During the duel Space and Enter draw the gun, and nothing else works.
+    if (DUEL.active) {
+      if (k === ' ' || k === 'Enter') { e.preventDefault(); DUEL.duelPress(); }
+      return;
+    }
     SOUND.init();
     MUSIC.unlock();
     if (k === 'Escape') {
-      if (!confirmEl.hidden) closeConfirm();
+      if (!medalsEl.hidden) closeMedals();
+      else if (!confirmEl.hidden) closeConfirm();
       else if (!overEl.hidden) overEl.hidden = true;
       else if (inGame()) askQuit();
       return;
     }
-    if (!confirmEl.hidden) return;      // the dialog has its own buttons
+    if (!confirmEl.hidden || !medalsEl.hidden) return;      // dialogs have their own buttons
     if (k === 'm' || k === 'M') { SOUND.toggleMute(); syncToggles(); return; }
     if (k === 'n' || k === 'N') { MUSIC.toggle(); syncToggles(); return; }
     const arrows = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
@@ -643,6 +753,29 @@
     }
   });
 
+  // ---------- Automatic pause ----------
+  // When the tab or the app goes to the background the game pauses: the clock
+  // and the memorize countdown stop (the time away is not counted) and the
+  // music fades out. Everything resumes when the player comes back.
+
+  function setPaused(p) {
+    if (p === state.paused) return;
+    state.paused = p;
+    const now = performance.now();
+    if (p) state.pausedAt = now;
+    else if (state.phase === 'play') state.t0 += now - state.pausedAt;   // skip the time away
+    memoBar.style.animationPlayState = p ? 'paused' : 'running';
+    MUSIC.suspend(p);
+    if (!p && (state.phase === 'play' || state.phase === 'memo') && now - state.pausedAt > 1500) {
+      DEALER.say('back');
+      if (state.phase === 'play') armWait();
+    }
+  }
+
+  document.addEventListener('visibilitychange', () => setPaused(document.hidden));
+  window.addEventListener('pagehide', () => setPaused(true));
+  window.addEventListener('pageshow', () => setPaused(document.hidden));
+
   // First gesture anywhere starts the audio (browser autoplay rules).
   document.addEventListener('pointerdown', () => { SOUND.init(); MUSIC.unlock(); }, { once: true });
 
@@ -652,8 +785,12 @@
 
   SCENE.hooks.records = () => records;
   SCENE.hooks.stats = () => stats;
+  SCENE.hooks.medals = () => ({ got: MEDALS.count, total: MEDALS.list.length });
+  CARDBACK.install();
   DEALER.init(tableEl);
+  FELTCAT.init(tableEl);
   SCENE.init($('mid'));         // the saloon lives in the margins around table and controls
+  SEASON.init();
   buildLevels();
   setLevel(state.level);
   layoutPreview();

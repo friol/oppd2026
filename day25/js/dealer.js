@@ -15,6 +15,12 @@ const DEALER = (function () {
     '<g class="hat bowler"><ellipse cx="32" cy="24" rx="22" ry="4.5" fill="#151515"/>' +
     '<path d="M19 24 C19 8 45 8 45 24 Z" fill="#1f1f1f"/>' +
     '<rect x="19" y="19" width="26" height="4" fill="#7a1d22"/></g>' +
+    // Seasonal hats (shown by setSeason).
+    '<g class="hat sh santa"><ellipse cx="32" cy="24" rx="22" ry="5" fill="#f4f1e8"/>' +
+    '<path d="M14 24 C16 9 30 3 47 6 C50 8 51 12 49 15 C41 12 37 17 50 24 Z" fill="#c4262e"/>' +
+    '<circle cx="50" cy="13" r="4.5" fill="#f4f1e8"/></g>' +
+    '<g class="hat sh witch"><ellipse cx="32" cy="24" rx="24" ry="4.5" fill="#2a1538"/>' +
+    '<path d="M21 24 L35 3 L43 24 Z" fill="#2a1538"/><rect x="21" y="19" width="22" height="4" fill="#8a4cc0"/></g>' +
     '<path class="brow0" d="M24 33 l6 -1.5 M34 31.5 l6 1.5" stroke="#2b1a12" stroke-width="2" stroke-linecap="round"/>' +
     '<path class="brow1" d="M23 31 L31 34.5 M41 34.5 L49 31" stroke="#2b1a12" stroke-width="2.6" stroke-linecap="round"/>' +
     '<circle class="eye" cx="27" cy="36" r="1.8" fill="#2b1a12"/>' +
@@ -38,6 +44,10 @@ const DEALER = (function () {
     lose: ['That\'s all, folks!', 'The house always remembers.', 'Better luck next time, partner.', 'Out of chances!'],
     wait: ['Take your time… I\'ve got all night.', 'Tick tock, partner.', 'Forgot already?', 'Any card. Pick one.'],
     quit: ['Walking away? Smart move.', 'Folding already?', 'Fine, pick your poison.', 'Changed your mind, partner?'],
+    sheriff: ['Nobody plays that clean. SHERIFF!', "Not one mistake? That's cheating. Sheriff!", "Sheriff! This one's too good to be honest!"],
+    duelWin: ['Fastest gun in the West, eh?', 'Well, the sheriff had it coming.', 'Remind me never to cross you.'],
+    duelLose: ['Ha! The law always wins.', "Should've stuck to cards, partner.", 'Too slow, friend.'],
+    back: ['Welcome back, partner.', 'Thought you skipped town!', 'Clock stopped while you were gone.'],
     level: ['A bigger table, eh?', 'Feeling brave tonight?', 'More cards, more trouble.', 'Back to basics?']
   };
 
@@ -65,6 +75,13 @@ const DEALER = (function () {
     SOUND.mumble(text.split(' ').length);
     clearTimeout(hideTimer);
     hideTimer = setTimeout(() => { bubble.hidden = true; }, 1800 + text.length * 45);
+  }
+
+  // Seasonal hat (Santa at Christmas, witch at Halloween), or the bowler.
+  function setSeason(id) {
+    if (!dealerEl) return;
+    dealerEl.classList.remove('s-halloween', 's-autumn', 's-christmas');
+    if (id) dealerEl.classList.add('s-' + id);
   }
 
   // He tips his hat for a moment.
@@ -177,5 +194,5 @@ const DEALER = (function () {
     requestAnimationFrame(loop);
   }
 
-  return { init, say, tip, FACE_SVG, resize: resizeCanvas };
+  return { init, say, tip, setSeason, FACE_SVG, resize: resizeCanvas };
 })();
