@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Déjà Vu</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app">
+    <header class="top">
+      <h1>Déjà <em>Vu</em></h1>
+    </header>
+
+    <section class="hud" aria-label="Game status">
+      <div class="stat"><span class="label">Pairs</span><span class="value" id="pairs">0/8</span></div>
+      <div class="stat"><span class="label">Chances</span><span class="value chances" id="chances"></span></div>
+      <div class="stat"><span class="label">Score</span><span class="value" id="score">0</span></div>
+      <div class="stat"><span class="label">Time</span><span class="value" id="time">0:00</span></div>
+      <div class="stat"><span class="label">Best</span><span class="value" id="best">—</span></div>
+    </section>
+
+    <div class="mid" id="mid">
+      <aside class="side left">
+        <div class="group">
+          <span class="label">Table</span>
+          <div class="seg" id="levels"></div>
+        </div>
+        <p class="keys">
+          <span><kbd>Space</kbd> deal</span>
+          <span><kbd>Arrows</kbd> move</span>
+          <span><kbd>Enter</kbd> flip</span>
+          <span><kbd>M</kbd> sound</span>
+          <span><kbd>N</kbd> music</span>
+          <span><kbd>Esc</kbd> quit</span>
+        </p>
+      </aside>
+
+      <section class="table" id="table" aria-label="Card table">
+        <div class="grid" id="grid" role="grid" aria-label="Cards"></div>
+        <div class="memo" id="memo" hidden><span id="memoText">Memorize!</span><i class="bar"><b id="memoBar"></b></i></div>
+        <p class="message" id="message" aria-live="polite">Pick a table and deal the cards.</p>
+      </section>
+
+      <aside class="side right">
+        <button class="deal" id="deal" type="button">Deal</button>
+        <button class="quit" id="quit" type="button" title="Leave this game and pick a table (Esc)" hidden>Quit game</button>
+        <span class="toggles">
+          <button class="mute" id="music" type="button" aria-label="Toggle music">Music on</button>
+          <button class="mute" id="mute" type="button" aria-label="Toggle sound effects">Sound on</button>
+        </span>
+      </aside>
+    </div>
+  </main>
+
+  <div class="overlay" id="over" hidden>
+    <div class="panel">
+      <h2 id="overTitle">Cleaned out!</h2>
+      <p id="overText"></p>
+      <p class="rank" id="overRank"></p>
+      <button class="deal" id="again" type="button">Play again</button>
+      <span class="label pick">or pick another table</span>
+      <div class="seg row" id="overLevels"></div>
+      <button class="mute leave" id="back" type="button">Back to the saloon</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="confirm" hidden>
+    <div class="panel" role="alertdialog" aria-labelledby="confirmTitle">
+      <h2 id="confirmTitle">Leave this game?</h2>
+      <p>The cards on the table will be lost and it counts as a game played.</p>
+      <div class="pbtns">
+        <button class="deal" id="confirmYes" type="button">Leave</button>
+        <button class="mute" id="confirmNo" type="button">Keep playing</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/sound.js"></script>
+  <script src="js/music.js"></script>
+  <script src="js/symbols.js"></script>
+  <script src="js/beats.js"></script>
+  <script src="js/scene.js"></script>
+  <script src="js/dealer.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
