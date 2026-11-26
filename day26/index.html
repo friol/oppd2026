@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Il Condominio</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Title screen -->
+  <section class="screen title" id="title">
+    <canvas class="titlesky" id="titlesky" width="200" height="120"></canvas>
+    <div class="titlebox">
+      <img class="logo" src="img/title.png" alt="Il Condominio">
+      <p class="tagline">A pixel-art simulation of life, money, quarrels and catastrophes in an Italian apartment building.</p>
+      <div class="menu">
+        <button class="btn big" id="btnContinue" hidden>Continue</button>
+        <button class="btn big primary" id="btnNew">New building</button>
+        <div class="opt">
+          <span class="label">Disasters</span>
+          <div class="seg" id="disSeg">
+            <button data-v="0">Rare</button><button data-v="1">Normal</button><button data-v="2">Chaos</button>
+          </div>
+        </div>
+        <button class="btn small" id="btnHelpTitle">How to play</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Game -->
+  <section class="screen game" id="game" hidden>
+    <header class="topbar">
+      <div class="brand">Il <b>Condominio</b></div>
+      <div class="hud">
+        <div class="stat"><span class="label" id="dow">Sun</span><span class="value" id="date">1 Mar 2026</span></div>
+        <div class="stat"><span class="label">Time</span><span class="value" id="clock">07:00</span></div>
+        <div class="stat"><span class="label">Weather</span><span class="value" id="weather">Sunny</span></div>
+        <div class="stat"><span class="label" id="debtLbl">Fund</span><span class="value" id="fund">€0</span></div>
+        <div class="stat"><span class="label">Residents · size</span><span class="value" id="pop">0</span></div>
+        <div class="stat" id="repStat"><span class="label">Reputation</span><span class="value"><span class="stars" id="rating">★★★☆☆</span> <span id="repNum">50</span></span></div>
+      </div>
+      <div class="ctrl">
+        <div class="seg speeds" id="speeds">
+          <button data-s="0" title="Pause (Space)">❚❚</button><button data-s="1" title="Speed 1 (key 1)">1×</button><button data-s="2" title="Speed 2 (key 2)">3×</button><button data-s="3" title="Speed 3 (key 3)">10×</button><button data-s="4" title="Speed 4 (key 4)">30×</button>
+        </div>
+        <button class="btn icon" id="btnMusic" title="Music (N)">♫</button>
+        <button class="btn icon" id="btnSound" title="Sound effects (M)">♪</button>
+        <button class="btn icon" id="btnMenu" title="Menu (Esc)">☰</button>
+      </div>
+    </header>
+    <div class="goal" id="goal"></div>
+    <div class="main">
+      <div class="view" id="view">
+        <canvas id="cv"></canvas>
+        <div class="banner" id="banner"></div>
+        <div class="tip" id="tip" hidden></div>
+        <div class="paused" id="pausedTag" hidden>PAUSED</div>
+        <button class="btn small zoomfit" id="zoomFit" hidden title="Show the whole building (0)">Fit view</button>
+      </div>
+      <aside class="side">
+        <nav class="tabs" id="tabs">
+          <button data-tab="apt">Selected</button><button data-tab="bld">Building</button><button data-tab="req">Requests<span class="badge" id="reqBadge" hidden></span></button><button data-tab="res">People</button>
+        </nav>
+        <div class="panel" id="panel"></div>
+        <h3 class="newshead">News</h3>
+        <ol class="log" id="log"></ol>
+      </aside>
+    </div>
+  </section>
+
+  <div class="modal" id="modal" hidden><div class="box" id="modalBox"></div></div>
+
+  <script src="js/util.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/music.js"></script>
+  <script src="js/sound.js"></script>
+  <script src="js/sim.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/ui.js"></script>
+</body>
+</html>
