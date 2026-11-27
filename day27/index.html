@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Artist and Computer</title>
+  <link rel="icon" href="favicon.svg">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <h1>Artist and Computer</h1>
+    </div>
+    <nav class="controls">
+      <button id="prev" title="Previous piece (←)">← Prev</button>
+      <button id="play" title="Pause / play (Space)">Pause</button>
+      <button id="next" title="Next piece (→)">Next →</button>
+      <button id="auto" title="Auto advance every 30 s (A)">Auto</button>
+      <button id="remix-c" title="Remix: same composition, other colours (C)">◐ Colours</button>
+      <button id="remix-s" title="Remix: same colours, another composition (R)">◇ Shape</button>
+      <button id="fav" title="Keep this piece in the gallery (K)">♡ Keep</button>
+      <button id="gallery-btn" title="Open the gallery of kept pieces (G)">Gallery</button>
+      <button id="save" title="Save as PNG (S)">PNG ↓</button>
+      <button id="svg" title="Save as SVG vectors, for large prints or a pen plotter (V)">SVG ↓</button>
+      <button id="full" title="Full screen, only the print (F or double click; Esc to leave)">⛶ Full</button>
+      <button id="music" title="Music on / off (M)">♫ Music</button>
+    </nav>
+  </header>
+
+  <div class="mid">
+  <nav class="styles" id="styles"></nav>
+
+  <main class="stage" id="stage">
+    <figure class="print" id="print">
+      <canvas id="art"></canvas>
+      <div class="timer"><i id="timer"></i></div>
+    </figure>
+    <figcaption class="label" id="label"></figcaption>
+  </main>
+  </div>
+
+  <div class="gallery" id="gallery" hidden>
+    <section class="gbox" role="dialog" aria-label="Gallery">
+      <header>
+        <h2>Gallery</h2>
+        <button id="gclose" title="Close (Esc)">Close ✕</button>
+      </header>
+      <p class="gempty" id="gempty">No kept pieces yet. Press “♡ Keep” (or K) on a print you like and it will wait for you here.</p>
+      <div class="ggrid" id="ggrid"></div>
+    </section>
+  </div>
+
+  <div class="hint" id="hint">Esc to leave full screen</div>
+
+  <footer class="credit">
+    Inspired by ‘Artist and Computer’ by Ruth Leavitt ·
+    <a href="https://www.atariarchives.org/artist/" target="_blank" rel="noopener">https://www.atariarchives.org/artist/</a>
+  </footer>
+
+  <script src="js/music.js"></script>
+  <script src="js/util.js"></script>
+  <script src="js/svg.js"></script>
+  <script src="js/styles.js"></script>
+  <script src="js/styles2.js"></script>
+  <script src="js/styles3.js"></script>
+  <script src="js/styles4.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,298 @@
+:root {
+  --wall: #e4dfd4;
+  --ink: #1d1b18;
+  --soft: #6b655b;
+  --line: #bdb5a6;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, "Courier New", monospace;
+  --sans: "Futura", "Century Gothic", "Avenir Next", "Trebuchet MS", sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; height: 100%; }
+
+body {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
+  height: 100dvh;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 50% 40%, #efebe2 0%, var(--wall) 60%, #d8d2c5 100%);
+  color: var(--ink);
+  font-family: var(--sans);
+}
+
+/* Header ------------------------------------------------------------------ */
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 16px 24px 8px;
+}
+
+.brand h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+
+.controls { display: flex; gap: 4px; flex-wrap: wrap; }
+
+button {
+  font: 12px var(--mono);
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--ink);
+  padding: 6px 8px;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background 0.15s, color 0.15s;
+}
+
+button:hover { background: rgba(29, 27, 24, 0.08); }
+button.on { background: var(--ink); color: var(--wall); }
+
+/* Style menu: a vertical column on the left, the stage takes the rest. ---- */
+.mid {
+  display: flex;
+  min-height: 0;
+}
+
+.styles {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  gap: 4px;
+  padding: 12px 0 0 24px;
+}
+
+.styles button {
+  border-color: var(--line);
+  padding: 5px 10px;
+  font-size: 11px;
+  text-align: left;
+}
+
+.styles button i {
+  display: inline-block;
+  min-width: 2ch;
+  text-align: right;
+  font-style: normal;
+  opacity: 0.5;
+  margin-right: 6px;
+}
+
+.styles button.on { border-color: var(--ink); }
+
+/* Stage and print ---------------------------------------------------------- */
+/* The print and its label (to the right, vertically centred, like a museum
+   card) are centred together in the stage; the style menu on the left
+   balances the label. .below puts the label under the print instead. */
+.stage {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto auto;
+  justify-content: center;
+  align-items: center;
+  column-gap: 32px;
+  min-height: 0;
+  overflow: hidden;
+  padding: 12px;
+}
+
+.stage.below {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+
+.print {
+  position: relative;
+  margin: 0;
+  background: #f2efe8;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.18),
+    0 10px 30px -8px rgba(40, 30, 15, 0.35),
+    0 30px 60px -30px rgba(40, 30, 15, 0.4);
+  transition: opacity 0.32s ease;
+}
+
+.print.fade { opacity: 0; }
+
+.print canvas { display: block; width: 100%; height: 100%; }
+
+.timer {
+  position: absolute;
+  left: 0; right: 0; bottom: -6px;
+  height: 2px;
+}
+
+.timer i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: rgba(29, 27, 24, 0.35);
+}
+
+.label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: none;
+  font: 12px var(--mono);
+  color: var(--soft);
+}
+
+.stage:not(.below) .label {
+  padding-top: 12px;
+  border-top: 1px solid var(--ink);
+}
+
+.stage:not(.below) .label b { font-size: 18px; line-height: 1.25; margin-bottom: 4px; }
+
+.label b {
+  font: 600 14px var(--sans);
+  letter-spacing: 0.04em;
+  color: var(--ink);
+}
+
+.label .meta { font-size: 11px; opacity: 0.8; }
+
+/* Footer ------------------------------------------------------------------- */
+.credit {
+  padding: 4px 24px 8px;
+  font: 10px var(--mono);
+  color: var(--soft);
+  text-align: center;
+}
+
+.credit a { color: var(--ink); }
+
+/* Small screens ------------------------------------------------------------ */
+@media (max-width: 640px) {
+  .top { padding: 10px 12px 4px; }
+  .brand h1 { font-size: 17px; }
+  .mid { flex-direction: column; }
+  .styles { flex-direction: row; padding: 2px 12px 0; overflow-x: auto; }
+  .styles button { flex: none; }
+  .credit { padding: 4px 12px 6px; font-size: 9px; }
+}
+
+/* Full screen: only the print on the wall --------------------------------- */
+body.kiosk .top,
+body.kiosk .styles,
+body.kiosk .label,
+body.kiosk .credit,
+body.kiosk .timer { display: none; }
+
+body.kiosk { grid-template-rows: minmax(0, 1fr); }
+body.kiosk .stage { grid-template-columns: auto; }
+body.kiosk.idle, body.kiosk.idle * { cursor: none; }
+
+.hint {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  padding: 8px 14px;
+  font: 12px var(--mono);
+  color: var(--wall);
+  background: rgba(29, 27, 24, 0.85);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s;
+}
+
+.hint.show { opacity: 1; }
+
+/* Gallery of kept pieces --------------------------------------------------- */
+.gallery {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(40, 34, 26, 0.45);
+}
+
+.gallery[hidden] { display: none; }
+
+.gbox {
+  display: flex;
+  flex-direction: column;
+  width: min(1100px, 100%);
+  max-height: 100%;
+  background: var(--wall);
+  box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.5);
+}
+
+.gbox header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(29, 27, 24, 0.15);
+}
+
+.gbox h2 {
+  margin: 0;
+  font-size: 16px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.gempty { margin: 0; padding: 28px 20px; font: 13px var(--mono); color: var(--soft); }
+.gempty[hidden] { display: none; }
+
+.ggrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 22px;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.card { display: flex; flex-direction: column; gap: 8px; }
+
+.thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 210px;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.thumb:hover { background: rgba(29, 27, 24, 0.06); }
+
+.thumb canvas {
+  display: block;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 8px 18px -8px rgba(40, 30, 15, 0.4);
+  transition: transform 0.15s;
+}
+
+.thumb:hover canvas { transform: translateY(-2px); }
+
+.cap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font: 12px var(--mono);
+  color: var(--soft);
+}
+
+.cap .del { padding: 2px 7px; border-color: var(--line); font-size: 11px; }
